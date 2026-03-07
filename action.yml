@@ -1,0 +1,131 @@
+name: 'SteerSpec Sync'
+description: 'Synchronize AI configuration files across your GitHub organization'
+author: 'SteerSpec'
+
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  command:
+    description: 'Command to run: sync, monitor, or conflict'
+    required: true
+  config-path:
+    description: 'Path to steerspec-sync.yml config file'
+    required: false
+    default: 'steerspec-sync.yml'
+  dry-run:
+    description: 'Preview changes without creating PRs (sync only)'
+    required: false
+    default: 'false'
+  target-filter:
+    description: 'Glob pattern to filter target repositories'
+    required: false
+    default: ''
+  template-filter:
+    description: 'Comma-separated template IDs to sync (sync only)'
+    required: false
+    default: ''
+  force:
+    description: 'Force sync even if deployment state shows current version (sync only)'
+    required: false
+    default: 'false'
+  tiers:
+    description: 'Comma-separated detection tiers to run (conflict only, e.g. "1,2,3")'
+    required: false
+    default: ''
+
+outputs:
+  # Sync outputs
+  prs-created:
+    description: 'Number of new PRs created'
+    value: ${{ steps.run.outputs.prs-created }}
+  prs-updated:
+    description: 'Number of existing PRs updated'
+    value: ${{ steps.run.outputs.prs-updated }}
+  repos-skipped:
+    description: 'Number of repositories already up to date'
+    value: ${{ steps.run.outputs.repos-skipped }}
+  errors:
+    description: 'Number of repositories that encountered errors'
+    value: ${{ steps.run.outputs.errors }}
+  # Monitor outputs
+  repos-in-sync:
+    description: 'Number of repositories with current versions'
+    value: ${{ steps.run.outputs.repos-in-sync }}
+  repos-drifted:
+    description: 'Number of repositories with detected drift'
+    value: ${{ steps.run.outputs.repos-drifted }}
+  issues-created:
+    description: 'Number of new drift issues created'
+    value: ${{ steps.run.outputs.issues-created }}
+  issues-closed:
+    description: 'Number of drift issues auto-closed'
+    value: ${{ steps.run.outputs.issues-closed }}
+  # Conflict outputs
+  conflicts-found:
+    description: 'Total conflicts detected'
+    value: ${{ steps.run.outputs.conflicts-found }}
+  critical-count:
+    description: 'Critical-severity conflicts'
+    value: ${{ steps.run.outputs.critical-count }}
+  warning-count:
+    description: 'Warning-severity conflicts'
+    value: ${{ steps.run.outputs.warning-count }}
+  info-count:
+    description: 'Info-severity conflicts'
+    value: ${{ steps.run.outputs.info-count }}
+  # Common
+  summary:
+    description: 'JSON summary of the operation'
+    value: ${{ steps.run.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine platform
+      id: platform
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+        echo "os=${OS}" >> "$GITHUB_OUTPUT"
+        echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
+
+    - name: Download strspc binary
+      shell: bash
+      run: |
+        VERSION="${{ github.action_ref }}"
+        VERSION="${VERSION#v}"
+        DOWNLOAD_URL="https://github.com/SteerSpec/strspc-sync/releases/download/v${VERSION}/strspc_${VERSION}_${{ steps.platform.outputs.os }}_${{ steps.platform.outputs.arch }}.tar.gz"
+        curl -fsSL "${DOWNLOAD_URL}" | tar xz -C /usr/local/bin strspc
+        chmod +x /usr/local/bin/strspc
+
+    - name: Run strspc
+      id: run
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        ARGS="${{ inputs.command }}"
+        ARGS="${ARGS} --config ${{ inputs.config-path }}"
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          ARGS="${ARGS} --dry-run"
+        fi
+        if [ -n "${{ inputs.target-filter }}" ]; then
+          ARGS="${ARGS} --target-filter ${{ inputs.target-filter }}"
+        fi
+        if [ -n "${{ inputs.template-filter }}" ]; then
+          ARGS="${ARGS} --template-filter ${{ inputs.template-filter }}"
+        fi
+        if [ "${{ inputs.force }}" = "true" ]; then
+          ARGS="${ARGS} --force"
+        fi
+        if [ -n "${{ inputs.tiers }}" ]; then
+          ARGS="${ARGS} --tiers ${{ inputs.tiers }}"
+        fi
+        strspc ${ARGS}

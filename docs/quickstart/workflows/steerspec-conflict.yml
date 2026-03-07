@@ -1,0 +1,16 @@
+name: SteerSpec Conflict Detection
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  conflict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: SteerSpec/strspc-sync/conflict@v1
+        with:
+          tiers: '1,2'
+        env:
+          GITHUB_TOKEN: ${{ secrets.STEERSPEC_TOKEN }}

@@ -1,0 +1,92 @@
+name: 'SteerSpec Sync - Sync'
+description: 'Synchronize templates to target repositories'
+author: 'SteerSpec'
+
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  config-path:
+    description: 'Path to steerspec-sync.yml config file'
+    required: false
+    default: 'steerspec-sync.yml'
+  dry-run:
+    description: 'Preview changes without creating PRs'
+    required: false
+    default: 'false'
+  target-filter:
+    description: 'Glob pattern to filter target repositories'
+    required: false
+    default: ''
+  template-filter:
+    description: 'Comma-separated template IDs to sync'
+    required: false
+    default: ''
+  force:
+    description: 'Force sync even if deployment state shows current version'
+    required: false
+    default: 'false'
+
+outputs:
+  prs-created:
+    description: 'Number of new PRs created'
+    value: ${{ steps.run.outputs.prs-created }}
+  prs-updated:
+    description: 'Number of existing PRs updated'
+    value: ${{ steps.run.outputs.prs-updated }}
+  repos-skipped:
+    description: 'Number of repositories already up to date'
+    value: ${{ steps.run.outputs.repos-skipped }}
+  errors:
+    description: 'Number of repositories that encountered errors'
+    value: ${{ steps.run.outputs.errors }}
+  summary:
+    description: 'JSON summary of the operation'
+    value: ${{ steps.run.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine platform
+      id: platform
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+        echo "os=${OS}" >> "$GITHUB_OUTPUT"
+        echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
+
+    - name: Download strspc binary
+      shell: bash
+      run: |
+        VERSION="${{ github.action_ref }}"
+        VERSION="${VERSION#v}"
+        DOWNLOAD_URL="https://github.com/SteerSpec/strspc-sync/releases/download/v${VERSION}/strspc_${VERSION}_${{ steps.platform.outputs.os }}_${{ steps.platform.outputs.arch }}.tar.gz"
+        curl -fsSL "${DOWNLOAD_URL}" | tar xz -C /usr/local/bin strspc
+        chmod +x /usr/local/bin/strspc
+
+    - name: Run strspc sync
+      id: run
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        ARGS="sync --config ${{ inputs.config-path }}"
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          ARGS="${ARGS} --dry-run"
+        fi
+        if [ -n "${{ inputs.target-filter }}" ]; then
+          ARGS="${ARGS} --target-filter ${{ inputs.target-filter }}"
+        fi
+        if [ -n "${{ inputs.template-filter }}" ]; then
+          ARGS="${ARGS} --template-filter ${{ inputs.template-filter }}"
+        fi
+        if [ "${{ inputs.force }}" = "true" ]; then
+          ARGS="${ARGS} --force"
+        fi
+        strspc ${ARGS}

@@ -1,0 +1,78 @@
+name: 'SteerSpec Sync - Conflict Detection'
+description: 'Detect conflicts in AI configuration across target repositories'
+author: 'SteerSpec'
+
+branding:
+  icon: 'alert-triangle'
+  color: 'orange'
+
+inputs:
+  config-path:
+    description: 'Path to steerspec-sync.yml config file'
+    required: false
+    default: 'steerspec-sync.yml'
+  target-filter:
+    description: 'Glob pattern to filter target repositories'
+    required: false
+    default: ''
+  tiers:
+    description: 'Comma-separated detection tiers to run (e.g. "1,2,3")'
+    required: false
+    default: ''
+
+outputs:
+  conflicts-found:
+    description: 'Total conflicts detected'
+    value: ${{ steps.run.outputs.conflicts-found }}
+  critical-count:
+    description: 'Critical-severity conflicts'
+    value: ${{ steps.run.outputs.critical-count }}
+  warning-count:
+    description: 'Warning-severity conflicts'
+    value: ${{ steps.run.outputs.warning-count }}
+  info-count:
+    description: 'Info-severity conflicts'
+    value: ${{ steps.run.outputs.info-count }}
+  summary:
+    description: 'JSON summary of the operation'
+    value: ${{ steps.run.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine platform
+      id: platform
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+        echo "os=${OS}" >> "$GITHUB_OUTPUT"
+        echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
+
+    - name: Download strspc binary
+      shell: bash
+      run: |
+        VERSION="${{ github.action_ref }}"
+        VERSION="${VERSION#v}"
+        DOWNLOAD_URL="https://github.com/SteerSpec/strspc-sync/releases/download/v${VERSION}/strspc_${VERSION}_${{ steps.platform.outputs.os }}_${{ steps.platform.outputs.arch }}.tar.gz"
+        curl -fsSL "${DOWNLOAD_URL}" | tar xz -C /usr/local/bin strspc
+        chmod +x /usr/local/bin/strspc
+
+    - name: Run strspc conflict
+      id: run
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        ARGS="conflict --config ${{ inputs.config-path }}"
+        if [ -n "${{ inputs.target-filter }}" ]; then
+          ARGS="${ARGS} --target-filter ${{ inputs.target-filter }}"
+        fi
+        if [ -n "${{ inputs.tiers }}" ]; then
+          ARGS="${ARGS} --tiers ${{ inputs.tiers }}"
+        fi
+        strspc ${ARGS}

@@ -1,0 +1,71 @@
+name: 'SteerSpec Sync - Monitor'
+description: 'Monitor target repositories for configuration drift'
+author: 'SteerSpec'
+
+branding:
+  icon: 'activity'
+  color: 'yellow'
+
+inputs:
+  config-path:
+    description: 'Path to steerspec-sync.yml config file'
+    required: false
+    default: 'steerspec-sync.yml'
+  target-filter:
+    description: 'Glob pattern to filter target repositories'
+    required: false
+    default: ''
+
+outputs:
+  repos-in-sync:
+    description: 'Number of repositories with current versions'
+    value: ${{ steps.run.outputs.repos-in-sync }}
+  repos-drifted:
+    description: 'Number of repositories with detected drift'
+    value: ${{ steps.run.outputs.repos-drifted }}
+  issues-created:
+    description: 'Number of new drift issues created'
+    value: ${{ steps.run.outputs.issues-created }}
+  issues-closed:
+    description: 'Number of drift issues auto-closed'
+    value: ${{ steps.run.outputs.issues-closed }}
+  summary:
+    description: 'JSON summary of the operation'
+    value: ${{ steps.run.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine platform
+      id: platform
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+        echo "os=${OS}" >> "$GITHUB_OUTPUT"
+        echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
+
+    - name: Download strspc binary
+      shell: bash
+      run: |
+        VERSION="${{ github.action_ref }}"
+        VERSION="${VERSION#v}"
+        DOWNLOAD_URL="https://github.com/SteerSpec/strspc-sync/releases/download/v${VERSION}/strspc_${VERSION}_${{ steps.platform.outputs.os }}_${{ steps.platform.outputs.arch }}.tar.gz"
+        curl -fsSL "${DOWNLOAD_URL}" | tar xz -C /usr/local/bin strspc
+        chmod +x /usr/local/bin/strspc
+
+    - name: Run strspc monitor
+      id: run
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        ARGS="monitor --config ${{ inputs.config-path }}"
+        if [ -n "${{ inputs.target-filter }}" ]; then
+          ARGS="${ARGS} --target-filter ${{ inputs.target-filter }}"
+        fi
+        strspc ${ARGS}

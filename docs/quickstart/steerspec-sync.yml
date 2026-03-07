@@ -1,0 +1,75 @@
+version: "1.0.0"
+
+auth:
+  method: github-app
+  app-id: ${{ secrets.STEERSPEC_APP_ID }}
+  private-key: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
+
+variables:
+  org_name: "acme-corp"
+  default_model: "claude-sonnet-4-6"
+  coding_standards_url: "https://acme-corp.dev/standards"
+
+templates:
+  - id: claude-md
+    type: claude-md
+    source: templates/CLAUDE.md.mustache
+    destination: CLAUDE.md
+    strategy: marker
+    variables:
+      managed_sections:
+        - project-standards
+        - coding-conventions
+
+  - id: agent-code-review
+    type: agent
+    source: templates/agents/code-review.md
+    destination: .claude/agents/code-review.md
+    strategy: full-replace
+
+  - id: skill-commit
+    type: skill
+    source: templates/skills/commit.md
+    destination: .claude/skills/commit.md
+    strategy: full-replace
+
+  - id: claude-settings
+    type: config
+    source: templates/settings.json.mustache
+    destination: .claude/settings/settings.json
+    strategy: mustache
+
+targets:
+  include:
+    - "acme-corp/*"
+  exclude:
+    - "acme-corp/archived-*"
+    - "acme-corp/.github"
+  topics:
+    - claude-managed
+  overrides:
+    - repo: acme-corp/api-server
+      default_branch: develop
+      variables:
+        project_type: "api"
+      exclude_templates:
+        - claude-settings
+    - repo: acme-corp/frontend
+      variables:
+        project_type: "frontend"
+        default_model: "claude-sonnet-4-6"
+
+sync:
+  concurrency: 5
+  pr-label: steerspec-sync
+  close-stale-prs: true
+
+monitor:
+  schedule: "0 8 * * 1"
+  issue-label: steerspec-drift
+  auto-close: true
+
+conflicts:
+  schedule: "0 9 * * 1"
+  tiers: [1, 2]
+  issue-label: steerspec-conflict

@@ -1,0 +1,4 @@
+strspc
+dist/
+*.exe
+coverage.out

@@ -1,0 +1,19 @@
+name: SteerSpec Sync
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'templates/**'
+      - 'steerspec-sync.yml'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: SteerSpec/strspc-sync/sync@v1
+        with:
+          dry-run: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.STEERSPEC_TOKEN }}

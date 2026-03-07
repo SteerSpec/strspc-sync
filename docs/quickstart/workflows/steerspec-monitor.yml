@@ -1,0 +1,14 @@
+name: SteerSpec Monitor
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: SteerSpec/strspc-sync/monitor@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.STEERSPEC_TOKEN }}
