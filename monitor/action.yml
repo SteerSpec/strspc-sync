@@ -54,7 +54,10 @@ runs:
       run: |
         VERSION="${{ github.action_ref }}"
         VERSION="${VERSION#v}"
-        DOWNLOAD_URL="https://github.com/SteerSpec/strspc-sync/releases/download/v${VERSION}/strspc_${VERSION}_${{ steps.platform.outputs.os }}_${{ steps.platform.outputs.arch }}.tar.gz"
+        OS="${{ steps.platform.outputs.os }}"
+        ARCH="${{ steps.platform.outputs.arch }}"
+        BASE="https://github.com/SteerSpec/strspc-sync/releases/download"
+        DOWNLOAD_URL="${BASE}/v${VERSION}/strspc_${VERSION}_${OS}_${ARCH}.tar.gz"
         curl -fsSL "${DOWNLOAD_URL}" | tar xz -C /usr/local/bin strspc
         chmod +x /usr/local/bin/strspc
 

@@ -1,6 +1,8 @@
 # SteerSpec Sync
 
-Synchronize AI configuration files (`CLAUDE.md`, `.claude/agents/`, `.claude/skills/`, `.claude/settings/`) across your GitHub organization. Define templates once in a central repo, then distribute them via pull requests.
+Synchronize AI configuration files (`CLAUDE.md`, `.claude/agents/`, `.claude/skills/`,
+`.claude/settings/`) across your GitHub organization. Define templates once in a central
+repo, then distribute them via pull requests.
 
 ## Quick Start
 
@@ -118,7 +120,10 @@ strspc conflict --config steerspec-sync.yml --tiers 1,2,3
 
 ## Configuration
 
-All configuration lives in `steerspec-sync.yml`. See [docs/quickstart/steerspec-sync.yml](docs/quickstart/steerspec-sync.yml) for an example and the [full specification](https://github.com/SteerSpec/strspc-spec/blob/main/rules/config/CONFIG.md) for the schema reference.
+All configuration lives in `steerspec-sync.yml`.
+See [docs/quickstart/steerspec-sync.yml](docs/quickstart/steerspec-sync.yml) for an example
+and the [full specification](https://github.com/SteerSpec/strspc-spec/blob/main/rules/config/CONFIG.md)
+for the schema reference.
 
 ## Specification
 

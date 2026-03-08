@@ -1,0 +1,10 @@
+{
+  "Exclude": [
+    "\\.beads/",
+    "AGENTS\\.md"
+  ],
+  "Disable": {
+    "IndentSize": true,
+    "Indentation": true
+  }
+}
