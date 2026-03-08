@@ -12,6 +12,7 @@ Implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strsp
 
 - A GitHub issue MUST always be created documenting the plan prior to starting any work.
 - Use beads (`bd`) for all task tracking — never markdown TODOs or external trackers.
+- Every beads epic MUST reference at least one GitHub issue.
 
 ## Build & Run
 
