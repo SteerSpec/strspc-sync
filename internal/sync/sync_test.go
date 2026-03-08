@@ -563,3 +563,185 @@ func TestPRTitleFormat(t *testing.T) {
 		}
 	}
 }
+
+// trackingPRService wraps mockPRService to track Update calls.
+type trackingPRService struct {
+	*mockPRService
+	updateCalls int
+}
+
+func (tp *trackingPRService) Update(ctx context.Context, owner, repo string, number int, pr *gh.PullRequestUpdate) error {
+	tp.updateCalls++
+	return tp.mockPRService.Update(ctx, owner, repo, number, pr)
+}
+
+func TestSYNCPR002_BranchNameFormat_KnownDeviation(t *testing.T) {
+	t.Skip("SYNCPR-002 requires version in branch name (steerspec-sync/<template-id>/<version>); not yet implemented")
+}
+
+func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
+	repoSvc := newMockRepoService()
+	basePR := newMockPRService()
+	prSvc := &trackingPRService{mockPRService: basePR}
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+
+	// Pre-populate an open PR matching the template
+	basePR.prs["testorg/repo-a"] = []*gh.PullRequest{
+		{
+			Number: 99,
+			Title:  "[SteerSpec] Update claude-md",
+			State:  "open",
+			Head:   "steerspec-sync/claude-md",
+			Base:   "main",
+			Labels: []string{"steerspec-sync"},
+			URL:    "https://github.com/testorg/repo-a/pull/99",
+		},
+	}
+
+	cfg := makeTestConfig()
+	client := &gh.Client{
+		Repos:        repoSvc,
+		PullRequests: prSvc,
+	}
+
+	syncer := New(cfg, client)
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.PRsCreated != 0 {
+		t.Errorf("SYNCPR-005: expected 0 PRs created (should reuse existing), got %d", result.PRsCreated)
+	}
+	if result.PRsUpdated != 1 {
+		t.Errorf("SYNCPR-005: expected 1 PR updated, got %d", result.PRsUpdated)
+	}
+	if len(basePR.created) != 0 {
+		t.Errorf("SYNCPR-005: expected Create NOT called, but it was called %d times", len(basePR.created))
+	}
+	if prSvc.updateCalls != 1 {
+		t.Errorf("SYNCPR-005: expected Update called once, got %d", prSvc.updateCalls)
+	}
+}
+
+func TestSYNCPR006_CloseStalePRs(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+
+	// Pre-populate 2 old stale PRs with matching title prefix and label
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{
+		{
+			Number: 10,
+			Title:  "[SteerSpec] Update claude-md (old v1)",
+			State:  "open",
+			Head:   "steerspec-sync/claude-md-old1",
+			Labels: []string{"steerspec-sync"},
+		},
+		{
+			Number: 11,
+			Title:  "[SteerSpec] Update claude-md (old v2)",
+			State:  "open",
+			Head:   "steerspec-sync/claude-md-old2",
+			Labels: []string{"steerspec-sync"},
+		},
+	}
+
+	cfg := makeTestConfig()
+	client := makeTestClient(repoSvc, prSvc)
+
+	syncer := New(cfg, client)
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.PRsCreated != 1 {
+		t.Errorf("SYNCPR-006: expected 1 new PR created, got %d", result.PRsCreated)
+	}
+
+	// The 2 old PRs should be closed
+	if len(prSvc.closed) != 2 {
+		t.Errorf("SYNCPR-006: expected 2 stale PRs closed, got %d: %v", len(prSvc.closed), prSvc.closed)
+	}
+}
+
+func TestSYNCACT_ResultCounts(t *testing.T) {
+	repoSvc := newMockRepoService()
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-new", FullName: "testorg/repo-new", DefaultBranch: "main"},
+		{Owner: "testorg", Name: "repo-insync", FullName: "testorg/repo-insync", DefaultBranch: "main"},
+		{Owner: "testorg", Name: "repo-fail", FullName: "testorg/repo-fail", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("content")
+
+	failPR := &failingPRService{
+		inner:    newMockPRService(),
+		failRepo: "repo-fail",
+	}
+
+	cfg := makeTestConfig()
+	client := &gh.Client{
+		Repos:        repoSvc,
+		PullRequests: failPR,
+	}
+
+	syncer := New(cfg, client)
+
+	// First run: creates PRs for repo-new and repo-fail (fails)
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// repo-new and repo-insync should get PRs created, repo-fail should error
+	if result.PRsCreated < 1 {
+		t.Errorf("SYNCACT-016: expected at least 1 PR created, got %d", result.PRsCreated)
+	}
+	if result.Errors < 1 {
+		t.Errorf("SYNCACT-019: expected at least 1 error, got %d", result.Errors)
+	}
+
+	// Now run again - already-synced repos should be skipped (hash match)
+	result2, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result2.ReposSkipped < 1 {
+		t.Errorf("SYNCACT-017: expected at least 1 repo skipped on second run, got %d", result2.ReposSkipped)
+	}
+}
+
+func TestDryRunDoesNotSaveState(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	setupMockRepos(repoSvc)
+
+	cfg := makeTestConfig()
+	client := makeTestClient(repoSvc, prSvc)
+
+	syncer := New(cfg, client)
+	_, err := syncer.Run(context.Background(), Options{
+		DryRun:  true,
+		Trigger: "manual",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify that CreateOrUpdateFile was never called for the state path
+	for _, path := range repoSvc.createdFiles {
+		if strings.Contains(path, "deployment-state.json") {
+			t.Errorf("SYNCOP-007: dry run should not save state, but CreateOrUpdateFile was called for %s", path)
+		}
+	}
+}

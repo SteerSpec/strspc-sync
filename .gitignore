@@ -1,4 +1,4 @@
-strspc
+/strspc
 dist/
 *.exe
 coverage.out

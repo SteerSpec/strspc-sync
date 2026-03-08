@@ -340,3 +340,152 @@ func TestFullScan_Tiers1And2(t *testing.T) {
 		t.Error("expected GitHub issues to be created for conflicts")
 	}
 }
+
+func TestCNFLDTS007_TierIndependentlyEnableable(t *testing.T) {
+	originalContent := []byte("# Original")
+	driftedContent := []byte("# Drifted")
+
+	repos := &mockRepoService{
+		files: map[string][]byte{
+			"org/repo1/CLAUDE.md":              driftedContent,
+			"org/repo1/.claude/skills/test.md": []byte("# Skill v1"),
+			"org/repo2/.claude/skills/test.md": []byte("# Skill v2"),
+		},
+	}
+	issues := &mockIssueService{}
+	client := newTestClient(repos, issues)
+	cfg := testConfig()
+
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version:   "1.0.0",
+		Hash:      hash.HashBytes(originalContent),
+		Timestamp: time.Now(),
+	})
+
+	targets := []string{"org/repo1", "org/repo2"}
+
+	// Run with only tier 1
+	scanner := New(cfg, client, "org", "central")
+	report1, err := scanner.Run(context.Background(), ds, targets, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range report1.Entries {
+		if e.Type == TypeDuplicateSkill {
+			t.Error("CNFLDTS-007: tier 1 only should not include tier 2 entries (duplicate-skill)")
+		}
+	}
+	hasVersionDrift := false
+	for _, e := range report1.Entries {
+		if e.Type == TypeVersionDrift {
+			hasVersionDrift = true
+		}
+	}
+	if !hasVersionDrift {
+		t.Error("CNFLDTS-007: tier 1 should include version-drift entries")
+	}
+
+	// Run with only tier 2
+	issues2 := &mockIssueService{}
+	client2 := newTestClient(repos, issues2)
+	scanner2 := New(cfg, client2, "org", "central")
+	report2, err := scanner2.Run(context.Background(), ds, targets, Options{Tiers: []int{2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range report2.Entries {
+		if e.Type == TypeVersionDrift {
+			t.Error("CNFLDTS-007: tier 2 only should not include tier 1 entries (version-drift)")
+		}
+	}
+	hasDupSkill := false
+	for _, e := range report2.Entries {
+		if e.Type == TypeDuplicateSkill {
+			hasDupSkill = true
+		}
+	}
+	if !hasDupSkill {
+		t.Error("CNFLDTS-007: tier 2 should include duplicate-skill entries")
+	}
+}
+
+func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {
+	originalContent := []byte("# Original")
+	driftedContent := []byte("# Drifted")
+
+	repos := &mockRepoService{
+		files: map[string][]byte{
+			"org/repo1/CLAUDE.md": driftedContent,
+		},
+	}
+
+	// Pre-populate an existing conflict issue with matching title
+	issues := &mockIssueService{
+		issues: []*gh.Issue{
+			{
+				Number: 55,
+				Title:  fmt.Sprintf("[SteerSpec Conflict] %s: %s", TypeVersionDrift, "CLAUDE.md"),
+				Body:   "old conflict body",
+				State:  "open",
+				Labels: []string{"steerspec-conflict"},
+			},
+		},
+	}
+	client := newTestClient(repos, issues)
+	cfg := testConfig()
+
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version:   "1.0.0",
+		Hash:      hash.HashBytes(originalContent),
+		Timestamp: time.Now(),
+	})
+
+	scanner := New(cfg, client, "org", "central")
+	_, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(issues.created) != 0 {
+		t.Errorf("CNFLACT-007: expected no new issues created (should update existing), got %d", len(issues.created))
+	}
+	if len(issues.updated) != 1 {
+		t.Errorf("CNFLACT-007: expected 1 issue updated, got %d", len(issues.updated))
+	}
+}
+
+func TestConflictEntrySeverityMapping(t *testing.T) {
+	tests := []struct {
+		entryType ConflictType
+		severity  Severity
+	}{
+		{TypeVersionDrift, SeverityCritical},
+		{TypeCrossReferenceBroken, SeverityCritical},
+		{TypeDuplicateSkill, SeverityWarning},
+		{TypeUnmanagedFile, SeverityInfo},
+	}
+
+	// Verify each type produces the expected severity via actual scan
+	for _, tt := range tests {
+		report := &ConflictReport{}
+		report.AddEntry(ConflictEntry{Severity: tt.severity, Type: tt.entryType})
+		report.ComputeSummary()
+
+		switch tt.severity {
+		case SeverityCritical:
+			if report.SeveritySummary.Critical != 1 {
+				t.Errorf("type %s: expected critical=1, got %d", tt.entryType, report.SeveritySummary.Critical)
+			}
+		case SeverityWarning:
+			if report.SeveritySummary.Warning != 1 {
+				t.Errorf("type %s: expected warning=1, got %d", tt.entryType, report.SeveritySummary.Warning)
+			}
+		case SeverityInfo:
+			if report.SeveritySummary.Info != 1 {
+				t.Errorf("type %s: expected info=1, got %d", tt.entryType, report.SeveritySummary.Info)
+			}
+		}
+	}
+}

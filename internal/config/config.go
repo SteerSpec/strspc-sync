@@ -146,10 +146,12 @@ func Validate(cfg *SyncConfig) error {
 		if cfg.Auth.PrivateKey == "" {
 			return fmt.Errorf("auth.private-key is required for github-app method")
 		}
-	case "pat", "github-token":
+	case "pat":
 		if cfg.Auth.Token == "" {
-			return fmt.Errorf("auth.token is required for %s method", cfg.Auth.Method)
+			return fmt.Errorf("auth.token is required for pat method")
 		}
+	case "github-token":
+		// Token can be empty in config; resolved from GITHUB_TOKEN env var at runtime
 	}
 
 	if len(cfg.Templates) == 0 {

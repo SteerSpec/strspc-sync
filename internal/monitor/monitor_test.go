@@ -414,3 +414,82 @@ func TestTargetFilter(t *testing.T) {
 		t.Errorf("expected 0 issues created, got %d", res.IssuesCreated)
 	}
 }
+
+func TestMNRACT005_HashBasedDriftDetection(t *testing.T) {
+	// Scenario: deployed version string is the same, but file content (and thus hash) differs.
+	// Proves drift detection is hash-based, not version-string-based.
+	deployedContent := []byte("# Standards v1.0\nOriginal rules here")
+	modifiedContent := []byte("# Standards v1.0\nModified rules with same version header")
+	deployedHash := hash.HashBytes(deployedContent)
+
+	repoSvc := &mockRepoService{
+		files: map[string][]byte{
+			"org/app/CLAUDE.md": modifiedContent,
+		},
+	}
+	issueSvc := newMockIssueService()
+	client := makeClient(repoSvc, issueSvc)
+
+	ds := makeState(map[string]map[string]state.TemplateState{
+		"org/app": {
+			"claude-md": {Version: "1.0", Hash: deployedHash, Timestamp: time.Now()},
+		},
+	})
+
+	mon := New(testConfig(), client, "test", "central")
+	res, err := mon.Run(context.Background(), ds, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ReposDrifted != 1 {
+		t.Errorf("MNRACT-005: expected 1 repo drifted (hash-based detection), got %d", res.ReposDrifted)
+	}
+	if res.IssuesCreated != 1 {
+		t.Errorf("MNRACT-005: expected 1 drift issue created, got %d", res.IssuesCreated)
+	}
+}
+
+func TestMNRACT008_NoDuplicateDriftIssues_TwoPassScenario(t *testing.T) {
+	expectedContent := []byte("expected")
+	actualContent := []byte("drifted")
+	expectedHash := hash.HashBytes(expectedContent)
+
+	repoSvc := &mockRepoService{
+		files: map[string][]byte{
+			"org/app/CLAUDE.md": actualContent,
+		},
+	}
+	issueSvc := newMockIssueService()
+	client := makeClient(repoSvc, issueSvc)
+
+	ds := makeState(map[string]map[string]state.TemplateState{
+		"org/app": {
+			"claude-md": {Version: "1.0", Hash: expectedHash, Timestamp: time.Now()},
+		},
+	})
+
+	mon := New(testConfig(), client, "test", "central")
+
+	// First run: creates a drift issue
+	res1, err := mon.Run(context.Background(), ds, Options{})
+	if err != nil {
+		t.Fatalf("first run error: %v", err)
+	}
+	if res1.IssuesCreated != 1 {
+		t.Fatalf("MNRACT-008: first run expected 1 issue created, got %d", res1.IssuesCreated)
+	}
+
+	// Second run with same drift: should update existing issue, not create new one
+	res2, err := mon.Run(context.Background(), ds, Options{})
+	if err != nil {
+		t.Fatalf("second run error: %v", err)
+	}
+	if res2.IssuesCreated != 0 {
+		t.Errorf("MNRACT-008: second run expected 0 new issues (should update existing), got %d", res2.IssuesCreated)
+	}
+	// Total issues created across both runs should be 1
+	totalCreated := len(issueSvc.created)
+	if totalCreated != 1 {
+		t.Errorf("MNRACT-008: expected 1 total issue created across both runs, got %d", totalCreated)
+	}
+}

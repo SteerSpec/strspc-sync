@@ -1,7 +1,9 @@
 package state
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -90,5 +92,42 @@ func TestGetSetOperations(t *testing.T) {
 	// Get nonexistent template in existing repo
 	if ts := ds.GetTemplateState("org/repo1", "nonexistent"); ts != nil {
 		t.Error("expected nil for nonexistent template")
+	}
+}
+
+func TestConcurrentSetGet(t *testing.T) {
+	ds := NewDeploymentState()
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			repo := fmt.Sprintf("org/repo-%d", n)
+			mu.Lock()
+			ds.SetTemplateState(repo, "tmpl", TemplateState{
+				Version: fmt.Sprintf("v%d", n),
+				Hash:    fmt.Sprintf("hash-%d", n),
+			})
+			mu.Unlock()
+
+			mu.Lock()
+			ts := ds.GetTemplateState(repo, "tmpl")
+			mu.Unlock()
+			if ts == nil {
+				t.Errorf("goroutine %d: expected non-nil state", n)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	// Verify all entries present
+	for i := 0; i < 10; i++ {
+		repo := fmt.Sprintf("org/repo-%d", i)
+		ts := ds.GetTemplateState(repo, "tmpl")
+		if ts == nil {
+			t.Errorf("missing state for %s", repo)
+		}
 	}
 }

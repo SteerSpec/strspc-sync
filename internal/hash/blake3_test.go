@@ -35,3 +35,28 @@ func TestHashStringMatchesHashBytes(t *testing.T) {
 		t.Error("HashString and HashBytes differ for the same input")
 	}
 }
+
+func TestHashBytesEmpty(t *testing.T) {
+	h := HashBytes([]byte{})
+	if !strings.HasPrefix(h, "b3_") {
+		t.Errorf("empty input hash should have b3_ prefix, got %s", h)
+	}
+	if len(h) != 3+64 { // "b3_" + 64 hex chars
+		t.Errorf("expected hash length 67, got %d", len(h))
+	}
+}
+
+func TestHashBytesLarge(t *testing.T) {
+	data := make([]byte, 1<<20) // 1MB
+	for i := range data {
+		data[i] = byte(i % 256)
+	}
+	h1 := HashBytes(data)
+	h2 := HashBytes(data)
+	if h1 != h2 {
+		t.Error("large input produced non-deterministic hashes")
+	}
+	if !strings.HasPrefix(h1, "b3_") {
+		t.Errorf("hash should have b3_ prefix, got %s", h1)
+	}
+}

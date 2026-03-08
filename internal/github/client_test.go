@@ -449,3 +449,119 @@ func TestAuthHeader(t *testing.T) {
 		t.Fatalf("expected 200, got %d (auth or accept header mismatch)", resp.StatusCode)
 	}
 }
+
+func TestPRCreateRequestBody(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/pulls", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if body["title"] != "Test Title" {
+			t.Errorf("expected title 'Test Title', got %v", body["title"])
+		}
+		if body["body"] != "Test Body" {
+			t.Errorf("expected body 'Test Body', got %v", body["body"])
+		}
+		if body["head"] != "feature-branch" {
+			t.Errorf("expected head 'feature-branch', got %v", body["head"])
+		}
+		if body["base"] != "main" {
+			t.Errorf("expected base 'main', got %v", body["base"])
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"number":   1,
+			"title":    "Test Title",
+			"state":    "open",
+			"head":     map[string]string{"ref": "feature-branch"},
+			"base":     map[string]string{"ref": "main"},
+			"html_url": "https://github.com/o/r/pull/1",
+		})
+	})
+	// Handle label addition (PR create adds labels separately)
+	mux.HandleFunc("/repos/o/r/issues/1/labels", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[{"name":"steerspec-sync"}]`)
+	})
+
+	c := testClient(t, mux)
+	pr, err := c.PullRequests.Create(context.Background(), "o", "r", &PullRequestCreate{
+		Title:  "Test Title",
+		Body:   "Test Body",
+		Head:   "feature-branch",
+		Base:   "main",
+		Labels: []string{"steerspec-sync"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pr.Number != 1 {
+		t.Errorf("expected PR #1, got #%d", pr.Number)
+	}
+}
+
+func TestIssueCreateLabels(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		labels, ok := body["labels"].([]any)
+		if !ok {
+			t.Error("expected labels array in request body")
+		} else if len(labels) != 2 {
+			t.Errorf("expected 2 labels, got %d", len(labels))
+		} else {
+			if labels[0] != "steerspec-drift" {
+				t.Errorf("expected first label 'steerspec-drift', got %v", labels[0])
+			}
+			if labels[1] != "automated" {
+				t.Errorf("expected second label 'automated', got %v", labels[1])
+			}
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"number":   5,
+			"title":    body["title"],
+			"state":    "open",
+			"html_url": "https://github.com/o/r/issues/5",
+			"labels":   []map[string]string{{"name": "steerspec-drift"}, {"name": "automated"}},
+		})
+	})
+
+	c := testClient(t, mux)
+	issue, err := c.Issues.Create(context.Background(), "o", "r", &IssueCreate{
+		Title:  "Drift detected",
+		Body:   "drift body",
+		Labels: []string{"steerspec-drift", "automated"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if issue.Number != 5 {
+		t.Errorf("expected issue #5, got #%d", issue.Number)
+	}
+	if len(issue.Labels) != 2 {
+		t.Errorf("expected 2 labels on created issue, got %d", len(issue.Labels))
+	}
+}
