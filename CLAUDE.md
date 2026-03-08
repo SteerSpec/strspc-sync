@@ -15,6 +15,11 @@ Implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strsp
   markdown TODOs, inline comments, or external trackers as a substitute.
 - Every beads epic MUST reference at least one GitHub issue. An epic without a linked GH issue
   is invalid and must not be worked on.
+- Upon every commit and push, ALL related beads issues and GH issues MUST be updated:
+  - Completed work: close beads epics (`bd close <id>`) and GH issues (`state_reason: completed`).
+  - In-progress work: update beads status and add a progress comment to the GH issue.
+  - Every closed GH issue MUST have a summary comment documenting what was implemented,
+    which files were changed, and the commit reference.
 
 ## Build & Run
 
