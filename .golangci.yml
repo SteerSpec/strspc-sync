@@ -10,6 +10,12 @@ linters:
     - govet
     - ineffassign
     - staticcheck
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
 
 formatters:
   enable:
@@ -17,10 +23,3 @@ formatters:
   settings:
     gofumpt:
       extra-rules: true
-
-linters-settings:
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
