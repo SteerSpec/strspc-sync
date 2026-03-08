@@ -17,7 +17,7 @@ builds:
 archives:
   - format: tar.gz
     name_template: >-
-      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+      strspc_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     format_overrides:
       - goos: darwin
         format: zip

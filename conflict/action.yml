@@ -56,8 +56,7 @@ runs:
     - name: Download strspc binary
       shell: bash
       run: |
-        VERSION="${{ github.action_ref }}"
-        VERSION="${VERSION#v}"
+        VERSION="$(cat "${{ github.action_path }}/../VERSION")"
         OS="${{ steps.platform.outputs.os }}"
         ARCH="${{ steps.platform.outputs.arch }}"
         BASE="https://github.com/SteerSpec/strspc-sync/releases/download"
