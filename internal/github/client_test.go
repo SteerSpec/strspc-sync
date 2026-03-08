@@ -259,11 +259,11 @@ func TestRateLimiterRetry(t *testing.T) {
 		if n <= 2 {
 			w.Header().Set("X-RateLimit-Remaining", "0")
 			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, `{"message":"rate limit exceeded"}`)
+			fmt.Fprint(w, `{"message":"rate limit exceeded"}`) //nolint:errcheck // test handler write
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"ok":true}`)
+		fmt.Fprint(w, `{"ok":true}`) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -271,7 +271,7 @@ func TestRateLimiterRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -285,7 +285,7 @@ func TestRateLimiterExhausted(t *testing.T) {
 	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-RateLimit-Remaining", "0")
 		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprint(w, `{"message":"rate limit exceeded"}`)
+		fmt.Fprint(w, `{"message":"rate limit exceeded"}`) //nolint:errcheck
 	})
 
 	c := testClient(t, mux)
@@ -303,7 +303,7 @@ func TestRepoListByOrg(t *testing.T) {
 			{Name: "repo1", FullName: "myorg/repo1", DefaultBranch: "main", Owner: struct{ Login string }{Login: "myorg"}},
 			{Name: "repo2", FullName: "myorg/repo2", DefaultBranch: "master", Owner: struct{ Login string }{Login: "myorg"}, Archived: true},
 		}
-		json.NewEncoder(w).Encode(repos)
+		json.NewEncoder(w).Encode(repos) //nolint:errcheck
 	})
 
 	c := testClient(t, mux)
@@ -334,10 +334,10 @@ func TestRepoListByOrgPagination(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/orgs/org/repos", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("page") == "2" {
-			json.NewEncoder(w).Encode(page2)
+			json.NewEncoder(w).Encode(page2) //nolint:errcheck
 			return
 		}
-		json.NewEncoder(w).Encode(page1)
+		json.NewEncoder(w).Encode(page1) //nolint:errcheck
 	})
 
 	c := testClient(t, mux)

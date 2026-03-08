@@ -338,7 +338,7 @@ func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)
 			return resp, nil
 		}
 
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck // drain body before retry
 
 		if attempt == rl.maxRetries {
 			return nil, fmt.Errorf("rate limit exceeded after %d retries", rl.maxRetries)
@@ -387,7 +387,7 @@ func checkResponse(resp *http.Response) error {
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // error response body close is best-effort
 	data, _ := io.ReadAll(resp.Body)
 	msg := string(data)
 	var apiResp struct {

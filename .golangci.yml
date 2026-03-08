@@ -16,6 +16,8 @@ linters:
         - diagnostic
         - style
         - performance
+      disabled-checks:
+        - whyNoLint
 
 formatters:
   enable:

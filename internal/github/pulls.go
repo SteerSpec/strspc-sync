@@ -97,7 +97,7 @@ func (s *pullRequestService) Create(ctx context.Context, owner, repo string, pr 
 		if err != nil {
 			return created, err
 		}
-		labelsResp.Body.Close()
+		labelsResp.Body.Close() //nolint:errcheck // label response body close is best-effort
 		created.Labels = pr.Labels
 	}
 

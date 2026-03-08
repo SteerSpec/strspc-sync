@@ -218,7 +218,7 @@ func TestSetOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmp.Close()
+	tmp.Close() //nolint:errcheck // best-effort: closing temp file before passing path to test
 
 	t.Setenv("GITHUB_OUTPUT", tmp.Name())
 	setOutput("prs-created", "3")

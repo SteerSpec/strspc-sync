@@ -179,8 +179,8 @@ func setOutput(key, value string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
-	fmt.Fprintf(f, "%s=%s\n", key, value)
+	defer f.Close() //nolint:errcheck // best-effort: output file write errors are non-fatal
+	fmt.Fprintf(f, "%s=%s\n", key, value) //nolint:errcheck // best-effort: output file write errors are non-fatal
 }
 
 func runSync(args []string, out, errOut io.Writer) error {
