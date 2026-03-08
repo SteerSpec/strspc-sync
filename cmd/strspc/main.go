@@ -134,17 +134,40 @@ func newGHClient(cfg *config.SyncConfig) (*gh.Client, error) {
 	if cfg.Auth.Method == "github-token" && cfg.Auth.Token == "" {
 		cfg.Auth.Token = os.Getenv("GITHUB_TOKEN")
 	}
+	if cfg.Auth.Method == "github-app" {
+		if cfg.Auth.AppID == "" {
+			cfg.Auth.AppID = os.Getenv("STEERSPEC_APP_ID")
+		}
+		if cfg.Auth.PrivateKey == "" {
+			cfg.Auth.PrivateKey = os.Getenv("STEERSPEC_PRIVATE_KEY")
+		}
+		if cfg.Auth.InstallationID == "" {
+			cfg.Auth.InstallationID = os.Getenv("STEERSPEC_INSTALLATION_ID")
+		}
+	}
 
 	client, err := gh.NewClient(gh.AuthConfig{
-		Method:     cfg.Auth.Method,
-		AppID:      cfg.Auth.AppID,
-		PrivateKey: cfg.Auth.PrivateKey,
-		Token:      cfg.Auth.Token,
+		Method:         cfg.Auth.Method,
+		AppID:          cfg.Auth.AppID,
+		PrivateKey:     cfg.Auth.PrivateKey,
+		InstallationID: cfg.Auth.InstallationID,
+		Org:            orgFromTargets(cfg),
+		Token:          cfg.Auth.Token,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error creating GitHub client: %w", err)
 	}
 	return client, nil
+}
+
+// orgFromTargets extracts the org name from the first include pattern (e.g. "acme-corp/*" → "acme-corp").
+func orgFromTargets(cfg *config.SyncConfig) string {
+	for _, pattern := range cfg.Targets.Include {
+		if i := strings.Index(pattern, "/"); i > 0 {
+			return pattern[:i]
+		}
+	}
+	return ""
 }
 
 func setOutput(key, value string) {

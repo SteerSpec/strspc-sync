@@ -2,12 +2,21 @@ package github
 
 import (
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -103,10 +112,12 @@ type IssueListOptions struct {
 }
 
 type AuthConfig struct {
-	Method     string // "github-app", "pat", "github-token"
-	AppID      string
-	PrivateKey string
-	Token      string
+	Method         string // "github-app", "pat", "github-token"
+	AppID          string
+	PrivateKey     string
+	InstallationID string
+	Org            string // required for github-app; used to discover installation ID
+	Token          string
 }
 
 // Client is the GitHub API client.
@@ -125,8 +136,130 @@ type rateLimiter struct {
 	baseDelay  time.Duration
 }
 
+// loadPrivateKey returns PEM bytes from either an inline PEM string or a file path.
+func loadPrivateKey(value string) ([]byte, error) {
+	if strings.HasPrefix(strings.TrimSpace(value), "-----BEGIN") {
+		return []byte(value), nil
+	}
+	return os.ReadFile(value)
+}
+
+// generateJWT creates a signed RS256 JWT for GitHub App authentication.
+func generateJWT(appID string, key *rsa.PrivateKey) (string, error) {
+	encode := func(v any) (string, error) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return base64.RawURLEncoding.EncodeToString(b), nil
+	}
+
+	header, err := encode(map[string]string{"alg": "RS256", "typ": "JWT"})
+	if err != nil {
+		return "", err
+	}
+
+	now := time.Now().Unix()
+	payload, err := encode(map[string]any{"iss": appID, "iat": now - 60, "exp": now + 600})
+	if err != nil {
+		return "", err
+	}
+
+	sigInput := header + "." + payload
+	h := sha256.Sum256([]byte(sigInput))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, h[:])
+	if err != nil {
+		return "", fmt.Errorf("signing JWT: %w", err)
+	}
+
+	return sigInput + "." + base64.RawURLEncoding.EncodeToString(sig), nil
+}
+
+// exchangeInstallationToken trades a GitHub App JWT for an installation access token.
+// If installationID is empty, the installation is auto-discovered from the org name.
+func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installationID string) (string, error) {
+	hc := &http.Client{Timeout: 30 * time.Second}
+
+	makeReq := func(method, url string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, method, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+jwt)
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+		return req, nil
+	}
+
+	if installationID == "" {
+		req, err := makeReq(http.MethodGet, baseURL+"/app/installations")
+		if err != nil {
+			return "", fmt.Errorf("building installations request: %w", err)
+		}
+		resp, err := hc.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("listing installations: %w", err)
+		}
+		defer resp.Body.Close() //nolint:errcheck
+		if resp.StatusCode != http.StatusOK {
+			data, _ := io.ReadAll(resp.Body)
+			return "", fmt.Errorf("listing installations: status %d: %s", resp.StatusCode, string(data))
+		}
+
+		var installations []struct {
+			ID      int64 `json:"id"`
+			Account struct {
+				Login string `json:"login"`
+			} `json:"account"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&installations); err != nil {
+			return "", fmt.Errorf("decoding installations: %w", err)
+		}
+
+		for _, inst := range installations {
+			if strings.EqualFold(inst.Account.Login, org) {
+				installationID = strconv.FormatInt(inst.ID, 10)
+				break
+			}
+		}
+		if installationID == "" {
+			return "", fmt.Errorf("no GitHub App installation found for org %q", org)
+		}
+	}
+
+	req, err := makeReq(http.MethodPost, baseURL+"/app/installations/"+installationID+"/access_tokens")
+	if err != nil {
+		return "", fmt.Errorf("building access_tokens request: %w", err)
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("exchanging installation token: %w", err)
+	}
+	defer resp.Body.Close() //nolint:errcheck
+	if resp.StatusCode != http.StatusCreated {
+		data, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("exchanging installation token: status %d: %s", resp.StatusCode, string(data))
+	}
+
+	var result struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decoding installation token: %w", err)
+	}
+	if result.Token == "" {
+		return "", fmt.Errorf("empty token in installation token response")
+	}
+	return result.Token, nil
+}
+
 // NewClient creates a new GitHub API client with the given auth configuration.
 func NewClient(auth AuthConfig) (*Client, error) {
+	baseURL := "https://api.github.com"
+	if u := os.Getenv("GITHUB_API_URL"); u != "" {
+		baseURL = u
+	}
+
 	var token string
 	switch auth.Method {
 	case "pat", "github-token":
@@ -135,19 +268,40 @@ func NewClient(auth AuthConfig) (*Client, error) {
 		}
 		token = auth.Token
 	case "github-app":
-		// TODO: Implement full GitHub App JWT / installation token exchange.
-		// For now, accept a pre-generated installation token via auth.Token.
-		if auth.Token == "" {
-			return nil, fmt.Errorf("pre-generated installation token is required for github-app auth (full JWT auth not yet implemented)")
+		if auth.AppID == "" || auth.PrivateKey == "" {
+			return nil, fmt.Errorf("app-id and private-key are required for github-app auth")
 		}
-		token = auth.Token
+		pemBytes, err := loadPrivateKey(auth.PrivateKey)
+		if err != nil {
+			return nil, fmt.Errorf("loading private key: %w", err)
+		}
+		block, _ := pem.Decode(pemBytes)
+		if block == nil {
+			return nil, fmt.Errorf("failed to decode PEM block from private key")
+		}
+		rsaKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			// Try PKCS8 (e.g. keys generated by newer tooling)
+			key, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err2 != nil {
+				return nil, fmt.Errorf("parsing private key: %w", err)
+			}
+			var ok bool
+			rsaKey, ok = key.(*rsa.PrivateKey)
+			if !ok {
+				return nil, fmt.Errorf("private key is not an RSA key")
+			}
+		}
+		jwt, err := generateJWT(auth.AppID, rsaKey)
+		if err != nil {
+			return nil, fmt.Errorf("generating JWT: %w", err)
+		}
+		token, err = exchangeInstallationToken(context.Background(), jwt, baseURL, auth.Org, auth.InstallationID)
+		if err != nil {
+			return nil, fmt.Errorf("github-app auth: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported auth method: %q", auth.Method)
-	}
-
-	baseURL := "https://api.github.com"
-	if u := os.Getenv("GITHUB_API_URL"); u != "" {
-		baseURL = u
 	}
 
 	c := &Client{

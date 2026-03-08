@@ -15,6 +15,18 @@ inputs:
     description: 'Glob pattern to filter target repositories'
     required: false
     default: ''
+  app-id:
+    description: 'GitHub App ID (for github-app auth method)'
+    required: false
+    default: ''
+  private-key:
+    description: 'GitHub App private key — inline PEM or file path (for github-app auth method)'
+    required: false
+    default: ''
+  installation-id:
+    description: 'GitHub App installation ID (optional; auto-discovered from org if omitted)'
+    required: false
+    default: ''
 
 outputs:
   repos-in-sync:
@@ -65,6 +77,9 @@ runs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        STEERSPEC_APP_ID: ${{ inputs.app-id }}
+        STEERSPEC_PRIVATE_KEY: ${{ inputs.private-key }}
+        STEERSPEC_INSTALLATION_ID: ${{ inputs.installation-id }}
       run: |
         ARGS="monitor --config ${{ inputs.config-path }}"
         if [ -n "${{ inputs.target-filter }}" ]; then

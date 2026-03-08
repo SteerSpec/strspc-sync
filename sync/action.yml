@@ -27,6 +27,18 @@ inputs:
     description: 'Force sync even if deployment state shows current version'
     required: false
     default: 'false'
+  app-id:
+    description: 'GitHub App ID (for github-app auth method)'
+    required: false
+    default: ''
+  private-key:
+    description: 'GitHub App private key — inline PEM or file path (for github-app auth method)'
+    required: false
+    default: ''
+  installation-id:
+    description: 'GitHub App installation ID (optional; auto-discovered from org if omitted)'
+    required: false
+    default: ''
 
 outputs:
   prs-created:
@@ -77,6 +89,9 @@ runs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        STEERSPEC_APP_ID: ${{ inputs.app-id }}
+        STEERSPEC_PRIVATE_KEY: ${{ inputs.private-key }}
+        STEERSPEC_INSTALLATION_ID: ${{ inputs.installation-id }}
       run: |
         ARGS="sync --config ${{ inputs.config-path }}"
         if [ "${{ inputs.dry-run }}" = "true" ]; then

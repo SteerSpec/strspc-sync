@@ -2,11 +2,18 @@ package github
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,6 +31,20 @@ func testClient(t *testing.T, handler http.Handler) *Client {
 	c.baseURL = srv.URL
 	c.rateLimiter.baseDelay = 10 * time.Millisecond // speed up tests
 	return c
+}
+
+// generateTestRSAKey returns a fresh RSA key and its inline PEM string.
+func generateTestRSAKey(t *testing.T) (*rsa.PrivateKey, string) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBytes := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
+	return key, string(pemBytes)
 }
 
 func TestNewClient_AuthValidation(t *testing.T) {
@@ -45,12 +66,188 @@ func TestNewClient_AuthValidation(t *testing.T) {
 		t.Fatalf("expected token 'tok', got %q", c.token)
 	}
 
-	c, err = NewClient(AuthConfig{Method: "github-app", Token: "inst-tok"})
+	_, err = NewClient(AuthConfig{Method: "github-app", AppID: "", PrivateKey: "somekey"})
+	if err == nil {
+		t.Fatal("expected error for github-app with empty AppID")
+	}
+}
+
+func TestLoadPrivateKey(t *testing.T) {
+	_, pemStr := generateTestRSAKey(t)
+
+	// Inline PEM returns bytes directly
+	got, err := loadPrivateKey(pemStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.token != "inst-tok" {
-		t.Fatalf("expected token 'inst-tok', got %q", c.token)
+	if string(got) != pemStr {
+		t.Fatal("expected inline PEM to be returned as-is")
+	}
+
+	// File path reads the file
+	dir := t.TempDir()
+	path := filepath.Join(dir, "key.pem")
+	if err := os.WriteFile(path, []byte(pemStr), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err = loadPrivateKey(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != pemStr {
+		t.Fatal("expected file content to match PEM")
+	}
+}
+
+func TestGenerateJWT(t *testing.T) {
+	_, pemStr := generateTestRSAKey(t)
+
+	pemBytes := []byte(pemStr)
+	block, _ := pem.Decode(pemBytes)
+	rsaKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := generateJWT("app-123", rsaKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("expected 3 JWT parts, got %d", len(parts))
+	}
+
+	// Verify header claims alg + typ
+	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		t.Fatal("decoding header:", err)
+	}
+	var header map[string]string
+	if err := json.Unmarshal(headerJSON, &header); err != nil {
+		t.Fatal("unmarshaling header:", err)
+	}
+	if header["alg"] != "RS256" {
+		t.Fatalf("expected alg RS256, got %q", header["alg"])
+	}
+	if header["typ"] != "JWT" {
+		t.Fatalf("expected typ JWT, got %q", header["typ"])
+	}
+
+	// Verify payload claims
+	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatal("decoding payload:", err)
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(payloadJSON, &claims); err != nil {
+		t.Fatal("unmarshaling payload:", err)
+	}
+	if claims["iss"] != "app-123" {
+		t.Fatalf("expected iss 'app-123', got %v", claims["iss"])
+	}
+	iat, ok := claims["iat"].(float64)
+	if !ok || iat <= 0 {
+		t.Fatalf("expected positive iat, got %v", claims["iat"])
+	}
+	exp, ok := claims["exp"].(float64)
+	if !ok || exp <= iat {
+		t.Fatalf("expected exp > iat, got exp=%v iat=%v", exp, iat)
+	}
+}
+
+func TestNewClient_GithubApp_WithDiscovery(t *testing.T) {
+	_, pemStr := generateTestRSAKey(t)
+
+	var discoveryCallCount atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/app/installations", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		discoveryCallCount.Add(1)
+		// Verify JWT bearer token format (3 dot-separated base64url parts)
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		token := strings.TrimPrefix(auth, "Bearer ")
+		if len(strings.Split(token, ".")) != 3 {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]map[string]any{ //nolint:errcheck
+			{"id": 42, "account": map[string]string{"login": "myorg"}},
+		})
+	})
+	mux.HandleFunc("/app/installations/42/access_tokens", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"token": "ghs_discovered_token"}) //nolint:errcheck
+	})
+
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	t.Setenv("GITHUB_API_URL", srv.URL)
+
+	c, err := NewClient(AuthConfig{
+		Method:     "github-app",
+		AppID:      "12345",
+		PrivateKey: pemStr,
+		Org:        "myorg",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.token != "ghs_discovered_token" {
+		t.Fatalf("expected 'ghs_discovered_token', got %q", c.token)
+	}
+	if discoveryCallCount.Load() != 1 {
+		t.Fatalf("expected exactly 1 discovery call, got %d", discoveryCallCount.Load())
+	}
+}
+
+func TestNewClient_GithubApp_InstallationIDShortcut(t *testing.T) {
+	_, pemStr := generateTestRSAKey(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/app/installations", func(w http.ResponseWriter, _ *http.Request) {
+		// Should never be called when InstallationID is set
+		t.Error("discovery endpoint called unexpectedly")
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	mux.HandleFunc("/app/installations/99/access_tokens", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"token": "ghs_shortcut_token"}) //nolint:errcheck
+	})
+
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	t.Setenv("GITHUB_API_URL", srv.URL)
+
+	c, err := NewClient(AuthConfig{
+		Method:         "github-app",
+		AppID:          "12345",
+		PrivateKey:     pemStr,
+		InstallationID: "99",
+		Org:            "myorg",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.token != "ghs_shortcut_token" {
+		t.Fatalf("expected 'ghs_shortcut_token', got %q", c.token)
 	}
 }
 

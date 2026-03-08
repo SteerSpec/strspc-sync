@@ -20,10 +20,11 @@ type SyncConfig struct {
 }
 
 type AuthConfig struct {
-	Method     string `yaml:"method"`
-	AppID      string `yaml:"app-id,omitempty"`
-	PrivateKey string `yaml:"private-key,omitempty"`
-	Token      string `yaml:"token,omitempty"`
+	Method         string `yaml:"method"`
+	AppID          string `yaml:"app-id,omitempty"`
+	PrivateKey     string `yaml:"private-key,omitempty"`
+	InstallationID string `yaml:"installation-id,omitempty"`
+	Token          string `yaml:"token,omitempty"`
 }
 
 type TemplateConfig struct {
@@ -143,12 +144,7 @@ func Validate(cfg *SyncConfig) error {
 
 	switch cfg.Auth.Method {
 	case "github-app":
-		if cfg.Auth.AppID == "" {
-			return fmt.Errorf("auth.app-id is required for github-app method")
-		}
-		if cfg.Auth.PrivateKey == "" {
-			return fmt.Errorf("auth.private-key is required for github-app method")
-		}
+		// app-id and private-key may arrive via env vars; validated post-resolution in newGHClient()
 	case "pat":
 		if cfg.Auth.Token == "" {
 			return fmt.Errorf("auth.token is required for pat method")

@@ -2,8 +2,16 @@ version: "1.0.0"
 
 auth:
   method: github-app
-  app-id: ${{ secrets.STEERSPEC_APP_ID }}
-  private-key: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
+  # Credentials resolved from env vars:
+  #   STEERSPEC_APP_ID            — GitHub App ID
+  #   STEERSPEC_PRIVATE_KEY       — PEM string or path to .pem file
+  #   STEERSPEC_INSTALLATION_ID   — optional; auto-discovered from org if omitted
+  #
+  # Required GitHub App permissions:
+  #   Contents: Read & Write
+  #   Pull requests: Read & Write
+  #   Issues: Read & Write
+  # Install on all org repos (or selected target repos)
 
 variables:
   org_name: "acme-corp"
