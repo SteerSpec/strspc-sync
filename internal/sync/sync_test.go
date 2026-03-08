@@ -155,6 +155,7 @@ func makeTestConfig() *config.SyncConfig {
 		Templates: []config.TemplateConfig{
 			{
 				ID:          "claude-md",
+				Version:     "1.0.0",
 				Type:        "claude-md",
 				Source:      "templates/CLAUDE.md",
 				Destination: "CLAUDE.md",
@@ -269,6 +270,7 @@ func TestTemplateFilter(t *testing.T) {
 	cfg := makeTestConfig()
 	cfg.Templates = append(cfg.Templates, config.TemplateConfig{
 		ID:          "skill-review",
+		Version:     "1.0.0",
 		Type:        "skill",
 		Source:      "templates/review.md",
 		Destination: ".claude/skills/review.md",
@@ -558,8 +560,8 @@ func TestPRTitleFormat(t *testing.T) {
 		if !strings.HasPrefix(pr.Title, "[SteerSpec] Update ") {
 			t.Errorf("PR title should start with '[SteerSpec] Update', got: %s", pr.Title)
 		}
-		if pr.Head != "steerspec-sync/claude-md" {
-			t.Errorf("branch should be 'steerspec-sync/claude-md', got: %s", pr.Head)
+		if pr.Head != "steerspec-sync/claude-md/1.0.0" {
+			t.Errorf("branch should be 'steerspec-sync/claude-md/1.0.0', got: %s", pr.Head)
 		}
 	}
 }
@@ -575,8 +577,26 @@ func (tp *trackingPRService) Update(ctx context.Context, owner, repo string, num
 	return tp.mockPRService.Update(ctx, owner, repo, number, pr)
 }
 
-func TestSYNCPR002_BranchNameFormat_KnownDeviation(t *testing.T) {
-	t.Skip("SYNCPR-002 requires version in branch name (steerspec-sync/<template-id>/<version>); not yet implemented")
+func TestSYNCPR002_BranchNameFormat(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	setupMockRepos(repoSvc)
+
+	cfg := makeTestConfig()
+	client := makeTestClient(repoSvc, prSvc)
+
+	syncer := New(cfg, client)
+	_, err := syncer.Run(context.Background(), Options{Trigger: "push"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, pr := range prSvc.created {
+		expected := "steerspec-sync/claude-md/1.0.0"
+		if pr.Head != expected {
+			t.Errorf("SYNCPR-002: branch should be %q, got %q", expected, pr.Head)
+		}
+	}
 }
 
 func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
@@ -595,7 +615,7 @@ func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
 			Number: 99,
 			Title:  "[SteerSpec] Update claude-md",
 			State:  "open",
-			Head:   "steerspec-sync/claude-md",
+			Head:   "steerspec-sync/claude-md/1.0.0",
 			Base:   "main",
 			Labels: []string{"steerspec-sync"},
 			URL:    "https://github.com/testorg/repo-a/pull/99",

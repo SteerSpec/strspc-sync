@@ -1,0 +1,20 @@
+version: "1.0.0"
+
+auth:
+  method: github-token
+
+templates:
+  - id: test-template
+    version: "1.0.0"
+    type: custom
+    strategy: full-replace
+    source: tests/fixtures/templates/test.txt
+    destination: .steerspec/test-sync-marker.txt
+
+targets:
+  include:
+    - "SteerSpec/strspc-sync"
+
+sync:
+  dry-run: true
+  concurrency: 1

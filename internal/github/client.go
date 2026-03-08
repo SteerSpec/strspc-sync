@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -144,9 +145,14 @@ func NewClient(auth AuthConfig) (*Client, error) {
 		return nil, fmt.Errorf("unsupported auth method: %q", auth.Method)
 	}
 
+	baseURL := "https://api.github.com"
+	if u := os.Getenv("GITHUB_API_URL"); u != "" {
+		baseURL = u
+	}
+
 	c := &Client{
 		httpClient: &http.Client{Timeout: 30 * time.Second},
-		baseURL:    "https://api.github.com",
+		baseURL:    baseURL,
 		token:      token,
 		rateLimiter: &rateLimiter{
 			maxRetries: 5,

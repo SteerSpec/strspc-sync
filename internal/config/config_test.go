@@ -13,6 +13,7 @@ auth:
   token: "ghp_test123"
 templates:
   - id: claude-md
+    version: "1.0.0"
     type: claude-md
     source: templates/CLAUDE.md
     destination: CLAUDE.md
@@ -293,5 +294,61 @@ conflicts:
 	_, err := Load(path)
 	if err == nil {
 		t.Fatal("expected error for invalid conflict tier")
+	}
+}
+
+func TestValidationTemplateVersionRequired(t *testing.T) {
+	cfg := `
+version: "1.0"
+auth:
+  method: pat
+  token: "test"
+templates:
+  - id: t1
+    type: claude-md
+    source: s
+    destination: d
+    strategy: mustache
+targets:
+  include: ["org/*"]
+`
+	path := writeConfig(t, cfg)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for missing template version")
+	}
+}
+
+func TestValidationTemplateVersionInvalidFormat(t *testing.T) {
+	cfg := `
+version: "1.0"
+auth:
+  method: pat
+  token: "test"
+templates:
+  - id: t1
+    version: "not-semver"
+    type: claude-md
+    source: s
+    destination: d
+    strategy: mustache
+targets:
+  include: ["org/*"]
+`
+	path := writeConfig(t, cfg)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for invalid template version format")
+	}
+}
+
+func TestTemplateVersionField(t *testing.T) {
+	path := writeConfig(t, validConfig)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Templates[0].Version != "1.0.0" {
+		t.Errorf("expected template version 1.0.0, got %s", cfg.Templates[0].Version)
 	}
 }

@@ -1,0 +1,34 @@
+name: Action Test
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  action-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        run: |
+          go build -o strspc ./cmd/strspc
+          sudo mv strspc /usr/local/bin/
+
+      - name: Test version
+        run: strspc version
+
+      - name: Test help
+        run: strspc help
+
+      - name: Test sync dry-run
+        run: strspc sync --config tests/fixtures/steerspec-sync.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: SteerSpec/strspc-sync

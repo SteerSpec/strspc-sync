@@ -1,6 +1,11 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +20,7 @@ auth:
   method: github-token
 templates:
   - id: test-template
+    version: "1.0.0"
     type: custom
     strategy: full-replace
     source: nonexistent.txt
@@ -268,5 +274,203 @@ func TestLoadConfig_Valid(t *testing.T) {
 	}
 	if cfg.Auth.Method != "github-token" {
 		t.Errorf("expected github-token auth, got %s", cfg.Auth.Method)
+	}
+}
+
+// ---- httptest-based happy-path tests ----
+
+// newTestGHServer spins up an httptest.Server that handles GitHub API calls with
+// minimal valid JSON responses. It covers the endpoints needed by sync, monitor,
+// and conflict for a single-repo org "testorg/central".
+func newTestGHServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	repoJSON := `{"full_name":"testorg/central","name":"central","owner":{"login":"testorg"},"default_branch":"main","topics":[],"archived":false}`
+	fileContent := base64.StdEncoding.EncodeToString([]byte("hello world"))
+	stateJSON, _ := json.Marshal(map[string]any{"repositories": map[string]any{}})
+
+	mux := http.NewServeMux()
+
+	// List org repos
+	mux.HandleFunc("/orgs/testorg/repos", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, "[%s]", repoJSON)
+	})
+
+	// Get repo info (for GetDefaultBranch / getBaseSHA)
+	mux.HandleFunc("/repos/testorg/central", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/testorg/central" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, repoJSON)
+	})
+
+	// File content: deployment state, template source, and target destination
+	mux.HandleFunc("/repos/testorg/central/contents/", func(w http.ResponseWriter, r *http.Request) {
+		filePath := strings.TrimPrefix(r.URL.Path, "/repos/testorg/central/contents/")
+		switch r.Method {
+		case http.MethodGet:
+			switch filePath {
+			case ".steerspec/deployment-state.json":
+				// Return valid state to cover loadDeploymentState success path
+				w.Header().Set("Content-Type", "application/json")
+				enc := base64.StdEncoding.EncodeToString(stateJSON)
+				_, _ = fmt.Fprintf(w, `{"content":%q,"sha":"statesha","encoding":"base64"}`, enc)
+			case "templates/test.txt":
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = fmt.Fprintf(w, `{"content":%q,"sha":"tmplsha","encoding":"base64"}`, fileContent)
+			default:
+				// File doesn't exist on the branch — 404
+				http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+			}
+		case http.MethodPut:
+			// CreateOrUpdateFile
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprint(w, `{}`)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+
+	// Git refs (CreateBranch)
+	mux.HandleFunc("/repos/testorg/central/git/refs", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = fmt.Fprint(w, `{"ref":"refs/heads/test","object":{"sha":"abc123"}}`)
+	})
+
+	// Pull requests
+	mux.HandleFunc("/repos/testorg/central/pulls", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = fmt.Fprint(w, `[]`)
+		case http.MethodPost:
+			_, _ = fmt.Fprint(w, `{"number":1,"title":"[SteerSpec] Update test","state":"open","head":{"ref":"steerspec-sync/test/1.0.0"},"base":{"ref":"main"},"labels":[]}`)
+		}
+	})
+
+	// PR update / close
+	mux.HandleFunc("/repos/testorg/central/pulls/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"number":1,"state":"open","head":{"ref":"steerspec-sync/test/1.0.0"},"base":{"ref":"main"},"labels":[]}`)
+	})
+
+	// Issues (monitor/conflict use these)
+	mux.HandleFunc("/repos/testorg/central/issues", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = fmt.Fprint(w, `[]`)
+		case http.MethodPost:
+			_, _ = fmt.Fprint(w, `{"number":2,"title":"drift","state":"open","labels":[]}`)
+		}
+	})
+
+	// Labels on issues (applied after PR creation)
+	mux.HandleFunc("/repos/testorg/central/issues/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `[]`)
+	})
+
+	return httptest.NewServer(mux)
+}
+
+// writeTestConfig writes a fixture config that points at the testorg/central repo.
+func writeTestConfig(t *testing.T, extraYAML string) string {
+	t.Helper()
+	dir := t.TempDir()
+	// Write the template source file (local path — but sync reads it from GitHub API)
+	cfg := fmt.Sprintf(`version: "1.0"
+auth:
+  method: github-token
+templates:
+  - id: test
+    version: "1.0.0"
+    type: custom
+    strategy: full-replace
+    source: templates/test.txt
+    destination: output/test.txt
+targets:
+  include:
+    - "testorg/central"
+%s`, extraYAML)
+	path := filepath.Join(dir, "steerspec-sync.yml")
+	if err := os.WriteFile(path, []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestRunSync_HappyPath(t *testing.T) {
+	srv := newTestGHServer(t)
+	defer srv.Close()
+	t.Setenv("GITHUB_API_URL", srv.URL)
+	t.Setenv("GITHUB_TOKEN", "fake-token")
+
+	cfgPath := writeTestConfig(t, "")
+	var out, errOut strings.Builder
+	code := run([]string{"sync", "--config", cfgPath, "--dry-run"}, &out, &errOut)
+	if code != 0 {
+		t.Errorf("expected exit 0, got %d; stderr: %s", code, errOut.String())
+	}
+}
+
+func TestRunMonitor_HappyPath(t *testing.T) {
+	srv := newTestGHServer(t)
+	defer srv.Close()
+	t.Setenv("GITHUB_API_URL", srv.URL)
+	t.Setenv("GITHUB_TOKEN", "fake-token")
+	t.Setenv("GITHUB_REPOSITORY", "testorg/central")
+
+	cfgPath := writeTestConfig(t, "")
+	var out, errOut strings.Builder
+	code := run([]string{"monitor", "--config", cfgPath}, &out, &errOut)
+	if code != 0 {
+		t.Errorf("expected exit 0, got %d; stderr: %s", code, errOut.String())
+	}
+}
+
+func TestRunConflict_HappyPath(t *testing.T) {
+	srv := newTestGHServer(t)
+	defer srv.Close()
+	t.Setenv("GITHUB_API_URL", srv.URL)
+	t.Setenv("GITHUB_TOKEN", "fake-token")
+	t.Setenv("GITHUB_REPOSITORY", "testorg/central")
+
+	cfgPath := writeTestConfig(t, "")
+	var out, errOut strings.Builder
+	code := run([]string{"conflict", "--config", cfgPath, "--tiers", "1"}, &out, &errOut)
+	if code != 0 {
+		t.Errorf("expected exit 0, got %d; stderr: %s", code, errOut.String())
+	}
+}
+
+func TestLoadDeploymentState_HappyPath(t *testing.T) {
+	stateJSON, _ := json.Marshal(map[string]any{"repositories": map[string]any{}})
+	enc := base64.StdEncoding.EncodeToString(stateJSON)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"content":%q,"sha":"statesha","encoding":"base64"}`, enc)
+	}))
+	defer srv.Close()
+
+	t.Setenv("GITHUB_API_URL", srv.URL)
+	t.Setenv("GITHUB_TOKEN", "fake-token")
+
+	cfg := writeTestConfig(t, "")
+	syncCfg, err := loadConfig(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	client, err := newGHClient(syncCfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+	ds := loadDeploymentState(client, "testorg", "central")
+	if ds == nil {
+		t.Error("expected non-nil deployment state")
 	}
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -27,6 +28,7 @@ type AuthConfig struct {
 
 type TemplateConfig struct {
 	ID          string            `yaml:"id"`
+	Version     string            `yaml:"version"`
 	Type        string            `yaml:"type"`
 	Source      string            `yaml:"source"`
 	Destination string            `yaml:"destination"`
@@ -69,10 +71,11 @@ type ConflictBehavior struct {
 }
 
 var (
-	validAuthMethods     = map[string]bool{"github-app": true, "pat": true, "github-token": true}
-	validTemplateTypes   = map[string]bool{"claude-md": true, "skill": true, "agent": true, "config": true, "custom": true}
-	validStrategies      = map[string]bool{"mustache": true, "marker": true, "full-replace": true}
-	validConflictTiers   = map[int]bool{1: true, 2: true, 3: true}
+	validAuthMethods   = map[string]bool{"github-app": true, "pat": true, "github-token": true}
+	validTemplateTypes = map[string]bool{"claude-md": true, "skill": true, "agent": true, "config": true, "custom": true}
+	validStrategies    = map[string]bool{"mustache": true, "marker": true, "full-replace": true}
+	validConflictTiers = map[int]bool{1: true, 2: true, 3: true}
+	semverRE           = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 )
 
 func Load(path string) (*SyncConfig, error) {
@@ -167,6 +170,13 @@ func Validate(cfg *SyncConfig) error {
 			return fmt.Errorf("duplicate template id: %s", tmpl.ID)
 		}
 		seen[tmpl.ID] = true
+
+		if tmpl.Version == "" {
+			return fmt.Errorf("templates[%d].version is required", i)
+		}
+		if !semverRE.MatchString(tmpl.Version) {
+			return fmt.Errorf("templates[%d].version %q must be a semver (e.g. \"1.0.0\")", i, tmpl.Version)
+		}
 
 		if !validTemplateTypes[tmpl.Type] {
 			return fmt.Errorf("templates[%d].type %q is not valid", i, tmpl.Type)

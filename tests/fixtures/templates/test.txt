@@ -1,0 +1,2 @@
+SteerSpec Sync test template fixture.
+This file is distributed to target repositories during integration testing.

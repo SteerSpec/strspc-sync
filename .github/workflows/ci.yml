@@ -71,3 +71,5 @@ jobs:
         with:
           config: .markdownlint.yml
           globs: '**/*.md'
+      - name: editorconfig-checker
+        uses: editorconfig-checker/action-editorconfig-checker@v2
