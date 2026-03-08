@@ -49,7 +49,7 @@ jobs:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v2.11.2
 
   lint-extra:
     runs-on: ubuntu-latest
