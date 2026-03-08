@@ -11,8 +11,10 @@ Implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strsp
 ## Workflow Rules
 
 - A GitHub issue MUST always be created documenting the plan prior to starting any work.
-- Use beads (`bd`) for all task tracking — never markdown TODOs or external trackers.
-- Every beads epic MUST reference at least one GitHub issue.
+- Beads (`bd`) MUST be used for ALL activities — planning, tracking, and follow-up. Never use
+  markdown TODOs, inline comments, or external trackers as a substitute.
+- Every beads epic MUST reference at least one GitHub issue. An epic without a linked GH issue
+  is invalid and must not be worked on.
 
 ## Build & Run
 
@@ -89,9 +91,9 @@ docs/quickstart/     Example config + templates
 
 ## CI/CD
 
-- **ci.yml**: `go vet` + `go test -race` + golangci-lint on push/PR to main
-- **release.yml**: GoReleaser on tag push (`v*`), builds binaries + creates GitHub release
-- Coverage artifact uploaded but no threshold enforcement (see issue #5)
+- **ci.yml**: `go vet` + `go test -race` + golangci-lint + lint-extra (actionlint, shellcheck,
+  yamllint, markdownlint) on push/PR to main; 70% coverage threshold enforced; Codecov upload
+- **release.yml**: pre-flight `go test -race` + build smoke test, then GoReleaser on tag push (`v*`)
 
 ## Auth Pattern
 
