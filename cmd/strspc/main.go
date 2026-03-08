@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -22,34 +23,52 @@ var (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, out, errOut io.Writer) int {
+	if len(args) < 1 {
+		printUsageTo(errOut)
+		return 1
 	}
 
-	cmd := os.Args[1]
-	args := os.Args[2:]
+	cmd := args[0]
+	rest := args[1:]
 
 	switch cmd {
 	case "sync":
-		runSync(args)
+		if err := runSync(rest, out, errOut); err != nil {
+			_, _ = fmt.Fprintln(errOut, err)
+			return 1
+		}
+		return 0
 	case "monitor":
-		runMonitor(args)
+		if err := runMonitor(rest, out, errOut); err != nil {
+			_, _ = fmt.Fprintln(errOut, err)
+			return 1
+		}
+		return 0
 	case "conflict":
-		runConflict(args)
+		if err := runConflict(rest, out, errOut); err != nil {
+			_, _ = fmt.Fprintln(errOut, err)
+			return 1
+		}
+		return 0
 	case "version":
-		fmt.Printf("strspc %s (commit: %s)\n", version, commit)
+		_, _ = fmt.Fprintf(out, "strspc %s (commit: %s)\n", version, commit)
+		return 0
 	case "help", "--help", "-h":
-		printUsage()
+		printUsageTo(errOut)
+		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n", cmd)
-		printUsage()
-		os.Exit(1)
+		_, _ = fmt.Fprintf(errOut, "unknown command: %s\n", cmd)
+		printUsageTo(errOut)
+		return 1
 	}
 }
 
-func printUsage() {
-	fmt.Fprintf(os.Stderr, `Usage: strspc <command> [flags]
+func printUsageTo(w io.Writer) {
+	_, _ = fmt.Fprintf(w, `Usage: strspc <command> [flags]
 
 Commands:
   sync       Synchronize templates to target repositories
@@ -103,17 +122,15 @@ func parseCommonFlags(args []string) (commonFlags, []string) {
 	return f, remaining
 }
 
-func loadConfig(path string) *config.SyncConfig {
+func loadConfig(path string) (*config.SyncConfig, error) {
 	cfg, err := config.Load(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error loading config: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("error loading config: %w", err)
 	}
-	return cfg
+	return cfg, nil
 }
 
-func newGHClient(cfg *config.SyncConfig) *gh.Client {
-	// For github-token method, resolve token from GITHUB_TOKEN env var if not set in config
+func newGHClient(cfg *config.SyncConfig) (*gh.Client, error) {
 	if cfg.Auth.Method == "github-token" && cfg.Auth.Token == "" {
 		cfg.Auth.Token = os.Getenv("GITHUB_TOKEN")
 	}
@@ -125,10 +142,9 @@ func newGHClient(cfg *config.SyncConfig) *gh.Client {
 		Token:      cfg.Auth.Token,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating GitHub client: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("error creating GitHub client: %w", err)
 	}
-	return client
+	return client, nil
 }
 
 func setOutput(key, value string) {
@@ -144,7 +160,7 @@ func setOutput(key, value string) {
 	fmt.Fprintf(f, "%s=%s\n", key, value)
 }
 
-func runSync(args []string) {
+func runSync(args []string, out, errOut io.Writer) error {
 	common, remaining := parseCommonFlags(args)
 	dryRun := false
 	templateFilter := ""
@@ -164,8 +180,14 @@ func runSync(args []string) {
 		}
 	}
 
-	cfg := loadConfig(common.configPath)
-	client := newGHClient(cfg)
+	cfg, err := loadConfig(common.configPath)
+	if err != nil {
+		return err
+	}
+	client, err := newGHClient(cfg)
+	if err != nil {
+		return err
+	}
 
 	syncer := sync.New(cfg, client)
 	result, err := syncer.Run(context.Background(), sync.Options{
@@ -177,11 +199,10 @@ func runSync(args []string) {
 		Trigger:        detectTrigger(),
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "sync error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("sync error: %w", err)
 	}
 
-	printJSON(result)
+	printJSON(result, out)
 
 	setOutput("prs-created", strconv.Itoa(result.PRsCreated))
 	setOutput("prs-updated", strconv.Itoa(result.PRsUpdated))
@@ -191,17 +212,27 @@ func runSync(args []string) {
 	setOutput("summary", string(summaryJSON))
 
 	if result.Errors > 0 {
-		os.Exit(1)
+		return fmt.Errorf("sync completed with %d error(s)", result.Errors)
 	}
+	return nil
 }
 
-func runMonitor(args []string) {
+func runMonitor(args []string, out, errOut io.Writer) error {
 	common, _ := parseCommonFlags(args)
 
-	cfg := loadConfig(common.configPath)
-	client := newGHClient(cfg)
+	cfg, err := loadConfig(common.configPath)
+	if err != nil {
+		return err
+	}
+	client, err := newGHClient(cfg)
+	if err != nil {
+		return err
+	}
 
-	centralOwner, centralRepo := detectCentralRepo()
+	centralOwner, centralRepo, err := detectCentralRepo(errOut)
+	if err != nil {
+		return err
+	}
 	mon := monitor.New(cfg, client, centralOwner, centralRepo)
 
 	deployState := loadDeploymentState(client, centralOwner, centralRepo)
@@ -211,11 +242,10 @@ func runMonitor(args []string) {
 		TargetFilter: common.targetFilter,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "monitor error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("monitor error: %w", err)
 	}
 
-	printJSON(result)
+	printJSON(result, out)
 
 	setOutput("repos-in-sync", strconv.Itoa(result.ReposInSync))
 	setOutput("repos-drifted", strconv.Itoa(result.ReposDrifted))
@@ -223,9 +253,10 @@ func runMonitor(args []string) {
 	setOutput("issues-closed", strconv.Itoa(result.IssuesClosed))
 	summaryJSON, _ := json.Marshal(result)
 	setOutput("summary", string(summaryJSON))
+	return nil
 }
 
-func runConflict(args []string) {
+func runConflict(args []string, out, errOut io.Writer) error {
 	common, remaining := parseCommonFlags(args)
 	var tiers []int
 
@@ -235,8 +266,7 @@ func runConflict(args []string) {
 				t = strings.TrimSpace(t)
 				n, err := strconv.Atoi(t)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "invalid tier: %s\n", t)
-					os.Exit(1)
+					return fmt.Errorf("invalid tier: %s", t)
 				}
 				tiers = append(tiers, n)
 			}
@@ -244,15 +274,23 @@ func runConflict(args []string) {
 		}
 	}
 
-	cfg := loadConfig(common.configPath)
-	client := newGHClient(cfg)
+	cfg, err := loadConfig(common.configPath)
+	if err != nil {
+		return err
+	}
+	client, err := newGHClient(cfg)
+	if err != nil {
+		return err
+	}
 
-	centralOwner, centralRepo := detectCentralRepo()
+	centralOwner, centralRepo, err := detectCentralRepo(errOut)
+	if err != nil {
+		return err
+	}
 	scanner := conflict.New(cfg, client, centralOwner, centralRepo)
 
 	deployState := loadDeploymentState(client, centralOwner, centralRepo)
 
-	// Collect target repo names from deployment state
 	var targets []string
 	for repo := range deployState.Repositories {
 		targets = append(targets, repo)
@@ -264,11 +302,10 @@ func runConflict(args []string) {
 		Tiers:        tiers,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "conflict detection error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("conflict detection error: %w", err)
 	}
 
-	printJSON(report)
+	printJSON(report, out)
 
 	setOutput("conflicts-found", strconv.Itoa(len(report.Entries)))
 	setOutput("critical-count", strconv.Itoa(report.SeveritySummary.Critical))
@@ -278,8 +315,9 @@ func runConflict(args []string) {
 	setOutput("report", string(reportJSON))
 
 	if report.SeveritySummary.Critical > 0 {
-		os.Exit(1)
+		return fmt.Errorf("conflict detection found %d critical conflict(s)", report.SeveritySummary.Critical)
 	}
+	return nil
 }
 
 func detectTrigger() string {
@@ -295,36 +333,32 @@ func detectTrigger() string {
 	return "manual"
 }
 
-func detectCentralRepo() (string, string) {
+func detectCentralRepo(errOut io.Writer) (string, string, error) {
 	repo := os.Getenv("GITHUB_REPOSITORY")
 	if repo != "" {
 		parts := strings.SplitN(repo, "/", 2)
 		if len(parts) == 2 {
-			return parts[0], parts[1]
+			return parts[0], parts[1], nil
 		}
 	}
-	fmt.Fprintf(os.Stderr, "error: cannot determine central repository; set GITHUB_REPOSITORY or run in a GitHub Actions environment\n")
-	os.Exit(1)
-	return "", ""
+	return "", "", fmt.Errorf("cannot determine central repository; set GITHUB_REPOSITORY or run in a GitHub Actions environment")
 }
 
 func loadDeploymentState(client *gh.Client, owner, repo string) *state.DeploymentState {
 	ctx := context.Background()
 	data, _, err := client.Repos.GetFileContent(ctx, owner, repo, ".steerspec/deployment-state.json", "")
 	if err != nil {
-		// State file may not exist yet; return empty state
 		return state.NewDeploymentState()
 	}
 	ds, err := state.Load(data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not parse deployment state, starting fresh: %v\n", err)
 		return state.NewDeploymentState()
 	}
 	return ds
 }
 
-func printJSON(v any) {
-	enc := json.NewEncoder(os.Stdout)
+func printJSON(v any, w io.Writer) {
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	enc.Encode(v)
+	enc.Encode(v) //nolint:errcheck
 }

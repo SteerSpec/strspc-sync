@@ -12,6 +12,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -19,11 +22,23 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test -race -coverprofile=coverage.out ./...
+      - name: Check coverage threshold
+        run: |
+          go tool cover -func=coverage.out | awk '/^total:/ {
+            pct = $3+0
+            if (pct < 70) { print "Coverage " pct "% below 70% threshold"; exit 1 }
+            print "Coverage OK: " pct "%"
+          }'
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage.out
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
 
   lint:
     runs-on: ubuntu-latest
@@ -35,3 +50,24 @@ jobs:
       - uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+
+  lint-extra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
+      - name: shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: '.'
+          severity: warning
+      - name: yamllint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: .yamllint.yml
+      - name: markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          config: .markdownlint.yml
+          globs: '**/*.md'

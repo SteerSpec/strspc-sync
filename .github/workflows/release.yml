@@ -18,6 +18,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Pre-flight tests
+        run: go test -race ./...
+      - name: Build smoke test
+        run: go build -o /tmp/strspc ./cmd/strspc && /tmp/strspc version
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: '~> v2'
