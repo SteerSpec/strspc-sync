@@ -26,7 +26,7 @@ type RepoService interface {
 	ListByTopic(ctx context.Context, topic string) ([]*Repository, error)
 	GetDefaultBranch(ctx context.Context, owner, repo string) (string, error)
 	GetFileContent(ctx context.Context, owner, repo, path, ref string) ([]byte, string, error) // content, sha, error
-	CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha string, message string) error
+	CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha, message string) error
 }
 
 // PullRequestService provides access to pull-request-related GitHub API endpoints.
@@ -181,7 +181,7 @@ func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installat
 	hc := &http.Client{Timeout: 30 * time.Second}
 
 	makeReq := func(method, url string) (*http.Request, error) {
-		req, err := http.NewRequestWithContext(ctx, method, url, nil)
+		req, err := http.NewRequestWithContext(ctx, method, url, http.NoBody)
 		if err != nil {
 			return nil, err
 		}

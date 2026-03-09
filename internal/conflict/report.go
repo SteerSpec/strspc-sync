@@ -15,12 +15,12 @@ const (
 type ConflictType string
 
 const (
-	TypeVersionDrift              ConflictType = "version-drift"
-	TypeManualOverride            ConflictType = "manual-override"
-	TypeCrossReferenceBroken      ConflictType = "cross-reference-broken"
-	TypeDuplicateSkill            ConflictType = "duplicate-skill"
-	TypeContradictoryInstruction  ConflictType = "contradictory-instruction"
-	TypeUnmanagedFile             ConflictType = "unmanaged-file"
+	TypeVersionDrift             ConflictType = "version-drift"
+	TypeManualOverride           ConflictType = "manual-override"
+	TypeCrossReferenceBroken     ConflictType = "cross-reference-broken"
+	TypeDuplicateSkill           ConflictType = "duplicate-skill"
+	TypeContradictoryInstruction ConflictType = "contradictory-instruction"
+	TypeUnmanagedFile            ConflictType = "unmanaged-file"
 )
 
 // ConflictReport holds the results of a conflict scan.

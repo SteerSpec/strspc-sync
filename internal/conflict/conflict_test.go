@@ -78,9 +78,11 @@ type mockPRService struct{}
 func (m *mockPRService) List(_ context.Context, _, _ string, _ *gh.PullRequestListOptions) ([]*gh.PullRequest, error) {
 	return nil, nil
 }
+
 func (m *mockPRService) Create(_ context.Context, _, _ string, _ *gh.PullRequestCreate) (*gh.PullRequest, error) {
 	return nil, nil
 }
+
 func (m *mockPRService) Update(_ context.Context, _, _ string, _ int, _ *gh.PullRequestUpdate) error {
 	return nil
 }

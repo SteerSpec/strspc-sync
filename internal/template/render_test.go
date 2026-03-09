@@ -1,6 +1,7 @@
 package template
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -75,7 +76,7 @@ func TestRenderMarkerNoExisting(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if string(out) != string(template) {
+	if !bytes.Equal(out, template) {
 		t.Errorf("got %q, want %q", string(out), string(template))
 	}
 }
@@ -88,7 +89,7 @@ func TestRenderMarkerEmptyExisting(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if string(out) != string(template) {
+	if !bytes.Equal(out, template) {
 		t.Errorf("got %q, want %q", string(out), string(template))
 	}
 }
@@ -102,7 +103,7 @@ func TestRenderFullReplace(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if string(out) != string(tmpl) {
+	if !bytes.Equal(out, tmpl) {
 		t.Errorf("got %q, want %q", string(out), string(tmpl))
 	}
 }
@@ -145,17 +146,11 @@ func TestRenderEmptyTemplate(t *testing.T) {
 func TestRenderMarkerMissingEndMarker(t *testing.T) {
 	tmpl := []byte("<!-- STEERSPEC:BEGIN:test -->\ncontent")
 
-	_, err := Render(StrategyMarker, tmpl, nil, nil)
-	// With no existing content, the template is returned as-is,
-	// but the extractSections should still catch unclosed markers
-	// since we need to parse template sections
-	if err != nil {
-		// extractSections is only called when existingContent is non-empty
-		// for the template path; with empty existing, template is returned directly
-	}
+	// With no existing content the template is returned as-is; no error expected.
+	_, _ = Render(StrategyMarker, tmpl, nil, nil)
 
 	// Test with existing content to trigger template parsing
-	_, err = Render(StrategyMarker, tmpl, []byte("existing"), nil)
+	_, err := Render(StrategyMarker, tmpl, []byte("existing"), nil)
 	if err == nil {
 		t.Fatal("expected error for unclosed marker")
 	}

@@ -12,7 +12,7 @@ const (
 )
 
 // Render dispatches to the appropriate renderer based on strategy.
-func Render(strategy Strategy, templateContent []byte, existingContent []byte, variables map[string]string) ([]byte, error) {
+func Render(strategy Strategy, templateContent, existingContent []byte, variables map[string]string) ([]byte, error) {
 	switch strategy {
 	case StrategyMustache:
 		return renderMustache(templateContent, variables)

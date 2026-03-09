@@ -76,7 +76,7 @@ var (
 	validTemplateTypes = map[string]bool{"claude-md": true, "skill": true, "agent": true, "config": true, "custom": true}
 	validStrategies    = map[string]bool{"mustache": true, "marker": true, "full-replace": true}
 	validConflictTiers = map[int]bool{1: true, 2: true, 3: true}
-	semverRE           = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+	semverRE           = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 func Load(path string) (*SyncConfig, error) {

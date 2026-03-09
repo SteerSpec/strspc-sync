@@ -113,7 +113,7 @@ func (s *issueService) Update(ctx context.Context, owner, repo string, number in
 	if err := checkResponse(resp); err != nil {
 		return fmt.Errorf("update issue %s/%s#%d: %w", owner, repo, number, err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck // success response body close is best-effort
 	return nil
 }
 
@@ -128,7 +128,7 @@ func (s *issueService) Close(ctx context.Context, owner, repo string, number int
 	if err := checkResponse(resp); err != nil {
 		return fmt.Errorf("close issue %s/%s#%d: %w", owner, repo, number, err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck // success response body close is best-effort
 	return nil
 }
 

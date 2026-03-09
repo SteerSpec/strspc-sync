@@ -70,7 +70,7 @@ func extractSections(data []byte) ([]section, error) {
 	return sections, nil
 }
 
-func renderMarker(templateContent []byte, existingContent []byte) ([]byte, error) {
+func renderMarker(templateContent, existingContent []byte) ([]byte, error) {
 	if len(existingContent) == 0 {
 		return templateContent, nil
 	}

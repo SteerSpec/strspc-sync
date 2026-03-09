@@ -220,17 +220,17 @@ func driftIssueTitle(repo, templateID string) string {
 func driftIssueBody(e DriftEntry) string {
 	var b strings.Builder
 	b.WriteString("## SteerSpec Drift Detected\n\n")
-	b.WriteString(fmt.Sprintf("**Repository:** `%s`\n", e.Repo))
-	b.WriteString(fmt.Sprintf("**Template:** `%s`\n", e.TemplateID))
-	b.WriteString(fmt.Sprintf("**Expected Version:** `%s`\n", e.ExpectedVersion))
-	b.WriteString(fmt.Sprintf("**Expected Hash:** `%s`\n", e.ExpectedHash))
+	fmt.Fprintf(&b, "**Repository:** `%s`\n", e.Repo)
+	fmt.Fprintf(&b, "**Template:** `%s`\n", e.TemplateID)
+	fmt.Fprintf(&b, "**Expected Version:** `%s`\n", e.ExpectedVersion)
+	fmt.Fprintf(&b, "**Expected Hash:** `%s`\n", e.ExpectedHash)
 	if e.ActualHash != "" {
-		b.WriteString(fmt.Sprintf("**Actual Hash:** `%s`\n", e.ActualHash))
+		fmt.Fprintf(&b, "**Actual Hash:** `%s`\n", e.ActualHash)
 	} else {
 		b.WriteString("**Actual Hash:** _(file not found)_\n")
 	}
 	if e.PRNumber > 0 {
-		b.WriteString(fmt.Sprintf("**PR:** #%d\n", e.PRNumber))
+		fmt.Fprintf(&b, "**PR:** #%d\n", e.PRNumber)
 	}
 	b.WriteString(fmt.Sprintf("**First Detected:** %s\n", e.FirstDetected.Format(time.RFC3339)))
 	return b.String()

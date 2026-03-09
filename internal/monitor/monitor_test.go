@@ -31,12 +31,15 @@ func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, _
 func (m *mockRepoService) ListByOrg(_ context.Context, _ string) ([]*gh.Repository, error) {
 	return nil, nil
 }
+
 func (m *mockRepoService) ListByTopic(_ context.Context, _ string) ([]*gh.Repository, error) {
 	return nil, nil
 }
+
 func (m *mockRepoService) GetDefaultBranch(_ context.Context, _, _ string) (string, error) {
 	return "main", nil
 }
+
 func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, _, _, _, _ string, _ []byte, _, _ string) error {
 	return nil
 }

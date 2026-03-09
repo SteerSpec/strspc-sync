@@ -360,7 +360,7 @@ func TestRepoListByTopic(t *testing.T) {
 				{Name: "r1", FullName: "o/r1", Owner: struct{ Login string }{Login: "o"}, Topics: []string{"steerspec"}},
 			},
 		}
-		json.NewEncoder(w).Encode(result)
+		json.NewEncoder(w).Encode(result) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -379,7 +379,7 @@ func TestRepoGetFileContent(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/contents/path/to/file", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{
+		json.NewEncoder(w).Encode(map[string]string{ //nolint:errcheck // test handler write
 			"content":  encoded,
 			"sha":      "abc123",
 			"encoding": "base64",
@@ -407,7 +407,7 @@ func TestRepoCreateOrUpdateFile(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"content":{"sha":"newsha"}}`)
+		fmt.Fprint(w, `{"content":{"sha":"newsha"}}`) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -425,7 +425,7 @@ func TestPRCreate(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
 			"number":   42,
 			"title":    "Test PR",
 			"state":    "open",
@@ -487,7 +487,7 @@ func TestPRCreateBranch(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/git/refs", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-		fmt.Fprint(w, `{"ref":"refs/heads/new-branch"}`)
+		fmt.Fprint(w, `{"ref":"refs/heads/new-branch"}`) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -587,7 +587,7 @@ func TestErrorHandling404(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, `{"message":"Not Found"}`)
+		fmt.Fprint(w, `{"message":"Not Found"}`) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -641,7 +641,7 @@ func TestAuthHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d (auth or accept header mismatch)", resp.StatusCode)
 	}

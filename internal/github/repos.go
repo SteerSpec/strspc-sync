@@ -122,7 +122,7 @@ func (s *repoService) GetFileContent(ctx context.Context, owner, repo, path, ref
 	return decoded, content.SHA, nil
 }
 
-func (s *repoService) CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha string, message string) error {
+func (s *repoService) CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha, message string) error {
 	u := fmt.Sprintf("%s/repos/%s/%s/contents/%s", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), path)
 
 	body := map[string]string{

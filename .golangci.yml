@@ -18,6 +18,11 @@ linters:
         - performance
       disabled-checks:
         - whyNoLint
+        - hugeParam
+        - unnamedResult
+        - nestingReduce
+        - rangeValCopy
+        - ifElseChain
 
 formatters:
   enable:
