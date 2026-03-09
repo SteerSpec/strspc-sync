@@ -535,7 +535,7 @@ func TestIssueUpdate(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/issues/10", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(apiIssue{Number: 10, Title: "Updated", State: "open"})
+		json.NewEncoder(w).Encode(apiIssue{Number: 10, Title: "Updated", State: "open"}) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -550,7 +550,7 @@ func TestIssueClose(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/issues/10", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(apiIssue{Number: 10, State: "closed"})
+		json.NewEncoder(w).Encode(apiIssue{Number: 10, State: "closed"}) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -567,7 +567,7 @@ func TestIssueListFiltersPRs(t *testing.T) {
 			{"number": 1, "title": "Real issue", "state": "open"},
 			{"number": 2, "title": "Actually a PR", "state": "open", "pull_request": map[string]string{"url": "https://api.github.com/repos/o/r/pulls/2"}},
 		}
-		json.NewEncoder(w).Encode(issues)
+		json.NewEncoder(w).Encode(issues) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -676,7 +676,7 @@ func TestPRCreateRequestBody(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
 			"number":   1,
 			"title":    "Test Title",
 			"state":    "open",
@@ -737,7 +737,7 @@ func TestIssueCreateLabels(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
 			"number":   5,
 			"title":    body["title"],
 			"state":    "open",

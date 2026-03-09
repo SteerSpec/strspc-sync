@@ -145,7 +145,7 @@ func (s *repoService) CreateOrUpdateFile(ctx context.Context, owner, repo, path,
 	if err := checkResponse(resp); err != nil {
 		return fmt.Errorf("create/update file %s/%s/%s: %w", owner, repo, path, err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck // success response body close is best-effort
 	return nil
 }
 
@@ -171,7 +171,7 @@ func (r *apiRepo) toDomain() *Repository {
 }
 
 func decodeBody(resp *http.Response, v any) error {
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // response body close is best-effort
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read response body: %w", err)
