@@ -458,7 +458,7 @@ func TestPRUpdate(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(apiPullRequest{Number: 1, Title: "Updated", State: "open"})
+		json.NewEncoder(w).Encode(apiPullRequest{Number: 1, Title: "Updated", State: "open"}) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -473,7 +473,7 @@ func TestPRClose(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/pulls/1", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(apiPullRequest{Number: 1, State: "closed"})
+		json.NewEncoder(w).Encode(apiPullRequest{Number: 1, State: "closed"}) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -505,7 +505,7 @@ func TestIssueCreate(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
 			"number":   10,
 			"title":    "Bug",
 			"state":    "open",
@@ -609,7 +609,7 @@ func TestErrorHandling403NonRateLimit(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprint(w, `{"message":"Repository access blocked"}`)
+		fmt.Fprint(w, `{"message":"Repository access blocked"}`) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -633,7 +633,7 @@ func TestAuthHeader(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{}`)
+		fmt.Fprint(w, `{}`) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)
@@ -688,7 +688,7 @@ func TestPRCreateRequestBody(t *testing.T) {
 	// Handle label addition (PR create adds labels separately)
 	mux.HandleFunc("/repos/o/r/issues/1/labels", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `[{"name":"steerspec-sync"}]`)
+		fmt.Fprint(w, `[{"name":"steerspec-sync"}]`) //nolint:errcheck // test handler write
 	})
 
 	c := testClient(t, mux)

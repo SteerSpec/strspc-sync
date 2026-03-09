@@ -126,7 +126,7 @@ func (s *pullRequestService) Update(ctx context.Context, owner, repo string, num
 	if err := checkResponse(resp); err != nil {
 		return fmt.Errorf("update PR %s/%s#%d: %w", owner, repo, number, err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck // success response body close is best-effort
 	return nil
 }
 
@@ -141,7 +141,7 @@ func (s *pullRequestService) Close(ctx context.Context, owner, repo string, numb
 	if err := checkResponse(resp); err != nil {
 		return fmt.Errorf("close PR %s/%s#%d: %w", owner, repo, number, err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck // success response body close is best-effort
 	return nil
 }
 
@@ -159,7 +159,7 @@ func (s *pullRequestService) CreateBranch(ctx context.Context, owner, repo, bran
 	if err := checkResponse(resp); err != nil {
 		return fmt.Errorf("create branch %s in %s/%s: %w", branch, owner, repo, err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck // success response body close is best-effort
 	return nil
 }
 

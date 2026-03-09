@@ -232,6 +232,6 @@ func driftIssueBody(e DriftEntry) string {
 	if e.PRNumber > 0 {
 		fmt.Fprintf(&b, "**PR:** #%d\n", e.PRNumber)
 	}
-	b.WriteString(fmt.Sprintf("**First Detected:** %s\n", e.FirstDetected.Format(time.RFC3339)))
+	fmt.Fprintf(&b, "**First Detected:** %s\n", e.FirstDetected.Format(time.RFC3339))
 	return b.String()
 }
