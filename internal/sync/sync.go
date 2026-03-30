@@ -54,12 +54,14 @@ type Options struct {
 
 // Syncer orchestrates template synchronization across repositories.
 type Syncer struct {
-	cfg      *config.SyncConfig
-	ghClient *gh.Client
-	reg      *registry.Registry
-	stateMu  gosync.Mutex
-	state    *state.DeploymentState
-	stateSHA string // SHA of the state file for updates
+	cfg          *config.SyncConfig
+	ghClient     *gh.Client
+	reg          *registry.Registry
+	centralOwner string
+	centralRepo  string
+	stateMu      gosync.Mutex
+	state        *state.DeploymentState
+	stateSHA     string // SHA of the state file for updates
 }
 
 // repoListerAdapter adapts gh.RepoService to registry.RepoLister.
@@ -103,13 +105,16 @@ func (a *repoListerAdapter) ListByTopic(ctx context.Context, topic string) ([]*r
 	return result, nil
 }
 
-// New creates a new Syncer.
-func New(cfg *config.SyncConfig, ghClient *gh.Client) *Syncer {
+// New creates a new Syncer. The centralOwner and centralRepo identify the
+// repository that holds templates and deployment state.
+func New(cfg *config.SyncConfig, ghClient *gh.Client, centralOwner, centralRepo string) *Syncer {
 	adapter := &repoListerAdapter{repos: ghClient.Repos}
 	return &Syncer{
-		cfg:      cfg,
-		ghClient: ghClient,
-		reg:      registry.New(adapter),
+		cfg:          cfg,
+		ghClient:     ghClient,
+		reg:          registry.New(adapter),
+		centralOwner: centralOwner,
+		centralRepo:  centralRepo,
 	}
 }
 
@@ -228,9 +233,8 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	owner, repo := splitRepo(target.Repo)
 
 	// Read template source from central repo
-	centralOwner, centralRepo := splitRepo(s.cfg.Targets.Include[0])
 	// The template source is relative to the config repo
-	templateContent, _, err := s.ghClient.Repos.GetFileContent(ctx, centralOwner, centralRepo, tmpl.Source, "")
+	templateContent, _, err := s.ghClient.Repos.GetFileContent(ctx, s.centralOwner, s.centralRepo, tmpl.Source, "")
 	if err != nil {
 		rr.Status = "error"
 		rr.Error = fmt.Sprintf("reading template source: %v", err)
@@ -376,12 +380,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 }
 
 func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string, error) {
-	// Determine central repo from first include pattern
-	if len(s.cfg.Targets.Include) == 0 {
-		return state.NewDeploymentState(), "", nil
-	}
-	owner, repo := splitRepo(s.cfg.Targets.Include[0])
-	data, sha, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, ".steerspec/deployment-state.json", "")
+	data, sha, err := s.ghClient.Repos.GetFileContent(ctx, s.centralOwner, s.centralRepo, ".steerspec/deployment-state.json", "")
 	if err != nil {
 		return nil, "", err
 	}
@@ -390,15 +389,11 @@ func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string,
 }
 
 func (s *Syncer) saveState(ctx context.Context) error {
-	if len(s.cfg.Targets.Include) == 0 {
-		return nil
-	}
-	owner, repo := splitRepo(s.cfg.Targets.Include[0])
 	data, err := s.state.Save()
 	if err != nil {
 		return fmt.Errorf("serializing state: %w", err)
 	}
-	return s.ghClient.Repos.CreateOrUpdateFile(ctx, owner, repo, ".steerspec/deployment-state.json", "", data, s.stateSHA, "[SteerSpec] Update deployment state")
+	return s.ghClient.Repos.CreateOrUpdateFile(ctx, s.centralOwner, s.centralRepo, ".steerspec/deployment-state.json", "", data, s.stateSHA, "[SteerSpec] Update deployment state")
 }
 
 func (s *Syncer) getBaseSHA(ctx context.Context, owner, repo, branch string) (string, error) {

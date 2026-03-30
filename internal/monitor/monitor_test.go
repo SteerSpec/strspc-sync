@@ -452,6 +452,125 @@ func TestMNRACT005_HashBasedDriftDetection(t *testing.T) {
 	}
 }
 
+func TestFingerprintBasedDedup_MatchesByFingerprint(t *testing.T) {
+	expectedContent := []byte("expected")
+	actualContent := []byte("drifted")
+	expectedHash := hash.HashBytes(expectedContent)
+
+	repoSvc := &mockRepoService{
+		files: map[string][]byte{
+			"org/app/CLAUDE.md": actualContent,
+		},
+	}
+	issueSvc := newMockIssueService()
+	// Pre-populate an existing issue with a fingerprint but a DIFFERENT title
+	fp := hash.Fingerprint("drift", "org/app", "claude-md")
+	issueSvc.issues = []*gh.Issue{
+		{
+			Number: 88,
+			Title:  "[SteerSpec Drift] COMPLETELY DIFFERENT TITLE",
+			Body:   "old body\n\n<!-- steerspec-fingerprint: " + fp + " -->",
+			State:  "open",
+			Labels: []string{"steerspec-drift"},
+			URL:    "https://github.com/test/central/issues/88",
+		},
+	}
+	client := makeClient(repoSvc, issueSvc)
+
+	ds := makeState(map[string]map[string]state.TemplateState{
+		"org/app": {
+			"claude-md": {Version: "1.0", Hash: expectedHash, Timestamp: time.Now()},
+		},
+	})
+
+	mon := New(testConfig(), client, "test", "central")
+	res, err := mon.Run(context.Background(), ds, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.IssuesCreated != 0 {
+		t.Errorf("expected 0 new issues (fingerprint match should update), got %d", res.IssuesCreated)
+	}
+	if _, ok := issueSvc.updated[88]; !ok {
+		t.Error("expected existing issue #88 to be updated via fingerprint match")
+	}
+}
+
+func TestFingerprintBasedDedup_CreatesWithFingerprint(t *testing.T) {
+	expectedContent := []byte("expected")
+	actualContent := []byte("drifted")
+	expectedHash := hash.HashBytes(expectedContent)
+
+	repoSvc := &mockRepoService{
+		files: map[string][]byte{
+			"org/app/CLAUDE.md": actualContent,
+		},
+	}
+	issueSvc := newMockIssueService()
+	client := makeClient(repoSvc, issueSvc)
+
+	ds := makeState(map[string]map[string]state.TemplateState{
+		"org/app": {
+			"claude-md": {Version: "1.0", Hash: expectedHash, Timestamp: time.Now()},
+		},
+	})
+
+	mon := New(testConfig(), client, "test", "central")
+	_, err := mon.Run(context.Background(), ds, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(issueSvc.created) != 1 {
+		t.Fatalf("expected 1 issue created, got %d", len(issueSvc.created))
+	}
+	if !strings.Contains(issueSvc.created[0].Body, "<!-- steerspec-fingerprint:") {
+		t.Error("created issue body should contain fingerprint marker")
+	}
+}
+
+func TestFingerprintBasedDedup_AutoCloseByFingerprint(t *testing.T) {
+	content := []byte("matching content")
+	h := hash.HashBytes(content)
+
+	repoSvc := &mockRepoService{
+		files: map[string][]byte{
+			"org/app/CLAUDE.md": content,
+		},
+	}
+	issueSvc := newMockIssueService()
+	// Issue has fingerprint but different title
+	fp := hash.Fingerprint("drift", "org/app", "claude-md")
+	issueSvc.issues = []*gh.Issue{
+		{
+			Number: 99,
+			Title:  "[SteerSpec Drift] RENAMED TITLE",
+			Body:   "drift body\n\n<!-- steerspec-fingerprint: " + fp + " -->",
+			State:  "open",
+			Labels: []string{"steerspec-drift"},
+			URL:    "https://github.com/test/central/issues/99",
+		},
+	}
+	client := makeClient(repoSvc, issueSvc)
+
+	ds := makeState(map[string]map[string]state.TemplateState{
+		"org/app": {
+			"claude-md": {Version: "1.0", Hash: h, Timestamp: time.Now()},
+		},
+	})
+
+	mon := New(testConfig(), client, "test", "central")
+	res, err := mon.Run(context.Background(), ds, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.IssuesClosed != 1 {
+		t.Errorf("expected 1 issue closed via fingerprint match, got %d", res.IssuesClosed)
+	}
+	if len(issueSvc.closed) != 1 || issueSvc.closed[0] != 99 {
+		t.Errorf("expected issue #99 closed, got %v", issueSvc.closed)
+	}
+}
+
 func TestMNRACT008_NoDuplicateDriftIssues_TwoPassScenario(t *testing.T) {
 	expectedContent := []byte("expected")
 	actualContent := []byte("drifted")

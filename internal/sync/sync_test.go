@@ -185,8 +185,8 @@ func setupMockRepos(repoSvc *mockRepoService) {
 		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
 		{Owner: "testorg", Name: "repo-b", FullName: "testorg/repo-b", DefaultBranch: "main"},
 	}
-	// Template source file
-	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	// Template source file in central repo
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
 	// State file (empty/missing is fine)
 }
 
@@ -198,7 +198,7 @@ func TestRunBasic(t *testing.T) {
 	cfg := makeTestConfig()
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -223,7 +223,7 @@ func TestDryRun(t *testing.T) {
 	cfg := makeTestConfig()
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	result, err := syncer.Run(context.Background(), Options{
 		DryRun:  true,
 		Trigger: "manual",
@@ -248,7 +248,7 @@ func TestTargetFilter(t *testing.T) {
 	cfg := makeTestConfig()
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	result, err := syncer.Run(context.Background(), Options{
 		TargetFilter: "testorg/repo-a",
 		Trigger:      "manual",
@@ -277,11 +277,11 @@ func TestTemplateFilter(t *testing.T) {
 		Strategy:    "full-replace",
 	})
 	// Add source for second template
-	repoSvc.files["testorg/*/templates/review.md/"] = []byte("review content")
+	repoSvc.files["testorg/central/templates/review.md/"] = []byte("review content")
 
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	result, err := syncer.Run(context.Background(), Options{
 		TemplateFilter: "claude-md",
 		Trigger:        "manual",
@@ -304,7 +304,7 @@ func TestForceBypassesHashCheck(t *testing.T) {
 	cfg := makeTestConfig()
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 
 	// First run to populate state
 	_, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
@@ -329,7 +329,7 @@ func TestForceBypassesHashCheck(t *testing.T) {
 	prSvc2 := newMockPRService()
 	// Copy existing PRs so they can be found
 	client2 := makeTestClient(repoSvc, prSvc2)
-	syncer2 := New(cfg, client2)
+	syncer2 := New(cfg, client2, "testorg", "central")
 	syncer2.state = syncer.state // carry over state
 
 	result3, err := syncer2.Run(context.Background(), Options{Force: true, Trigger: "manual"})
@@ -354,7 +354,7 @@ func TestPerRepoErrorIsolation(t *testing.T) {
 		{Owner: "testorg", Name: "repo-fail", FullName: "testorg/repo-fail", DefaultBranch: "main"},
 	}
 	// Only provide template source (both repos try to read from central, which uses first include pattern)
-	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("content")
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("content")
 
 	// Make PR creation fail for repo-fail
 	failPRSvc := &failingPRService{
@@ -368,7 +368,7 @@ func TestPerRepoErrorIsolation(t *testing.T) {
 		PullRequests: failPRSvc,
 	}
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -424,7 +424,7 @@ func TestConcurrencyLimiting(t *testing.T) {
 		})
 	}
 	repoSvc.repos["testorg"] = repos
-	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("content")
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("content")
 
 	var maxConcurrent int64
 	var current int64
@@ -452,7 +452,7 @@ func TestConcurrencyLimiting(t *testing.T) {
 		PullRequests: slowPR,
 	}
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	_, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -550,7 +550,7 @@ func TestPRTitleFormat(t *testing.T) {
 	cfg := makeTestConfig()
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	_, err := syncer.Run(context.Background(), Options{Trigger: "push"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -585,7 +585,7 @@ func TestSYNCPR002_BranchNameFormat(t *testing.T) {
 	cfg := makeTestConfig()
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	_, err := syncer.Run(context.Background(), Options{Trigger: "push"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -607,7 +607,7 @@ func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
 	repoSvc.repos["testorg"] = []*gh.Repository{
 		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
 	}
-	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
 
 	// Pre-populate an open PR matching the template
 	basePR.prs["testorg/repo-a"] = []*gh.PullRequest{
@@ -628,7 +628,7 @@ func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
 		PullRequests: prSvc,
 	}
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	result, err := syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -655,7 +655,7 @@ func TestSYNCPR006_CloseStalePRs(t *testing.T) {
 	repoSvc.repos["testorg"] = []*gh.Repository{
 		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
 	}
-	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
 
 	// Pre-populate 2 old stale PRs with matching title prefix and label
 	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{
@@ -678,7 +678,7 @@ func TestSYNCPR006_CloseStalePRs(t *testing.T) {
 	cfg := makeTestConfig()
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -702,7 +702,7 @@ func TestSYNCACT_ResultCounts(t *testing.T) {
 		{Owner: "testorg", Name: "repo-insync", FullName: "testorg/repo-insync", DefaultBranch: "main"},
 		{Owner: "testorg", Name: "repo-fail", FullName: "testorg/repo-fail", DefaultBranch: "main"},
 	}
-	repoSvc.files["testorg/*/templates/CLAUDE.md/"] = []byte("content")
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("content")
 
 	failPR := &failingPRService{
 		inner:    newMockPRService(),
@@ -715,7 +715,7 @@ func TestSYNCACT_ResultCounts(t *testing.T) {
 		PullRequests: failPR,
 	}
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 
 	// First run: creates PRs for repo-new and repo-fail (fails)
 	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
@@ -749,7 +749,7 @@ func TestDryRunDoesNotSaveState(t *testing.T) {
 	cfg := makeTestConfig()
 	client := makeTestClient(repoSvc, prSvc)
 
-	syncer := New(cfg, client)
+	syncer := New(cfg, client, "testorg", "central")
 	_, err := syncer.Run(context.Background(), Options{
 		DryRun:  true,
 		Trigger: "manual",

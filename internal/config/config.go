@@ -9,14 +9,15 @@ import (
 )
 
 type SyncConfig struct {
-	Version   string            `yaml:"version"`
-	Auth      AuthConfig        `yaml:"auth"`
-	Variables map[string]string `yaml:"variables,omitempty"`
-	Templates []TemplateConfig  `yaml:"templates"`
-	Targets   TargetsConfig     `yaml:"targets"`
-	Sync      SyncBehavior      `yaml:"sync,omitempty"`
-	Monitor   MonitorBehavior   `yaml:"monitor,omitempty"`
-	Conflicts ConflictBehavior  `yaml:"conflicts,omitempty"`
+	Version     string            `yaml:"version"`
+	CentralRepo string            `yaml:"central-repo,omitempty"`
+	Auth        AuthConfig        `yaml:"auth"`
+	Variables   map[string]string `yaml:"variables,omitempty"`
+	Templates   []TemplateConfig  `yaml:"templates"`
+	Targets     TargetsConfig     `yaml:"targets"`
+	Sync        SyncBehavior      `yaml:"sync,omitempty"`
+	Monitor     MonitorBehavior   `yaml:"monitor,omitempty"`
+	Conflicts   ConflictBehavior  `yaml:"conflicts,omitempty"`
 }
 
 type AuthConfig struct {
