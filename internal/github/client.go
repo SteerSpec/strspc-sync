@@ -394,7 +394,8 @@ func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)
 			return resp, nil
 		}
 
-		resp.Body.Close() //nolint:errcheck // drain body before retry
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20)) //nolint:errcheck // drain body to enable connection reuse
+		resp.Body.Close()                                     //nolint:errcheck // best-effort close before retry
 
 		if attempt == rl.maxRetries {
 			return nil, fmt.Errorf("rate limit exceeded after %d retries", rl.maxRetries)

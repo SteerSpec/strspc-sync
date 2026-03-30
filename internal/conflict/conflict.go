@@ -79,14 +79,14 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 
 	report.ComputeSummary()
 
-	if err := s.createIssuesForConflicts(ctx, report, targets); err != nil {
+	if err := s.createIssuesForConflicts(ctx, report); err != nil {
 		return report, fmt.Errorf("creating issues: %w", err)
 	}
 
 	return report, nil
 }
 
-func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport, _ []string) error {
+func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport) error {
 	// Only create issues for critical and warning entries
 	for _, entry := range report.Entries {
 		if entry.Severity == SeverityInfo {
