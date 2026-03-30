@@ -3,6 +3,7 @@ package conflict
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -455,6 +456,93 @@ func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {
 	}
 	if len(issues.updated) != 1 {
 		t.Errorf("CNFLACT-007: expected 1 issue updated, got %d", len(issues.updated))
+	}
+}
+
+func TestFingerprintBasedDedup_SkipsWhenFingerprintMatches(t *testing.T) {
+	originalContent := []byte("# Original")
+	driftedContent := []byte("# Drifted")
+
+	repos := &mockRepoService{
+		files: map[string][]byte{
+			"org/repo1/CLAUDE.md": driftedContent,
+		},
+	}
+
+	// Pre-populate an existing issue with a fingerprint in the body (but a DIFFERENT title)
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{
+		issues: []*gh.Issue{
+			{
+				Number: 77,
+				Title:  "[SteerSpec Conflict] TOTALLY DIFFERENT TITLE",
+				Body:   "old body\n\n<!-- steerspec-fingerprint: " + fp + " -->",
+				State:  "open",
+				Labels: []string{"steerspec-conflict"},
+			},
+		},
+	}
+	client := newTestClient(repos, issues)
+	cfg := testConfig()
+
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version:   "1.0.0",
+		Hash:      hash.HashBytes(originalContent),
+		Timestamp: time.Now(),
+	})
+
+	scanner := New(cfg, client, "org", "central")
+	_, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(issues.created) != 0 {
+		t.Errorf("expected no new issues (fingerprint match should update), got %d created", len(issues.created))
+	}
+	if len(issues.updated) != 1 {
+		t.Errorf("expected 1 issue updated via fingerprint match, got %d", len(issues.updated))
+	}
+}
+
+func TestFingerprintBasedDedup_CreatesWhenNoMatch(t *testing.T) {
+	originalContent := []byte("# Original")
+	driftedContent := []byte("# Drifted")
+
+	repos := &mockRepoService{
+		files: map[string][]byte{
+			"org/repo1/CLAUDE.md": driftedContent,
+		},
+	}
+
+	// No existing issues at all
+	issues := &mockIssueService{}
+	client := newTestClient(repos, issues)
+	cfg := testConfig()
+
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version:   "1.0.0",
+		Hash:      hash.HashBytes(originalContent),
+		Timestamp: time.Now(),
+	})
+
+	scanner := New(cfg, client, "org", "central")
+	_, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(issues.created) == 0 {
+		t.Error("expected new issue to be created when no fingerprint match exists")
+	}
+
+	// Verify the created issue body contains a fingerprint
+	for _, ic := range issues.created {
+		if !strings.Contains(ic.Body, "<!-- steerspec-fingerprint:") {
+			t.Errorf("created issue body missing fingerprint marker: %s", ic.Body)
+		}
 	}
 }
 

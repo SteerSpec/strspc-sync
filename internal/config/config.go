@@ -9,14 +9,15 @@ import (
 )
 
 type SyncConfig struct {
-	Version   string            `yaml:"version"`
-	Auth      AuthConfig        `yaml:"auth"`
-	Variables map[string]string `yaml:"variables,omitempty"`
-	Templates []TemplateConfig  `yaml:"templates"`
-	Targets   TargetsConfig     `yaml:"targets"`
-	Sync      SyncBehavior      `yaml:"sync,omitempty"`
-	Monitor   MonitorBehavior   `yaml:"monitor,omitempty"`
-	Conflicts ConflictBehavior  `yaml:"conflicts,omitempty"`
+	Version     string            `yaml:"version"`
+	CentralRepo string            `yaml:"central-repo,omitempty"`
+	Auth        AuthConfig        `yaml:"auth"`
+	Variables   map[string]string `yaml:"variables,omitempty"`
+	Templates   []TemplateConfig  `yaml:"templates"`
+	Targets     TargetsConfig     `yaml:"targets"`
+	Sync        SyncBehavior      `yaml:"sync,omitempty"`
+	Monitor     MonitorBehavior   `yaml:"monitor,omitempty"`
+	Conflicts   ConflictBehavior  `yaml:"conflicts,omitempty"`
 }
 
 type AuthConfig struct {
@@ -151,6 +152,12 @@ func Validate(cfg *SyncConfig) error {
 		}
 	case "github-token":
 		// Token can be empty in config; resolved from GITHUB_TOKEN env var at runtime
+	}
+
+	if cfg.CentralRepo != "" {
+		if matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$`, cfg.CentralRepo); !matched {
+			return fmt.Errorf("central-repo must be in owner/repo format, got %q", cfg.CentralRepo)
+		}
 	}
 
 	if len(cfg.Templates) == 0 {

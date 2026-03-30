@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	"github.com/SteerSpec/strspc-sync/internal/conflict"
@@ -77,20 +78,17 @@ Commands:
   version    Print version information
   help       Show this help
 
-Sync Flags:
+Common Flags:
   --config <path>           Config file path (default: steerspec-sync.yml)
-  --dry-run                 Preview changes without creating PRs
   --target-filter <glob>    Filter target repositories
+  --timeout <duration>      Overall operation timeout (default: 10m)
+
+Sync Flags:
+  --dry-run                 Preview changes without creating PRs
   --template-filter <glob>  Filter templates
   --force                   Force sync even if up to date
 
-Monitor Flags:
-  --config <path>           Config file path (default: steerspec-sync.yml)
-  --target-filter <glob>    Filter target repositories
-
 Conflict Flags:
-  --config <path>           Config file path (default: steerspec-sync.yml)
-  --target-filter <glob>    Filter target repositories
   --tiers <list>            Detection tiers to run (e.g. "1,2,3")
 `)
 }
@@ -98,10 +96,11 @@ Conflict Flags:
 type commonFlags struct {
 	configPath   string
 	targetFilter string
+	timeout      time.Duration
 }
 
 func parseCommonFlags(args []string) (commonFlags, []string) {
-	f := commonFlags{configPath: "steerspec-sync.yml"}
+	f := commonFlags{configPath: "steerspec-sync.yml", timeout: 10 * time.Minute}
 	var remaining []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -113,6 +112,14 @@ func parseCommonFlags(args []string) (commonFlags, []string) {
 		case "--target-filter":
 			if i+1 < len(args) {
 				f.targetFilter = args[i+1]
+				i++
+			}
+		case "--timeout":
+			if i+1 < len(args) {
+				d, err := time.ParseDuration(args[i+1])
+				if err == nil {
+					f.timeout = d
+				}
 				i++
 			}
 		default:
@@ -212,8 +219,16 @@ func runSync(args []string, out, errOut io.Writer) error {
 		return err
 	}
 
-	syncer := sync.New(cfg, client)
-	result, err := syncer.Run(context.Background(), sync.Options{
+	centralOwner, centralRepo, err := detectCentralRepo(cfg, errOut)
+	if err != nil {
+		return fmt.Errorf("resolving central repo: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), common.timeout)
+	defer cancel()
+
+	syncer := sync.New(cfg, client, centralOwner, centralRepo)
+	result, err := syncer.Run(ctx, sync.Options{
 		ConfigPath:     common.configPath,
 		DryRun:         dryRun,
 		TargetFilter:   common.targetFilter,
@@ -252,15 +267,18 @@ func runMonitor(args []string, out, errOut io.Writer) error {
 		return err
 	}
 
-	centralOwner, centralRepo, err := detectCentralRepo(errOut)
+	centralOwner, centralRepo, err := detectCentralRepo(cfg, errOut)
 	if err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), common.timeout)
+	defer cancel()
+
 	mon := monitor.New(cfg, client, centralOwner, centralRepo)
 
 	deployState := loadDeploymentState(client, centralOwner, centralRepo)
 
-	result, err := mon.Run(context.Background(), deployState, monitor.Options{
+	result, err := mon.Run(ctx, deployState, monitor.Options{
 		ConfigPath:   common.configPath,
 		TargetFilter: common.targetFilter,
 	})
@@ -306,10 +324,13 @@ func runConflict(args []string, out, errOut io.Writer) error {
 		return err
 	}
 
-	centralOwner, centralRepo, err := detectCentralRepo(errOut)
+	centralOwner, centralRepo, err := detectCentralRepo(cfg, errOut)
 	if err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), common.timeout)
+	defer cancel()
+
 	scanner := conflict.New(cfg, client, centralOwner, centralRepo)
 
 	deployState := loadDeploymentState(client, centralOwner, centralRepo)
@@ -319,7 +340,7 @@ func runConflict(args []string, out, errOut io.Writer) error {
 		targets = append(targets, repo)
 	}
 
-	report, err := scanner.Run(context.Background(), deployState, targets, conflict.Options{
+	report, err := scanner.Run(ctx, deployState, targets, conflict.Options{
 		ConfigPath:   common.configPath,
 		TargetFilter: common.targetFilter,
 		Tiers:        tiers,
@@ -356,7 +377,17 @@ func detectTrigger() string {
 	return "manual"
 }
 
-func detectCentralRepo(errOut io.Writer) (string, string, error) {
+func detectCentralRepo(cfg *config.SyncConfig, errOut io.Writer) (string, string, error) {
+	// 1. Explicit config field takes priority
+	if cfg.CentralRepo != "" {
+		parts := strings.SplitN(cfg.CentralRepo, "/", 2)
+		if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+			return parts[0], parts[1], nil
+		}
+		return "", "", fmt.Errorf("invalid central-repo value %q: expected owner/repo format", cfg.CentralRepo)
+	}
+
+	// 2. Fall back to GITHUB_REPOSITORY env var
 	repo := os.Getenv("GITHUB_REPOSITORY")
 	if repo != "" {
 		parts := strings.SplitN(repo, "/", 2)
@@ -364,7 +395,7 @@ func detectCentralRepo(errOut io.Writer) (string, string, error) {
 			return parts[0], parts[1], nil
 		}
 	}
-	return "", "", fmt.Errorf("cannot determine central repository; set GITHUB_REPOSITORY or run in a GitHub Actions environment")
+	return "", "", fmt.Errorf("cannot determine central repository; set central-repo in config or GITHUB_REPOSITORY env var")
 }
 
 func loadDeploymentState(client *gh.Client, owner, repo string) *state.DeploymentState {

@@ -17,6 +17,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -134,6 +135,10 @@ type Client struct {
 type rateLimiter struct {
 	maxRetries int
 	baseDelay  time.Duration
+	mu         sync.Mutex
+	remaining  int // -1 means unknown
+	resetAt    time.Time
+	threshold  int // proactive sleep when remaining < threshold
 }
 
 // loadPrivateKey returns PEM bytes from either an inline PEM string or a file path.
@@ -311,6 +316,8 @@ func NewClient(auth AuthConfig) (*Client, error) {
 		rateLimiter: &rateLimiter{
 			maxRetries: 5,
 			baseDelay:  time.Second,
+			remaining:  -1,
+			threshold:  50,
 		},
 	}
 	c.Repos = &repoService{client: c}
@@ -319,15 +326,74 @@ func NewClient(auth AuthConfig) (*Client, error) {
 	return c, nil
 }
 
+// updateRateLimitState reads X-RateLimit-Remaining and X-RateLimit-Reset headers
+// from a response and updates the rate limiter's shared state.
+func (rl *rateLimiter) updateRateLimitState(resp *http.Response) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if v := resp.Header.Get("X-RateLimit-Remaining"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			rl.remaining = n
+		}
+	}
+
+	if v := resp.Header.Get("X-RateLimit-Reset"); v != "" {
+		if ts, err := strconv.ParseInt(v, 10, 64); err == nil {
+			rl.resetAt = time.Unix(ts, 0)
+		}
+	}
+}
+
+// waitIfBelowThreshold sleeps until the rate limit window resets when remaining
+// requests are below the configured threshold. It returns early if the context
+// is cancelled. If the remaining count is unknown (-1), it does not block.
+func (rl *rateLimiter) waitIfBelowThreshold(ctx context.Context) error {
+	rl.mu.Lock()
+	remaining := rl.remaining
+	resetAt := rl.resetAt
+	threshold := rl.threshold
+	rl.mu.Unlock()
+
+	if remaining >= 0 && remaining < threshold && time.Now().Before(resetAt) {
+		sleepDuration := time.Until(resetAt)
+		timer := time.NewTimer(sleepDuration)
+		defer func() {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+		}()
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	return nil
+}
+
 func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)) (*http.Response, error) {
 	var resp *http.Response
 	var err error
 
 	for attempt := 0; attempt <= rl.maxRetries; attempt++ {
+		// Proactively wait if we know we're close to the rate limit.
+		if err := rl.waitIfBelowThreshold(ctx); err != nil {
+			return nil, err
+		}
+
 		resp, err = fn()
 		if err != nil {
 			return nil, err
 		}
+
+		// Always update rate limit state from response headers.
+		rl.updateRateLimitState(resp)
 
 		if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode != http.StatusForbidden {
 			return resp, nil
@@ -338,13 +404,21 @@ func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)
 			return resp, nil
 		}
 
-		resp.Body.Close() //nolint:errcheck // drain body before retry
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20)) //nolint:errcheck // drain body to enable connection reuse
+		resp.Body.Close()                                     //nolint:errcheck // best-effort close before retry
 
 		if attempt == rl.maxRetries {
 			return nil, fmt.Errorf("rate limit exceeded after %d retries", rl.maxRetries)
 		}
 
+		// Prefer Retry-After header (secondary rate limits) over exponential backoff.
 		delay := rl.baseDelay * time.Duration(math.Pow(2, float64(attempt)))
+		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+			if seconds, parseErr := strconv.Atoi(retryAfter); parseErr == nil && seconds > 0 {
+				delay = time.Duration(seconds) * time.Second
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()

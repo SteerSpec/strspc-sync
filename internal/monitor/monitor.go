@@ -12,6 +12,11 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/state"
 )
 
+const (
+	fingerprintPrefix = "<!-- steerspec-fingerprint: "
+	fingerprintSuffix = " -->"
+)
+
 // Result holds the outcome of a monitor run.
 type Result struct {
 	ReposInSync   int          `json:"repos_in_sync"`
@@ -81,10 +86,14 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 		return nil, fmt.Errorf("listing drift issues: %w", err)
 	}
 
-	// Index existing issues by title for fast lookup.
+	// Index existing issues by fingerprint (preferred) and title (fallback) for fast lookup.
+	issueByFingerprint := make(map[string]*gh.Issue, len(existingIssues))
 	issueByTitle := make(map[string]*gh.Issue, len(existingIssues))
 	for _, iss := range existingIssues {
 		issueByTitle[iss.Title] = iss
+		if fp := extractFingerprint(iss.Body); fp != "" {
+			issueByFingerprint[fp] = iss
+		}
 	}
 
 	result := &Result{}
@@ -108,6 +117,8 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 				continue
 			}
 
+			fp := driftFingerprint(repoFullName, templateID)
+
 			content, _, err := m.ghClient.Repos.GetFileContent(ctx, owner, repo, destPath, "")
 			if err != nil {
 				// Treat fetch error as drift (file may be missing).
@@ -121,7 +132,8 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 					FirstDetected:   time.Now(),
 				}
 				issTitle := driftIssueTitle(repoFullName, templateID)
-				if existing, found := issueByTitle[issTitle]; found {
+				existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
+				if existing != nil {
 					body := driftIssueBody(entry)
 					if err := m.ghClient.Issues.Update(ctx, m.centralOwner, m.centralRepo, existing.Number, &gh.IssueUpdate{Body: &body}); err != nil {
 						return nil, fmt.Errorf("updating drift issue #%d: %w", existing.Number, err)
@@ -153,12 +165,14 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 			if actualHash == ts.Hash {
 				// In sync. Close existing issue if auto-close is enabled.
 				if autoClose {
-					if existing, found := issueByTitle[issTitle]; found {
+					existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
+					if existing != nil {
 						if err := m.ghClient.Issues.Close(ctx, m.centralOwner, m.centralRepo, existing.Number); err != nil {
 							return nil, fmt.Errorf("closing resolved drift issue #%d: %w", existing.Number, err)
 						}
 						result.IssuesClosed++
-						delete(issueByTitle, issTitle)
+						delete(issueByTitle, existing.Title)
+						delete(issueByFingerprint, fp)
 					}
 				}
 				inSyncRepos[repoFullName] = true
@@ -176,7 +190,8 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 				FirstDetected:   time.Now(),
 			}
 
-			if existing, found := issueByTitle[issTitle]; found {
+			existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
+			if existing != nil {
 				body := driftIssueBody(entry)
 				if err := m.ghClient.Issues.Update(ctx, m.centralOwner, m.centralRepo, existing.Number, &gh.IssueUpdate{Body: &body}); err != nil {
 					return nil, fmt.Errorf("updating drift issue #%d: %w", existing.Number, err)
@@ -233,5 +248,46 @@ func driftIssueBody(e DriftEntry) string {
 		fmt.Fprintf(&b, "**PR:** #%d\n", e.PRNumber)
 	}
 	fmt.Fprintf(&b, "**First Detected:** %s\n", e.FirstDetected.Format(time.RFC3339))
+
+	fp := driftFingerprint(e.Repo, e.TemplateID)
+	fmt.Fprintf(&b, "\n%s%s%s\n", fingerprintPrefix, fp, fingerprintSuffix)
+
 	return b.String()
+}
+
+// driftFingerprint produces a stable fingerprint for a drift issue from its
+// identifying components.
+func driftFingerprint(repo, templateID string) string {
+	return hash.Fingerprint("drift", repo, templateID)
+}
+
+// findIssueByFingerprintOrTitle looks up an existing issue first by fingerprint
+// (stable across title changes), then falls back to title match.
+func findIssueByFingerprintOrTitle(
+	byFingerprint map[string]*gh.Issue,
+	byTitle map[string]*gh.Issue,
+	fp, title string,
+) *gh.Issue {
+	if iss, ok := byFingerprint[fp]; ok {
+		return iss
+	}
+	if iss, ok := byTitle[title]; ok {
+		return iss
+	}
+	return nil
+}
+
+// extractFingerprint returns the fingerprint embedded in an issue body, or ""
+// if none is found.
+func extractFingerprint(body string) string {
+	idx := strings.Index(body, fingerprintPrefix)
+	if idx < 0 {
+		return ""
+	}
+	start := idx + len(fingerprintPrefix)
+	end := strings.Index(body[start:], fingerprintSuffix)
+	if end < 0 {
+		return ""
+	}
+	return body[start : start+end]
 }

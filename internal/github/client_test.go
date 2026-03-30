@@ -762,3 +762,174 @@ func TestIssueCreateLabels(t *testing.T) {
 		t.Errorf("expected 2 labels on created issue, got %d", len(issue.Labels))
 	}
 }
+
+func TestRateLimiterProactiveSleep(t *testing.T) {
+	// When remaining is below threshold, the rate limiter should wait until resetAt.
+	var calls atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.Header().Set("X-RateLimit-Remaining", "5000")
+		w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Hour).Unix()))
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok":true}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+
+	// Simulate low remaining count with a reset time slightly in the future.
+	c.rateLimiter.mu.Lock()
+	c.rateLimiter.remaining = 10
+	c.rateLimiter.threshold = 50
+	c.rateLimiter.resetAt = time.Now().Add(200 * time.Millisecond)
+	c.rateLimiter.mu.Unlock()
+
+	start := time.Now()
+	resp, err := c.doRequest(context.Background(), http.MethodGet, c.baseURL+"/test", nil)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	// Should have waited at least ~200ms for the proactive sleep (wide tolerance for CI).
+	if elapsed < 150*time.Millisecond {
+		t.Fatalf("expected proactive sleep of ~200ms, but elapsed was %v", elapsed)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("expected 1 call, got %d", calls.Load())
+	}
+}
+
+func TestRateLimiterUnknownStateDoesNotBlock(t *testing.T) {
+	// When remaining is -1 (unknown), requests should proceed immediately.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok":true}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	// remaining defaults to -1 via NewClient, verify it doesn't block.
+	if c.rateLimiter.remaining != -1 {
+		t.Fatalf("expected initial remaining to be -1, got %d", c.rateLimiter.remaining)
+	}
+
+	resp, err := c.doRequest(context.Background(), http.MethodGet, c.baseURL+"/test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	// Verify the request completed successfully — no proactive sleep was triggered
+	// because remaining was -1 (unknown state is not treated as below threshold).
+}
+
+func TestRateLimiterRetryAfterHeader(t *testing.T) {
+	// When a 429 response includes Retry-After, it should be used instead of exponential backoff.
+	var calls atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
+		n := calls.Add(1)
+		if n == 1 {
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			fmt.Fprint(w, `{"message":"rate limit"}`) //nolint:errcheck // test handler write
+			return
+		}
+		w.Header().Set("X-RateLimit-Remaining", "4999")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok":true}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	// Use a very small base delay so that exponential backoff would be much shorter than 1s.
+	c.rateLimiter.baseDelay = 1 * time.Millisecond
+
+	start := time.Now()
+	resp, err := c.doRequest(context.Background(), http.MethodGet, c.baseURL+"/test", nil)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("expected 2 calls, got %d", calls.Load())
+	}
+	// Retry-After was 1 second; exponential backoff would have been ~1ms.
+	// Verify we waited at least 900ms (Retry-After kicked in).
+	if elapsed < 900*time.Millisecond {
+		t.Fatalf("expected Retry-After delay of ~1s, but elapsed was %v", elapsed)
+	}
+}
+
+func TestRateLimiterUpdatesStateFromHeaders(t *testing.T) {
+	resetTime := time.Now().Add(30 * time.Minute).Unix()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-RateLimit-Remaining", "4200")
+		w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", resetTime))
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok":true}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	resp, err := c.doRequest(context.Background(), http.MethodGet, c.baseURL+"/test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
+
+	c.rateLimiter.mu.Lock()
+	remaining := c.rateLimiter.remaining
+	reset := c.rateLimiter.resetAt
+	c.rateLimiter.mu.Unlock()
+
+	if remaining != 4200 {
+		t.Fatalf("expected remaining 4200, got %d", remaining)
+	}
+	if reset.Unix() != resetTime {
+		t.Fatalf("expected resetAt %d, got %d", resetTime, reset.Unix())
+	}
+}
+
+func TestRateLimiterProactiveSleepContextCancel(t *testing.T) {
+	// When context is cancelled during proactive sleep, it should return immediately.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok":true}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	c.rateLimiter.mu.Lock()
+	c.rateLimiter.remaining = 5
+	c.rateLimiter.threshold = 50
+	c.rateLimiter.resetAt = time.Now().Add(10 * time.Second) // long reset
+	c.rateLimiter.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := c.doRequest(ctx, http.MethodGet, c.baseURL+"/test", nil)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected context error")
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Fatalf("expected quick cancellation, but elapsed was %v", elapsed)
+	}
+}

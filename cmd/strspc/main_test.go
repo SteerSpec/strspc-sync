@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/SteerSpec/strspc-sync/internal/config"
 )
 
 // minimalConfig is a valid config that passes validation but has no real targets.
@@ -232,9 +235,34 @@ func TestSetOutput(t *testing.T) {
 	}
 }
 
-func TestDetectCentralRepo_Success(t *testing.T) {
+func TestDetectCentralRepo_FromConfig(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "")
+	cfg := &config.SyncConfig{CentralRepo: "cfgorg/cfgrepo"}
+	owner, repo, err := detectCentralRepo(cfg, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if owner != "cfgorg" || repo != "cfgrepo" {
+		t.Errorf("expected cfgorg/cfgrepo, got %s/%s", owner, repo)
+	}
+}
+
+func TestDetectCentralRepo_ConfigOverridesEnv(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "envorg/envrepo")
+	cfg := &config.SyncConfig{CentralRepo: "cfgorg/cfgrepo"}
+	owner, repo, err := detectCentralRepo(cfg, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if owner != "cfgorg" || repo != "cfgrepo" {
+		t.Errorf("config should take priority; expected cfgorg/cfgrepo, got %s/%s", owner, repo)
+	}
+}
+
+func TestDetectCentralRepo_FallbackToEnv(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "myorg/myrepo")
-	owner, repo, err := detectCentralRepo(nil)
+	cfg := &config.SyncConfig{}
+	owner, repo, err := detectCentralRepo(cfg, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -243,11 +271,21 @@ func TestDetectCentralRepo_Success(t *testing.T) {
 	}
 }
 
+func TestDetectCentralRepo_InvalidConfigFormat(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "")
+	cfg := &config.SyncConfig{CentralRepo: "noslash"}
+	_, _, err := detectCentralRepo(cfg, nil)
+	if err == nil {
+		t.Error("expected error for invalid central-repo format")
+	}
+}
+
 func TestDetectCentralRepo_Missing(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "")
-	_, _, err := detectCentralRepo(nil)
+	cfg := &config.SyncConfig{}
+	_, _, err := detectCentralRepo(cfg, nil)
 	if err == nil {
-		t.Error("expected error when GITHUB_REPOSITORY is empty")
+		t.Error("expected error when both config and env are empty")
 	}
 }
 
@@ -408,6 +446,7 @@ func TestRunSync_HappyPath(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("GITHUB_API_URL", srv.URL)
 	t.Setenv("GITHUB_TOKEN", "fake-token")
+	t.Setenv("GITHUB_REPOSITORY", "testorg/central")
 
 	cfgPath := writeTestConfig(t, "")
 	var out, errOut strings.Builder
@@ -444,6 +483,62 @@ func TestRunConflict_HappyPath(t *testing.T) {
 	code := run([]string{"conflict", "--config", cfgPath, "--tiers", "1"}, &out, &errOut)
 	if code != 0 {
 		t.Errorf("expected exit 0, got %d; stderr: %s", code, errOut.String())
+	}
+}
+
+func TestParseCommonFlags_TimeoutDefault(t *testing.T) {
+	f, _ := parseCommonFlags([]string{})
+	if f.timeout != 10*time.Minute {
+		t.Errorf("expected default timeout 10m, got %v", f.timeout)
+	}
+}
+
+func TestParseCommonFlags_TimeoutCustom(t *testing.T) {
+	f, _ := parseCommonFlags([]string{"--timeout", "5m"})
+	if f.timeout != 5*time.Minute {
+		t.Errorf("expected timeout 5m, got %v", f.timeout)
+	}
+}
+
+func TestParseCommonFlags_TimeoutSeconds(t *testing.T) {
+	f, _ := parseCommonFlags([]string{"--timeout", "30s"})
+	if f.timeout != 30*time.Second {
+		t.Errorf("expected timeout 30s, got %v", f.timeout)
+	}
+}
+
+func TestParseCommonFlags_TimeoutInvalidKeepsDefault(t *testing.T) {
+	f, _ := parseCommonFlags([]string{"--timeout", "notaduration"})
+	if f.timeout != 10*time.Minute {
+		t.Errorf("expected default timeout 10m after invalid value, got %v", f.timeout)
+	}
+}
+
+func TestParseCommonFlags_TimeoutWithOtherFlags(t *testing.T) {
+	f, remaining := parseCommonFlags([]string{"--config", "c.yml", "--timeout", "2m", "--dry-run"})
+	if f.configPath != "c.yml" {
+		t.Errorf("expected configPath c.yml, got %s", f.configPath)
+	}
+	if f.timeout != 2*time.Minute {
+		t.Errorf("expected timeout 2m, got %v", f.timeout)
+	}
+	if len(remaining) != 1 || remaining[0] != "--dry-run" {
+		t.Errorf("expected remaining [--dry-run], got %v", remaining)
+	}
+}
+
+func TestRunSync_TimeoutFlag(t *testing.T) {
+	srv := newTestGHServer(t)
+	defer srv.Close()
+	t.Setenv("GITHUB_API_URL", srv.URL)
+	t.Setenv("GITHUB_TOKEN", "fake-token")
+	t.Setenv("GITHUB_REPOSITORY", "testorg/central")
+
+	cfgPath := writeTestConfig(t, "")
+	var out, errOut strings.Builder
+	code := run([]string{"sync", "--config", cfgPath, "--timeout", "5m", "--dry-run"}, &out, &errOut)
+	if code != 0 {
+		t.Errorf("expected exit 0 with --timeout flag, got %d; stderr: %s", code, errOut.String())
 	}
 }
 

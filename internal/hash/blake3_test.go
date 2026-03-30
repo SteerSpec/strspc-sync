@@ -60,3 +60,44 @@ func TestHashBytesLarge(t *testing.T) {
 		t.Errorf("hash should have b3_ prefix, got %s", h1)
 	}
 }
+
+func TestFingerprintDeterministic(t *testing.T) {
+	fp1 := Fingerprint("conflict", "org/repo", "CLAUDE.md")
+	fp2 := Fingerprint("conflict", "org/repo", "CLAUDE.md")
+	if fp1 != fp2 {
+		t.Errorf("same inputs produced different fingerprints: %s vs %s", fp1, fp2)
+	}
+}
+
+func TestFingerprintLength(t *testing.T) {
+	fp := Fingerprint("a", "b", "c")
+	// 16 bytes = 32 hex chars
+	if len(fp) != 32 {
+		t.Errorf("expected fingerprint length 32, got %d (%s)", len(fp), fp)
+	}
+}
+
+func TestFingerprintDifferentInputs(t *testing.T) {
+	fp1 := Fingerprint("conflict", "org/repo1", "CLAUDE.md")
+	fp2 := Fingerprint("conflict", "org/repo2", "CLAUDE.md")
+	if fp1 == fp2 {
+		t.Error("different inputs produced the same fingerprint")
+	}
+}
+
+func TestFingerprintOrderMatters(t *testing.T) {
+	fp1 := Fingerprint("a", "b", "c")
+	fp2 := Fingerprint("c", "b", "a")
+	if fp1 == fp2 {
+		t.Error("different orderings should produce different fingerprints")
+	}
+}
+
+func TestFingerprintNullSeparation(t *testing.T) {
+	// "ab" + "" vs "a" + "b" should differ due to null-byte separators
+	fp1 := Fingerprint("ab", "c")
+	fp2 := Fingerprint("a", "bc")
+	if fp1 == fp2 {
+		t.Error("concatenation ambiguity not resolved by null separator")
+	}
+}
