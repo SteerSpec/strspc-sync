@@ -171,7 +171,7 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 							return nil, fmt.Errorf("closing resolved drift issue #%d: %w", existing.Number, err)
 						}
 						result.IssuesClosed++
-						delete(issueByTitle, issTitle)
+						delete(issueByTitle, existing.Title)
 						delete(issueByFingerprint, fp)
 					}
 				}

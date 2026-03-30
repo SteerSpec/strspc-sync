@@ -154,6 +154,12 @@ func Validate(cfg *SyncConfig) error {
 		// Token can be empty in config; resolved from GITHUB_TOKEN env var at runtime
 	}
 
+	if cfg.CentralRepo != "" {
+		if matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$`, cfg.CentralRepo); !matched {
+			return fmt.Errorf("central-repo must be in owner/repo format, got %q", cfg.CentralRepo)
+		}
+	}
+
 	if len(cfg.Templates) == 0 {
 		return fmt.Errorf("at least one template is required")
 	}

@@ -357,10 +357,20 @@ func (rl *rateLimiter) waitIfBelowThreshold(ctx context.Context) error {
 
 	if remaining >= 0 && remaining < threshold && time.Now().Before(resetAt) {
 		sleepDuration := time.Until(resetAt)
+		timer := time.NewTimer(sleepDuration)
+		defer func() {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+		}()
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(sleepDuration):
+		case <-timer.C:
 		}
 	}
 
