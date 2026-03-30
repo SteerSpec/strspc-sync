@@ -190,7 +190,15 @@ func TestNewClient_GithubApp_WithDiscovery(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"token": "ghs_discovered_token"}) //nolint:errcheck
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"token": "ghs_discovered_token",
+			"permissions": map[string]string{
+				"contents":      "write",
+				"pull_requests": "write",
+				"issues":        "write",
+				"metadata":      "read",
+			},
+		})
 	})
 
 	srv := httptest.NewServer(mux)
@@ -229,7 +237,15 @@ func TestNewClient_GithubApp_InstallationIDShortcut(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"token": "ghs_shortcut_token"}) //nolint:errcheck
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"token": "ghs_shortcut_token",
+			"permissions": map[string]string{
+				"contents":      "write",
+				"pull_requests": "write",
+				"issues":        "write",
+				"metadata":      "read",
+			},
+		})
 	})
 
 	srv := httptest.NewServer(mux)
@@ -248,6 +264,126 @@ func TestNewClient_GithubApp_InstallationIDShortcut(t *testing.T) {
 	}
 	if c.token != "ghs_shortcut_token" {
 		t.Fatalf("expected 'ghs_shortcut_token', got %q", c.token)
+	}
+}
+
+func TestNewClient_GithubApp_InsufficientPermissions(t *testing.T) {
+	_, pemStr := generateTestRSAKey(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/app/installations/77/access_tokens", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"token": "ghs_limited_token",
+			"permissions": map[string]string{
+				"contents": "read",
+				"metadata": "read",
+			},
+		})
+	})
+
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	t.Setenv("GITHUB_API_URL", srv.URL)
+
+	_, err := NewClient(AuthConfig{
+		Method:         "github-app",
+		AppID:          "12345",
+		PrivateKey:     pemStr,
+		InstallationID: "77",
+		Org:            "myorg",
+	})
+	if err == nil {
+		t.Fatal("expected error for insufficient permissions, got nil")
+	}
+	if !strings.Contains(err.Error(), "missing required permissions") {
+		t.Fatalf("expected missing permissions error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "contents:write") {
+		t.Fatalf("expected contents:write in missing permissions, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "issues:write") {
+		t.Fatalf("expected issues:write in missing, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "pull_requests:write") {
+		t.Fatalf("expected pull_requests:write in missing, got: %v", err)
+	}
+}
+
+func TestValidatePermissions_AllPresent(t *testing.T) {
+	perms := map[string]string{
+		"contents":      "write",
+		"pull_requests": "write",
+		"issues":        "write",
+		"metadata":      "read",
+	}
+	if err := validatePermissions(perms); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestValidatePermissions_MissingPermission(t *testing.T) {
+	perms := map[string]string{
+		"contents":      "write",
+		"pull_requests": "write",
+		"metadata":      "read",
+	}
+	err := validatePermissions(perms)
+	if err == nil {
+		t.Fatal("expected error for missing issues:write")
+	}
+	if !strings.Contains(err.Error(), "issues:write") {
+		t.Fatalf("expected issues:write in error, got: %v", err)
+	}
+}
+
+func TestValidatePermissions_ReadSatisfiedByWrite(t *testing.T) {
+	perms := map[string]string{
+		"contents":      "write",
+		"pull_requests": "write",
+		"issues":        "write",
+		"metadata":      "write",
+	}
+	if err := validatePermissions(perms); err != nil {
+		t.Fatalf("write should satisfy read requirement, got: %v", err)
+	}
+}
+
+func TestValidatePermissions_AdminSatisfies(t *testing.T) {
+	perms := map[string]string{
+		"contents":      "admin",
+		"pull_requests": "admin",
+		"issues":        "admin",
+		"metadata":      "admin",
+	}
+	if err := validatePermissions(perms); err != nil {
+		t.Fatalf("admin should satisfy all requirements, got: %v", err)
+	}
+}
+
+func TestPermissionSatisfies(t *testing.T) {
+	tests := []struct {
+		granted  string
+		required string
+		want     bool
+	}{
+		{"read", "read", true},
+		{"write", "write", true},
+		{"write", "read", true},
+		{"admin", "read", true},
+		{"admin", "write", true},
+		{"read", "write", false},
+		{"read", "admin", false},
+	}
+	for _, tt := range tests {
+		got := permissionSatisfies(tt.granted, tt.required)
+		if got != tt.want {
+			t.Errorf("permissionSatisfies(%q, %q) = %v, want %v", tt.granted, tt.required, got, tt.want)
+		}
 	}
 }
 
