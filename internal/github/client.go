@@ -279,7 +279,7 @@ func validatePermissions(granted map[string]string) error {
 	}
 	if len(missing) > 0 {
 		sort.Strings(missing)
-		return fmt.Errorf("GitHub App installation missing required permissions: %s", strings.Join(missing, ", "))
+		return fmt.Errorf("github app installation missing required permissions: %s", strings.Join(missing, ", "))
 	}
 	return nil
 }
@@ -347,7 +347,7 @@ func NewClient(auth AuthConfig) (*Client, error) {
 			return nil, fmt.Errorf("github-app auth: %w", err)
 		}
 		if err := validatePermissions(permissions); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("github-app permissions: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported auth method: %q", auth.Method)
