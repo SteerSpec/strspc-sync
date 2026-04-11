@@ -188,6 +188,40 @@ func TestParseCommonFlags_UnknownFlagsPassThrough(t *testing.T) {
 	}
 }
 
+func TestParseCommonFlags_LogFlags(t *testing.T) {
+	f, _ := parseCommonFlags([]string{"--log-level", "debug", "--log-format", "json"})
+	if f.logLevel != "debug" {
+		t.Errorf("expected logLevel debug, got %s", f.logLevel)
+	}
+	if f.logFormat != "json" {
+		t.Errorf("expected logFormat json, got %s", f.logFormat)
+	}
+}
+
+func TestParseCommonFlags_LogDefaults(t *testing.T) {
+	f, _ := parseCommonFlags([]string{})
+	if f.logLevel != "info" {
+		t.Errorf("expected default logLevel info, got %s", f.logLevel)
+	}
+	if f.logFormat != "auto" {
+		t.Errorf("expected default logFormat auto, got %s", f.logFormat)
+	}
+}
+
+func TestApplyLogFlags_InvalidLevel(t *testing.T) {
+	err := applyLogFlags(commonFlags{logLevel: "bogus", logFormat: "auto"})
+	if err == nil {
+		t.Error("expected error for invalid log level")
+	}
+}
+
+func TestApplyLogFlags_InvalidFormat(t *testing.T) {
+	err := applyLogFlags(commonFlags{logLevel: "info", logFormat: "yaml"})
+	if err == nil {
+		t.Error("expected error for invalid log format")
+	}
+}
+
 func TestDetectTrigger_Push(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_NAME", "push")
 	if got := detectTrigger(); got != "push" {
