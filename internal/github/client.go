@@ -15,6 +15,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -182,7 +183,7 @@ func generateJWT(appID string, key *rsa.PrivateKey) (string, error) {
 
 // exchangeInstallationToken trades a GitHub App JWT for an installation access token.
 // If installationID is empty, the installation is auto-discovered from the org name.
-func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installationID string) (string, error) {
+func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installationID string) (string, map[string]string, error) {
 	hc := &http.Client{Timeout: 30 * time.Second}
 
 	makeReq := func(method, url string) (*http.Request, error) {
@@ -199,16 +200,16 @@ func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installat
 	if installationID == "" {
 		req, err := makeReq(http.MethodGet, baseURL+"/app/installations")
 		if err != nil {
-			return "", fmt.Errorf("building installations request: %w", err)
+			return "", nil, fmt.Errorf("building installations request: %w", err)
 		}
 		resp, err := hc.Do(req)
 		if err != nil {
-			return "", fmt.Errorf("listing installations: %w", err)
+			return "", nil, fmt.Errorf("listing installations: %w", err)
 		}
 		defer resp.Body.Close() //nolint:errcheck
 		if resp.StatusCode != http.StatusOK {
 			data, _ := io.ReadAll(resp.Body)
-			return "", fmt.Errorf("listing installations: status %d: %s", resp.StatusCode, string(data))
+			return "", nil, fmt.Errorf("listing installations: status %d: %s", resp.StatusCode, string(data))
 		}
 
 		var installations []struct {
@@ -218,7 +219,7 @@ func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installat
 			} `json:"account"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&installations); err != nil {
-			return "", fmt.Errorf("decoding installations: %w", err)
+			return "", nil, fmt.Errorf("decoding installations: %w", err)
 		}
 
 		for _, inst := range installations {
@@ -228,34 +229,73 @@ func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installat
 			}
 		}
 		if installationID == "" {
-			return "", fmt.Errorf("no GitHub App installation found for org %q", org)
+			return "", nil, fmt.Errorf("no GitHub App installation found for org %q", org)
 		}
 	}
 
 	req, err := makeReq(http.MethodPost, baseURL+"/app/installations/"+installationID+"/access_tokens")
 	if err != nil {
-		return "", fmt.Errorf("building access_tokens request: %w", err)
+		return "", nil, fmt.Errorf("building access_tokens request: %w", err)
 	}
 	resp, err := hc.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("exchanging installation token: %w", err)
+		return "", nil, fmt.Errorf("exchanging installation token: %w", err)
 	}
 	defer resp.Body.Close() //nolint:errcheck
 	if resp.StatusCode != http.StatusCreated {
 		data, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("exchanging installation token: status %d: %s", resp.StatusCode, string(data))
+		return "", nil, fmt.Errorf("exchanging installation token: status %d: %s", resp.StatusCode, string(data))
 	}
 
 	var result struct {
-		Token string `json:"token"`
+		Token       string            `json:"token"`
+		Permissions map[string]string `json:"permissions"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("decoding installation token: %w", err)
+		return "", nil, fmt.Errorf("decoding installation token: %w", err)
 	}
 	if result.Token == "" {
-		return "", fmt.Errorf("empty token in installation token response")
+		return "", nil, fmt.Errorf("empty token in installation token response")
 	}
-	return result.Token, nil
+	return result.Token, result.Permissions, nil
+}
+
+// requiredPermissions defines the minimum permissions the GitHub App needs.
+var requiredPermissions = map[string]string{
+	"contents":      "write",
+	"pull_requests": "write",
+	"issues":        "write",
+	"metadata":      "read",
+}
+
+// validatePermissions checks that all required permissions are granted by the installation.
+func validatePermissions(granted map[string]string) error {
+	var missing []string
+	for perm, level := range requiredPermissions {
+		g, ok := granted[perm]
+		if !ok || !permissionSatisfies(g, level) {
+			missing = append(missing, perm+":"+level)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("github app installation missing required permissions: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// permissionSatisfies checks if a granted permission level satisfies the required level.
+func permissionSatisfies(granted, required string) bool {
+	if granted == required {
+		return true
+	}
+	if required == "read" && (granted == "write" || granted == "admin") {
+		return true
+	}
+	if required == "write" && granted == "admin" {
+		return true
+	}
+	return false
 }
 
 // NewClient creates a new GitHub API client with the given auth configuration.
@@ -301,9 +341,13 @@ func NewClient(auth AuthConfig) (*Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("generating JWT: %w", err)
 		}
-		token, err = exchangeInstallationToken(context.Background(), jwt, baseURL, auth.Org, auth.InstallationID)
+		var permissions map[string]string
+		token, permissions, err = exchangeInstallationToken(context.Background(), jwt, baseURL, auth.Org, auth.InstallationID)
 		if err != nil {
 			return nil, fmt.Errorf("github-app auth: %w", err)
+		}
+		if err := validatePermissions(permissions); err != nil {
+			return nil, fmt.Errorf("github-app permissions: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported auth method: %q", auth.Method)
