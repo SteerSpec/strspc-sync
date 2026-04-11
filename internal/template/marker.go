@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"sort"
 )
 
 var (
@@ -13,8 +14,7 @@ var (
 
 type section struct {
 	name    string
-	content []byte // content between BEGIN and END markers, inclusive of markers + surrounding newline
-	inner   []byte // content between BEGIN and END markers, exclusive of markers and their trailing newline
+	content []byte // content from the BEGIN marker through the END marker, inclusive of both markers
 }
 
 // detectEOL returns the dominant line ending of data — CRLF if \r\n occurrences
@@ -42,74 +42,89 @@ func normalizeEOL(data, target []byte) []byte {
 	return bytes.ReplaceAll(normalized, lf, target)
 }
 
+// markerKind tags a BEGIN or END marker match during extractSections'
+// ordered scan.
+type markerKind int
+
+const (
+	markerBegin markerKind = iota
+	markerEnd
+)
+
+type markerMatch struct {
+	kind  markerKind
+	name  string
+	start int // byte offset of the full marker (e.g. '<' in "<!--")
+	end   int // byte offset one past the closing '>'
+}
+
 // extractSections finds all STEERSPEC:BEGIN/END marker pairs in data by
-// byte offsets. Returns an error on nested, unmatched, or mismatched markers.
+// byte offsets. Returns an error on nested, unmatched, or mismatched markers,
+// always pointing at the specific offending marker by scanning them in order.
 //
-// We match by byte offset rather than line-splitting so mixed line endings
-// (e.g. a previously LF-rendered section inside a now-CRLF file during the
-// CRLF-preservation rollout) don't break marker detection.
+// Matching by byte offset rather than line-splitting makes this robust to
+// mixed line endings (e.g. a previously LF-rendered section living inside a
+// now-CRLF file during the CRLF-preservation rollout).
 func extractSections(data []byte) ([]section, error) {
-	begins := markerBeginRe.FindAllSubmatchIndex(data, -1)
-	ends := markerEndRe.FindAllSubmatchIndex(data, -1)
+	matches := collectMarkers(data)
 
-	if len(begins) != len(ends) {
-		if len(begins) > len(ends) {
-			name := string(data[begins[len(ends)][2]:begins[len(ends)][3]])
-			return nil, fmt.Errorf("unclosed STEERSPEC:BEGIN marker %q", name)
+	var sections []section
+	// Stack depth = 1 because nesting is disallowed; the extra state just
+	// lets us report the nesting case with the correct outer/inner names.
+	var open *markerMatch
+	for i := range matches {
+		m := &matches[i]
+		switch m.kind {
+		case markerBegin:
+			if open != nil {
+				return nil, fmt.Errorf("nested STEERSPEC:BEGIN marker %q inside %q", m.name, open.name)
+			}
+			open = m
+		case markerEnd:
+			if open == nil {
+				return nil, fmt.Errorf("STEERSPEC:END marker %q without matching BEGIN", m.name)
+			}
+			if open.name != m.name {
+				return nil, fmt.Errorf("STEERSPEC:END marker %q does not match BEGIN %q", m.name, open.name)
+			}
+			content := append([]byte(nil), data[open.start:m.end]...)
+			sections = append(sections, section{name: open.name, content: content})
+			open = nil
 		}
-		name := string(data[ends[len(begins)][2]:ends[len(begins)][3]])
-		return nil, fmt.Errorf("STEERSPEC:END marker %q without matching BEGIN", name)
 	}
-
-	sections := make([]section, 0, len(begins))
-	for i, b := range begins {
-		e := ends[i]
-		if e[0] < b[1] {
-			// END appears before BEGIN: unmatched END.
-			name := string(data[e[2]:e[3]])
-			return nil, fmt.Errorf("STEERSPEC:END marker %q without matching BEGIN", name)
-		}
-		if i+1 < len(begins) && begins[i+1][0] < e[0] {
-			// A BEGIN appears before the current END: nested.
-			inner := string(data[begins[i+1][2]:begins[i+1][3]])
-			outer := string(data[b[2]:b[3]])
-			return nil, fmt.Errorf("nested STEERSPEC:BEGIN marker %q inside %q", inner, outer)
-		}
-
-		beginName := string(data[b[2]:b[3]])
-		endName := string(data[e[2]:e[3]])
-		if beginName != endName {
-			return nil, fmt.Errorf("STEERSPEC:END marker %q does not match BEGIN %q", endName, beginName)
-		}
-
-		innerStart, innerEnd := b[1], e[0]
-		inner := trimSurroundingNewline(data[innerStart:innerEnd])
-		content := data[b[0]:e[1]]
-
-		sections = append(sections, section{
-			name:    beginName,
-			inner:   append([]byte(nil), inner...),
-			content: append([]byte(nil), content...),
-		})
+	if open != nil {
+		return nil, fmt.Errorf("unclosed STEERSPEC:BEGIN marker %q", open.name)
 	}
 	return sections, nil
 }
 
-// trimSurroundingNewline strips one leading and one trailing newline (CRLF or
-// LF) from inner marker content so that a round-trip extract/insert doesn't
-// accumulate blank lines across renders.
-func trimSurroundingNewline(b []byte) []byte {
-	if bytes.HasPrefix(b, []byte("\r\n")) {
-		b = b[2:]
-	} else if bytes.HasPrefix(b, []byte("\n")) {
-		b = b[1:]
+// collectMarkers returns every BEGIN and END marker occurrence in data,
+// sorted by their byte offset so the caller can walk them in source order.
+func collectMarkers(data []byte) []markerMatch {
+	begins := markerBeginRe.FindAllSubmatchIndex(data, -1)
+	ends := markerEndRe.FindAllSubmatchIndex(data, -1)
+
+	matches := make([]markerMatch, 0, len(begins)+len(ends))
+	for _, b := range begins {
+		matches = append(matches, markerMatch{
+			kind:  markerBegin,
+			name:  string(data[b[2]:b[3]]),
+			start: b[0],
+			end:   b[1],
+		})
 	}
-	if bytes.HasSuffix(b, []byte("\r\n")) {
-		b = b[:len(b)-2]
-	} else if bytes.HasSuffix(b, []byte("\n")) {
-		b = b[:len(b)-1]
+	for _, e := range ends {
+		matches = append(matches, markerMatch{
+			kind:  markerEnd,
+			name:  string(data[e[2]:e[3]]),
+			start: e[0],
+			end:   e[1],
+		})
 	}
-	return b
+	sort.Slice(matches, func(i, j int) bool {
+		return matches[i].start < matches[j].start
+	})
+	return matches
 }
 
 func renderMarker(templateContent, existingContent []byte) ([]byte, error) {

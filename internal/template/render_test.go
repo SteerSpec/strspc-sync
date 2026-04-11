@@ -183,6 +183,62 @@ func TestRenderMarkerMixedEndingsPrefersDominant(t *testing.T) {
 	}
 }
 
+// TestExtractSections_NestedBeginReportsOuterAndInner verifies that a BEGIN
+// inside another still-open BEGIN reports the actual outer/inner names — not
+// whichever pair the old count-based shortcut happened to index.
+func TestExtractSections_NestedBeginReportsOuterAndInner(t *testing.T) {
+	data := []byte("<!-- STEERSPEC:BEGIN:a -->\ntext\n<!-- STEERSPEC:BEGIN:b -->\n<!-- STEERSPEC:END:b -->\n<!-- STEERSPEC:END:a -->")
+	_, err := extractSections(data)
+	if err == nil {
+		t.Fatal("expected nesting error")
+	}
+	if !strings.Contains(err.Error(), `nested STEERSPEC:BEGIN marker "b" inside "a"`) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestExtractSections_UnclosedOuterReportsOuter verifies the regression
+// Copilot called out: BEGIN A, BEGIN B, END B (A never closed) must point at
+// A as the nesting violation, not at B.
+func TestExtractSections_UnclosedOuterReportsOuter(t *testing.T) {
+	data := []byte("<!-- STEERSPEC:BEGIN:a -->\n<!-- STEERSPEC:BEGIN:b -->\ntext\n<!-- STEERSPEC:END:b -->")
+	_, err := extractSections(data)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// The first violation is the inner BEGIN inside the still-open outer.
+	if !strings.Contains(err.Error(), `nested STEERSPEC:BEGIN marker "b" inside "a"`) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestExtractSections_EndBeforeBeginReportsEnd verifies that an END that
+// appears before any BEGIN is flagged with the offending END's name (not
+// a stale BEGIN from further down).
+func TestExtractSections_EndBeforeBeginReportsEnd(t *testing.T) {
+	data := []byte("<!-- STEERSPEC:END:stray -->\n<!-- STEERSPEC:BEGIN:real -->\n<!-- STEERSPEC:END:real -->")
+	_, err := extractSections(data)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), `STEERSPEC:END marker "stray" without matching BEGIN`) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestExtractSections_UnclosedBeginReportsName verifies the simple single-BEGIN
+// unclosed case points at the right name.
+func TestExtractSections_UnclosedBeginReportsName(t *testing.T) {
+	data := []byte("<!-- STEERSPEC:BEGIN:only -->\ntext")
+	_, err := extractSections(data)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), `unclosed STEERSPEC:BEGIN marker "only"`) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 // TestRenderMarkerLFRegression locks in that pure-LF existing content keeps
 // LF endings end-to-end (no regression from the CRLF fix).
 func TestRenderMarkerLFRegression(t *testing.T) {
