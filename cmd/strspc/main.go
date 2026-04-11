@@ -150,8 +150,9 @@ func parseCommonFlags(args []string) (commonFlags, []string) {
 }
 
 // applyLogFlags parses the log-related fields on commonFlags and initializes
-// the package-level logger. Returns an error if either flag is malformed.
-func applyLogFlags(f commonFlags) error {
+// the package-level logger to write to errOut (the same writer the run*
+// functions use for diagnostics). Returns an error if either flag is malformed.
+func applyLogFlags(f commonFlags, errOut io.Writer) error {
 	level, err := sslog.ParseLevel(f.logLevel)
 	if err != nil {
 		return err
@@ -160,7 +161,7 @@ func applyLogFlags(f commonFlags) error {
 	if err != nil {
 		return err
 	}
-	sslog.Init(level, format)
+	sslog.InitTo(errOut, level, format)
 	return nil
 }
 
@@ -227,7 +228,7 @@ func setOutput(key, value string) {
 
 func runSync(args []string, out, errOut io.Writer) error {
 	common, remaining := parseCommonFlags(args)
-	if err := applyLogFlags(common); err != nil {
+	if err := applyLogFlags(common, errOut); err != nil {
 		return err
 	}
 	dryRun := false
@@ -295,7 +296,7 @@ func runSync(args []string, out, errOut io.Writer) error {
 
 func runMonitor(args []string, out, errOut io.Writer) error {
 	common, _ := parseCommonFlags(args)
-	if err := applyLogFlags(common); err != nil {
+	if err := applyLogFlags(common, errOut); err != nil {
 		return err
 	}
 
@@ -340,7 +341,7 @@ func runMonitor(args []string, out, errOut io.Writer) error {
 
 func runConflict(args []string, out, errOut io.Writer) error {
 	common, remaining := parseCommonFlags(args)
-	if err := applyLogFlags(common); err != nil {
+	if err := applyLogFlags(common, errOut); err != nil {
 		return err
 	}
 	var tiers []int

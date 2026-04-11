@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
+	sslog "github.com/SteerSpec/strspc-sync/internal/log"
 )
 
 // minimalConfig is a valid config that passes validation but has no real targets.
@@ -209,16 +212,29 @@ func TestParseCommonFlags_LogDefaults(t *testing.T) {
 }
 
 func TestApplyLogFlags_InvalidLevel(t *testing.T) {
-	err := applyLogFlags(commonFlags{logLevel: "bogus", logFormat: "auto"})
+	err := applyLogFlags(commonFlags{logLevel: "bogus", logFormat: "auto"}, io.Discard)
 	if err == nil {
 		t.Error("expected error for invalid log level")
 	}
 }
 
 func TestApplyLogFlags_InvalidFormat(t *testing.T) {
-	err := applyLogFlags(commonFlags{logLevel: "info", logFormat: "yaml"})
+	err := applyLogFlags(commonFlags{logLevel: "info", logFormat: "yaml"}, io.Discard)
 	if err == nil {
 		t.Error("expected error for invalid log format")
+	}
+}
+
+// TestApplyLogFlags_WritesToErrOut verifies that logs emitted after
+// applyLogFlags land in the supplied writer, not os.Stderr.
+func TestApplyLogFlags_WritesToErrOut(t *testing.T) {
+	var buf bytes.Buffer
+	if err := applyLogFlags(commonFlags{logLevel: "info", logFormat: "text"}, &buf); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	sslog.L().Info("captured", "field", "value")
+	if !strings.Contains(buf.String(), "captured") {
+		t.Errorf("expected log to reach writer, got %q", buf.String())
 	}
 }
 

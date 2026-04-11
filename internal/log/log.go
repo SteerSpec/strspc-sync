@@ -27,12 +27,15 @@ const (
 
 var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 
-// Init configures the package-level logger. Safe to call once at startup.
+// Init configures the package-level logger to write to os.Stderr.
 func Init(level slog.Level, format Format) {
-	initTo(os.Stderr, level, format)
+	InitTo(os.Stderr, level, format)
 }
 
-func initTo(w io.Writer, level slog.Level, format Format) {
+// InitTo configures the package-level logger to write to the supplied writer.
+// Use this to redirect logs in tests or when the CLI already threads an
+// alternative stderr writer through its run functions.
+func InitTo(w io.Writer, level slog.Level, format Format) {
 	opts := &slog.HandlerOptions{Level: level}
 	useJSON := format == FormatJSON || (format == FormatAuto && os.Getenv("GITHUB_ACTIONS") == "true")
 	var h slog.Handler

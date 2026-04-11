@@ -58,7 +58,7 @@ func TestParseFormat(t *testing.T) {
 
 func TestInit_JSONHandler(t *testing.T) {
 	var buf bytes.Buffer
-	initTo(&buf, slog.LevelInfo, FormatJSON)
+	InitTo(&buf, slog.LevelInfo, FormatJSON)
 	L().Info("hello", "repo", "acme/foo", "count", 3)
 
 	var record map[string]any
@@ -78,7 +78,7 @@ func TestInit_JSONHandler(t *testing.T) {
 
 func TestInit_TextHandler(t *testing.T) {
 	var buf bytes.Buffer
-	initTo(&buf, slog.LevelInfo, FormatText)
+	InitTo(&buf, slog.LevelInfo, FormatText)
 	L().Info("hello", "repo", "acme/foo")
 
 	out := buf.String()
@@ -93,7 +93,7 @@ func TestInit_TextHandler(t *testing.T) {
 
 func TestInit_LevelFiltering(t *testing.T) {
 	var buf bytes.Buffer
-	initTo(&buf, slog.LevelWarn, FormatText)
+	InitTo(&buf, slog.LevelWarn, FormatText)
 	L().Info("should be filtered")
 	L().Warn("should appear")
 
