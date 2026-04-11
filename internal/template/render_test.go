@@ -94,6 +94,113 @@ func TestRenderMarkerEmptyExisting(t *testing.T) {
 	}
 }
 
+// TestRenderMarkerPreservesCRLF verifies that when the existing target file
+// uses CRLF line endings, the rendered output preserves CRLF throughout —
+// including across the section we replaced, the unmanaged preamble/footer,
+// and any newly appended sections. The template itself is authored with LF
+// (the realistic case — templates are stored in the central repo) and must
+// be normalized up to CRLF so marker extraction still finds its sections.
+func TestRenderMarkerPreservesCRLF(t *testing.T) {
+	existing := []byte(strings.Join([]string{
+		"# My File",
+		"Some intro text",
+		"<!-- STEERSPEC:BEGIN:standards -->",
+		"old standards content",
+		"<!-- STEERSPEC:END:standards -->",
+		"Footer text",
+	}, "\r\n"))
+
+	template := []byte(strings.Join([]string{
+		"<!-- STEERSPEC:BEGIN:standards -->",
+		"new standards content",
+		"line two",
+		"<!-- STEERSPEC:END:standards -->",
+	}, "\n"))
+
+	out, err := Render(StrategyMarker, template, existing, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The replaced section's inner content must be present and CRLF-joined.
+	if !bytes.Contains(out, []byte("new standards content\r\nline two")) {
+		t.Errorf("expected CRLF-joined new section body, got %q", string(out))
+	}
+	// Unmanaged preamble and footer must still be CRLF-terminated.
+	if !bytes.Contains(out, []byte("# My File\r\nSome intro text\r\n")) {
+		t.Errorf("preamble lost CRLF, got %q", string(out))
+	}
+	if !bytes.Contains(out, []byte("<!-- STEERSPEC:END:standards -->\r\nFooter text")) {
+		t.Errorf("footer lost CRLF, got %q", string(out))
+	}
+	// No bare LF should have crept in.
+	if bytes.Contains(bytes.ReplaceAll(out, []byte("\r\n"), nil), []byte("\n")) {
+		t.Errorf("output contains stray LF after stripping CRLF: %q", string(out))
+	}
+	if bytes.Contains(out, []byte("old standards content")) {
+		t.Error("old standards content should be replaced")
+	}
+}
+
+// TestRenderMarkerAppendsWithCRLF covers the "section not present in existing"
+// branch at marker.go's append path: the new section must be separated from
+// the existing content with CRLF, not a bare LF.
+func TestRenderMarkerAppendsWithCRLF(t *testing.T) {
+	existing := []byte("# Header\r\nbody line\r\n")
+	template := []byte(strings.Join([]string{
+		"<!-- STEERSPEC:BEGIN:new -->",
+		"brand new content",
+		"<!-- STEERSPEC:END:new -->",
+	}, "\n"))
+
+	out, err := Render(StrategyMarker, template, existing, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The separator between existing and appended section must be CRLF.
+	if !bytes.Contains(out, []byte("body line\r\n\r\n<!-- STEERSPEC:BEGIN:new -->")) {
+		t.Errorf("appended section not separated by CRLF: %q", string(out))
+	}
+	if !bytes.Contains(out, []byte("<!-- STEERSPEC:BEGIN:new -->\r\nbrand new content\r\n<!-- STEERSPEC:END:new -->")) {
+		t.Errorf("appended section body not CRLF-joined: %q", string(out))
+	}
+}
+
+// TestRenderMarkerMixedEndingsPrefersDominant asserts that when existing
+// content has mixed line endings, the dominant style wins.
+func TestRenderMarkerMixedEndingsPrefersDominant(t *testing.T) {
+	// 3 CRLFs vs 1 LF — CRLF wins.
+	existing := []byte("# H\r\na\r\nb\r\n<!-- STEERSPEC:BEGIN:s -->\nold\n<!-- STEERSPEC:END:s -->\r\nfooter")
+	template := []byte("<!-- STEERSPEC:BEGIN:s -->\nnew\n<!-- STEERSPEC:END:s -->")
+
+	out, err := Render(StrategyMarker, template, existing, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Contains(out, []byte("<!-- STEERSPEC:BEGIN:s -->\r\nnew\r\n<!-- STEERSPEC:END:s -->")) {
+		t.Errorf("expected CRLF-joined replacement under dominant CRLF, got %q", string(out))
+	}
+}
+
+// TestRenderMarkerLFRegression locks in that pure-LF existing content keeps
+// LF endings end-to-end (no regression from the CRLF fix).
+func TestRenderMarkerLFRegression(t *testing.T) {
+	existing := []byte("# Header\nbody\n<!-- STEERSPEC:BEGIN:s -->\nold\n<!-- STEERSPEC:END:s -->\nfooter\n")
+	template := []byte("<!-- STEERSPEC:BEGIN:s -->\nnew\n<!-- STEERSPEC:END:s -->")
+
+	out, err := Render(StrategyMarker, template, existing, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bytes.Contains(out, []byte("\r\n")) {
+		t.Errorf("LF-only input should produce LF-only output, got %q", string(out))
+	}
+	if !bytes.Contains(out, []byte("<!-- STEERSPEC:BEGIN:s -->\nnew\n<!-- STEERSPEC:END:s -->")) {
+		t.Errorf("LF replacement missing, got %q", string(out))
+	}
+}
+
 func TestRenderFullReplace(t *testing.T) {
 	tmpl := []byte("This is the template content")
 	existing := []byte("This is existing content that should be ignored")
