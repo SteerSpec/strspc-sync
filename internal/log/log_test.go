@@ -105,3 +105,34 @@ func TestInit_LevelFiltering(t *testing.T) {
 		t.Errorf("warn-level line missing: %q", out)
 	}
 }
+
+// TestInit_FormatAutoInCI locks in that FormatAuto selects the JSON handler
+// when GITHUB_ACTIONS=true, so GitHub Actions runners get machine-parseable
+// stderr without callers having to pass --log-format=json.
+func TestInit_FormatAutoInCI(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "true")
+	var buf bytes.Buffer
+	InitTo(&buf, slog.LevelInfo, FormatAuto)
+	L().Info("hello", "repo", "acme/foo")
+
+	if !json.Valid(buf.Bytes()) {
+		t.Errorf("expected JSON handler under GITHUB_ACTIONS=true, got %q", buf.String())
+	}
+}
+
+// TestInit_FormatAutoLocal locks in that FormatAuto falls back to the text
+// handler when GITHUB_ACTIONS is unset, giving human-readable output during
+// local development.
+func TestInit_FormatAutoLocal(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "")
+	var buf bytes.Buffer
+	InitTo(&buf, slog.LevelInfo, FormatAuto)
+	L().Info("hello", "repo", "acme/foo")
+
+	if json.Valid(buf.Bytes()) {
+		t.Errorf("expected text handler with GITHUB_ACTIONS unset, got JSON %q", buf.String())
+	}
+	if !strings.Contains(buf.String(), "repo=acme/foo") {
+		t.Errorf("text handler output missing repo field: %q", buf.String())
+	}
+}
