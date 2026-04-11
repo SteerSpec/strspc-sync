@@ -3,7 +3,6 @@ package sync
 import (
 	"context"
 	"fmt"
-	"log"
 	"path"
 	"strings"
 	gosync "sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/hash"
+	sslog "github.com/SteerSpec/strspc-sync/internal/log"
 	"github.com/SteerSpec/strspc-sync/internal/registry"
 	"github.com/SteerSpec/strspc-sync/internal/state"
 	"github.com/SteerSpec/strspc-sync/internal/template"
@@ -141,7 +141,8 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 	// Load deployment state from central repo
 	s.state, s.stateSHA, err = s.loadState(ctx)
 	if err != nil {
-		log.Printf("warning: could not load deployment state, starting fresh: %v", err)
+		sslog.L().Warn("could not load deployment state, starting fresh",
+			"operation", "sync", "err", err)
 		s.state = state.NewDeploymentState()
 	}
 
@@ -217,7 +218,8 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 	// Save state back (skip on dry run)
 	if !dryRun {
 		if err := s.saveState(ctx); err != nil {
-			log.Printf("warning: could not save deployment state: %v", err)
+			sslog.L().Warn("could not save deployment state",
+				"operation", "sync", "err", err)
 		}
 	}
 
@@ -283,7 +285,9 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	}
 
 	if dryRun {
-		log.Printf("[dry-run] would sync %s to %s/%s", tmpl.ID, target.Repo, tmpl.Destination)
+		sslog.L().Info("dry-run: would sync template",
+			"operation", "sync", "dry_run", true,
+			"template_id", tmpl.ID, "repo", target.Repo, "destination", tmpl.Destination)
 		rr.Status = "skipped"
 		return rr
 	}

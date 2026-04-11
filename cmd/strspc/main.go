@@ -13,6 +13,7 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	"github.com/SteerSpec/strspc-sync/internal/conflict"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
+	sslog "github.com/SteerSpec/strspc-sync/internal/log"
 	"github.com/SteerSpec/strspc-sync/internal/monitor"
 	"github.com/SteerSpec/strspc-sync/internal/state"
 	"github.com/SteerSpec/strspc-sync/internal/sync"
@@ -82,6 +83,8 @@ Common Flags:
   --config <path>           Config file path (default: steerspec-sync.yml)
   --target-filter <glob>    Filter target repositories
   --timeout <duration>      Overall operation timeout (default: 10m)
+  --log-level <level>       Log level: debug|info|warn|error (default: info)
+  --log-format <format>     Log format: auto|json|text (default: auto)
 
 Sync Flags:
   --dry-run                 Preview changes without creating PRs
@@ -97,10 +100,17 @@ type commonFlags struct {
 	configPath   string
 	targetFilter string
 	timeout      time.Duration
+	logLevel     string
+	logFormat    string
 }
 
 func parseCommonFlags(args []string) (commonFlags, []string) {
-	f := commonFlags{configPath: "steerspec-sync.yml", timeout: 10 * time.Minute}
+	f := commonFlags{
+		configPath: "steerspec-sync.yml",
+		timeout:    10 * time.Minute,
+		logLevel:   "info",
+		logFormat:  "auto",
+	}
 	var remaining []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -122,11 +132,37 @@ func parseCommonFlags(args []string) (commonFlags, []string) {
 				}
 				i++
 			}
+		case "--log-level":
+			if i+1 < len(args) {
+				f.logLevel = args[i+1]
+				i++
+			}
+		case "--log-format":
+			if i+1 < len(args) {
+				f.logFormat = args[i+1]
+				i++
+			}
 		default:
 			remaining = append(remaining, args[i])
 		}
 	}
 	return f, remaining
+}
+
+// applyLogFlags parses the log-related fields on commonFlags and initializes
+// the package-level logger to write to errOut (the same writer the run*
+// functions use for diagnostics). Returns an error if either flag is malformed.
+func applyLogFlags(f commonFlags, errOut io.Writer) error {
+	level, err := sslog.ParseLevel(f.logLevel)
+	if err != nil {
+		return err
+	}
+	format, err := sslog.ParseFormat(f.logFormat)
+	if err != nil {
+		return err
+	}
+	sslog.InitTo(errOut, level, format)
+	return nil
 }
 
 func loadConfig(path string) (*config.SyncConfig, error) {
@@ -192,6 +228,9 @@ func setOutput(key, value string) {
 
 func runSync(args []string, out, errOut io.Writer) error {
 	common, remaining := parseCommonFlags(args)
+	if err := applyLogFlags(common, errOut); err != nil {
+		return err
+	}
 	dryRun := false
 	templateFilter := ""
 	force := false
@@ -257,6 +296,9 @@ func runSync(args []string, out, errOut io.Writer) error {
 
 func runMonitor(args []string, out, errOut io.Writer) error {
 	common, _ := parseCommonFlags(args)
+	if err := applyLogFlags(common, errOut); err != nil {
+		return err
+	}
 
 	cfg, err := loadConfig(common.configPath)
 	if err != nil {
@@ -299,6 +341,9 @@ func runMonitor(args []string, out, errOut io.Writer) error {
 
 func runConflict(args []string, out, errOut io.Writer) error {
 	common, remaining := parseCommonFlags(args)
+	if err := applyLogFlags(common, errOut); err != nil {
+		return err
+	}
 	var tiers []int
 
 	for i := 0; i < len(remaining); i++ {
