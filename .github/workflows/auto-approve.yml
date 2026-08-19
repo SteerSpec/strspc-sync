@@ -5,9 +5,24 @@ name: PR Auto-Approve (Copilot)
 # Pinned to @v1 (the released tag) rather than a branch on purpose.
 
 on:
-  pull_request:
+  # pull_request_target, NOT pull_request. For a same-repo PR, `pull_request`
+  # runs the workflow definition from the PR's HEAD commit with secrets in
+  # scope, so anyone able to push a branch could edit this file in their own PR
+  # and exfiltrate BOT_TOKEN — a token with org-wide write whose review is what
+  # satisfies the required-approval ruleset. pull_request_target runs the
+  # definition from the base branch instead, so a PR cannot alter it.
+  #
+  # The usual pull_request_target footgun does not apply: it is dangerous when
+  # you check out and execute PR code with secrets in scope, and this workflow
+  # never checks anything out — the action only calls the GitHub API.
+  #
+  # This makes the fork guard in the if: below load-bearing rather than
+  # belt-and-braces. Do not remove it.
+  pull_request_target:
     branches: [main]
     types: [opened, ready_for_review, synchronize, reopened]
+  # Safe as-is: pull_request_review workflows already run from the base branch,
+  # so they are not an injection path.
   pull_request_review:
     types: [submitted]
   # Catches checks posted by third-party apps. It does NOT fire for this repo's
@@ -44,12 +59,13 @@ jobs:
           github.run_id
         }}
       cancel-in-progress: true
-    # BASE-BRANCH SYNC — 3 points must agree: on.pull_request.branches above,
+    # BASE-BRANCH SYNC — 3 points must agree: on.pull_request_target.branches above,
     # the base.ref check here, and the base-branch input below. All say 'main',
     # this repo's default branch, which is what the org rulesets target.
     #
-    # The base.ref / draft / fork conditions apply ONLY to the pull_request and
-    # pull_request_review branch. check_run and workflow_run carry no
+    # The base.ref / draft / fork conditions apply ONLY to the
+    # pull_request_target and pull_request_review branch. check_run and
+    # workflow_run carry no
     # pull_request payload, so the action re-applies those same gates itself
     # after resolving the PR — enforced later, not skipped.
     #
@@ -59,7 +75,7 @@ jobs:
     if: >-
       (
         (
-          github.event_name == 'pull_request' ||
+          github.event_name == 'pull_request_target' ||
           (
             github.event_name == 'pull_request_review' &&
             github.actor != 'cnslr-bt'
