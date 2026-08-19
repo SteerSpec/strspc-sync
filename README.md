@@ -129,6 +129,17 @@ for the schema reference.
 
 This tool implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strspc-spec).
 
+## Contributing
+
+Pull requests to `main` are reviewed automatically by GitHub Copilot. When that review
+comes back clean, [`pr-auto-approve`](https://github.com/SteerSpec/strspc-pr-review)
+posts the approving review as `cnslr-bt`, which satisfies the required-approval rule — so
+an approval from a bot you have never met is expected, not a misconfiguration.
+
+It approves only when every check has passed and Copilot's latest review is clean for the
+current commit. A push after Copilot reviewed dismisses the approval until Copilot
+re-reviews, and `CHANGES_REQUESTED` always blocks.
+
 ## License
 
 MIT -- see [LICENSE](LICENSE).
