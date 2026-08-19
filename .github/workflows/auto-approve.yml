@@ -1,0 +1,108 @@
+name: PR Auto-Approve (Copilot)
+
+# Auto-approves PRs as cnslr-bt once Copilot's review is clean, so the org
+# ruleset's required approving review is satisfied without a human click.
+# Pinned to @v1 (the released tag) rather than a branch on purpose.
+
+on:
+  # pull_request_target, NOT pull_request. For a same-repo PR, `pull_request`
+  # runs the workflow definition from the PR's HEAD commit with secrets in
+  # scope, so anyone able to push a branch could edit this file in their own PR
+  # and exfiltrate BOT_TOKEN — a token with org-wide write whose review is what
+  # satisfies the required-approval ruleset. pull_request_target runs the
+  # definition from the base branch instead, so a PR cannot alter it.
+  #
+  # The usual pull_request_target footgun does not apply: it is dangerous when
+  # you check out and execute PR code with secrets in scope, and this workflow
+  # never checks anything out — the action only calls the GitHub API.
+  #
+  # This makes the fork guard in the if: below load-bearing rather than
+  # belt-and-braces. Do not remove it.
+  pull_request_target:
+    branches: [main]
+    types: [opened, ready_for_review, synchronize, reopened]
+  # Safe as-is: pull_request_review workflows already run from the base branch,
+  # so they are not an injection path.
+  pull_request_review:
+    types: [submitted]
+  # Catches checks posted by third-party apps. It does NOT fire for this repo's
+  # own Actions jobs: those check runs are created with GITHUB_TOKEN, and
+  # GITHUB_TOKEN-generated events never start a new workflow run (the recursion
+  # guard) — the event is emitted, it just cannot start us.
+  check_run:
+    types: [completed]
+  # ...so workflow_run is the re-entry point that actually works. BOTH PR-gating
+  # workflows are listed: each fires its own event, and whichever finishes last
+  # is the one that finds every other check complete. Listing only one means a
+  # PR where the other finishes later is never re-evaluated.
+  workflow_run:
+    workflows: ['CI', 'Action Test']
+    types: [completed]
+
+jobs:
+  # The check-run name is load-bearing: it comes from `name:` below, and the
+  # check_run branch of the if: excludes it by that exact string to break the
+  # feedback loop. The job key is kept identical so the two can't drift.
+  auto-approve:
+    name: auto-approve
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+      checks: read
+    concurrency:
+      group: >-
+        pr-auto-approve-${{ github.repository }}-${{
+          github.event.pull_request.number ||
+          github.event.check_run.pull_requests[0].number ||
+          github.event.workflow_run.pull_requests[0].number ||
+          github.run_id
+        }}
+      cancel-in-progress: true
+    # BASE-BRANCH SYNC — 3 points must agree: on.pull_request_target.branches above,
+    # the base.ref check here, and the base-branch input below. All say 'main',
+    # this repo's default branch, which is what the org rulesets target.
+    #
+    # The base.ref / draft / fork conditions apply ONLY to the
+    # pull_request_target and pull_request_review branch. check_run and
+    # workflow_run carry no
+    # pull_request payload, so the action re-applies those same gates itself
+    # after resolving the PR — enforced later, not skipped.
+    #
+    # 'cnslr-bt' is hard-coded rather than read from a variable: an unset
+    # variable makes this `github.actor != ''`, always true, silently disabling
+    # the loop guard. It MUST stay identical to the bot-login input below.
+    if: >-
+      (
+        (
+          github.event_name == 'pull_request_target' ||
+          (
+            github.event_name == 'pull_request_review' &&
+            github.actor != 'cnslr-bt'
+          )
+        ) &&
+        github.event.pull_request.base.ref == 'main' &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      ) || (
+        github.event_name == 'check_run' &&
+        github.event.check_run.name != 'auto-approve' &&
+        github.event.check_run.pull_requests[0] != null
+      ) || (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.pull_requests[0] != null
+      )
+    steps:
+      - uses: SteerSpec/strspc-pr-review@v1
+        with:
+          bot-login: cnslr-bt
+          bot-github-token: ${{ secrets.BOT_TOKEN }}
+          base-branch: main
+          # Copilot cannot re-trigger us — its check run is GITHUB_TOKEN-created
+          # (recursion guard) and any run Copilot itself triggers is held at
+          # 'action_required' pending manual approval. So this run, started by
+          # CI completing, waits for Copilot's check instead of skipping.
+          # Without it every PR needs a manual re-run. Free here (public repo).
+          wait-for-copilot-seconds: '300'
