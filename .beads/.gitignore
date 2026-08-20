@@ -49,3 +49,19 @@ bd.db
 # They would override fork protection in .git/info/exclude.
 # Config files (metadata.json, config.yaml) are tracked by git by default
 # since no pattern above ignores them.
+
+# Added by bd (missing required patterns)
+.env
+*.gate.lock*
+export-state.json
+last_pull
+embeddeddolt/
+proxieddb/
+daemon.*
+*.lock
+*.corrupt.backup/
+.beads-credential-key
+proxied_server_client_info.json
+
+# Machine-specific: embeds an absolute local path to the backup directory.
+dolt-backup.json
