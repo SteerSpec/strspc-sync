@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -22,23 +21,36 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test -race -coverprofile=coverage.out ./...
-      - name: Check coverage threshold
+      - name: Coverage report and threshold
+        env:
+          THRESHOLD: '70'
         run: |
-          go tool cover -func=coverage.out | awk '/^total:/ {
-            pct = $3+0
-            if (pct < 70) { print "Coverage " pct "% below 70% threshold"; exit 1 }
-            print "Coverage OK: " pct "%"
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3+0}')
+          {
+            echo "## Coverage"
+            echo
+            echo "**${total}%** of statements (threshold: ${THRESHOLD}%)"
+            echo
+            echo '<details><summary>Per-function breakdown</summary>'
+            echo
+            echo '```'
+            go tool cover -func=coverage.out
+            echo '```'
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+          awk -v t="$THRESHOLD" -v c="$total" 'BEGIN {
+            if (c+0 < t+0) {
+              printf "Coverage %s%% is below the %s%% threshold\n", c, t
+              exit 1
+            }
+            printf "Coverage %s%% meets the %s%% threshold\n", c, t
           }'
-      - name: Upload coverage
+      - name: Upload coverage profile
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage.out
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: coverage.out
-          fail_ci_if_error: false
 
   lint:
     runs-on: ubuntu-latest
