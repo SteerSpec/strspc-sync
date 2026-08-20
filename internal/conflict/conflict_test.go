@@ -40,6 +40,10 @@ func (m *mockRepoService) GetDefaultBranch(_ context.Context, _, _ string) (stri
 	return "main", nil
 }
 
+func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, _ string) (string, error) {
+	return "abc123sha", nil
+}
+
 func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, _, _, _, _ string, _ []byte, _, _ string) error {
 	return nil
 }
