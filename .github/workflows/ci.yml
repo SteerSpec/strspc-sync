@@ -25,7 +25,16 @@ jobs:
         env:
           THRESHOLD: '70'
         run: |
+          # Actions' default shell is `bash -e`, which does not set pipefail, so a
+          # failure inside the pipeline below would be masked and $total left empty.
+          # The gate still fails closed (awk coerces "" to 0, under any threshold),
+          # but it would misreport a broken profile as low coverage.
+          set -euo pipefail
           total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3+0}')
+          if [ -z "$total" ]; then
+            echo "::error::no 'total:' line in coverage.out - the profile is missing or malformed"
+            exit 1
+          fi
           {
             echo "## Coverage"
             echo
