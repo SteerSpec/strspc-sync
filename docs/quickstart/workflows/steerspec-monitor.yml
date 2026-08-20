@@ -9,6 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: SteerSpec/strspc-sync/monitor@v1
+      - uses: SteerSpec/strspc-sync/monitor@v0.2.0
         env:
           GITHUB_TOKEN: ${{ secrets.STEERSPEC_TOKEN }}

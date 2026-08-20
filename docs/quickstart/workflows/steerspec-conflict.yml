@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: SteerSpec/strspc-sync/conflict@v1
+      - uses: SteerSpec/strspc-sync/conflict@v0.2.0
         with:
           tiers: '1,2'
         env:
