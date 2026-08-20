@@ -93,6 +93,34 @@ func (s *repoService) GetDefaultBranch(ctx context.Context, owner, repo string) 
 	return r.DefaultBranch, nil
 }
 
+// GetBranchSHA resolves a branch name to the commit SHA it points at. Callers
+// that need a base for a new ref must use this rather than the branch name —
+// the git/refs endpoint takes a SHA and rejects a name.
+func (s *repoService) GetBranchSHA(ctx context.Context, owner, repo, branch string) (string, error) {
+	u := fmt.Sprintf("%s/repos/%s/%s/git/ref/heads/%s",
+		s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(branch))
+	resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "", err
+	}
+	if err := checkResponse(resp); err != nil {
+		return "", fmt.Errorf("get branch ref %s in %s/%s: %w", branch, owner, repo, err)
+	}
+
+	var ref struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	if err := decodeBody(resp, &ref); err != nil {
+		return "", err
+	}
+	if ref.Object.SHA == "" {
+		return "", fmt.Errorf("get branch ref %s in %s/%s: empty sha in response", branch, owner, repo)
+	}
+	return ref.Object.SHA, nil
+}
+
 func (s *repoService) GetFileContent(ctx context.Context, owner, repo, path, ref string) ([]byte, string, error) {
 	u := fmt.Sprintf("%s/repos/%s/%s/contents/%s", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), path)
 	if ref != "" {

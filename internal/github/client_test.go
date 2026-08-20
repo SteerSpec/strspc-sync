@@ -1069,3 +1069,50 @@ func TestRateLimiterProactiveSleepContextCancel(t *testing.T) {
 		t.Fatalf("expected quick cancellation, but elapsed was %v", elapsed)
 	}
 }
+
+func TestGetBranchSHA(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/git/ref/heads/main", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"ref":"refs/heads/main","object":{"sha":"d34db33f","type":"commit"}}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	sha, err := c.Repos.GetBranchSHA(context.Background(), "o", "r", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sha != "d34db33f" {
+		t.Fatalf("expected sha d34db33f, got %q", sha)
+	}
+}
+
+func TestGetBranchSHANotFound(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/git/ref/heads/nope", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"message":"Not Found"}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	if _, err := c.Repos.GetBranchSHA(context.Background(), "o", "r", "nope"); err == nil {
+		t.Fatal("expected error for missing branch ref")
+	}
+}
+
+// A 200 with no sha would otherwise hand callers an empty string, which
+// CreateBranch would post as the base of a new ref.
+func TestGetBranchSHAEmptySHA(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/git/ref/heads/main", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"ref":"refs/heads/main","object":{}}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	_, err := c.Repos.GetBranchSHA(context.Background(), "o", "r", "main")
+	if err == nil {
+		t.Fatal("expected error for empty sha")
+	}
+	if !strings.Contains(err.Error(), "empty sha") {
+		t.Fatalf("expected an empty-sha error, got %v", err)
+	}
+}

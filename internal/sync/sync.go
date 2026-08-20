@@ -2,7 +2,9 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"strings"
 	gosync "sync"
@@ -303,8 +305,14 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		return rr
 	}
 
-	// Create branch (ignore error if already exists)
-	_ = s.ghClient.PullRequests.CreateBranch(ctx, owner, repo, branchName, baseSHA)
+	// Create the branch. A 422 means it already exists, which is the normal case
+	// on re-runs; anything else is a real failure and must not be swallowed —
+	// every step below would otherwise operate on a branch that does not exist.
+	if err := s.ghClient.PullRequests.CreateBranch(ctx, owner, repo, branchName, baseSHA); err != nil && !isAlreadyExists(err) {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("creating branch: %v", err)
+		return rr
+	}
 
 	// Get the file SHA on the branch (for updates)
 	_, fileSHA, _ := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, branchName)
@@ -400,14 +408,18 @@ func (s *Syncer) saveState(ctx context.Context) error {
 	return s.ghClient.Repos.CreateOrUpdateFile(ctx, s.centralOwner, s.centralRepo, ".steerspec/deployment-state.json", "", data, s.stateSHA, "[SteerSpec] Update deployment state")
 }
 
+// getBaseSHA resolves the branch a sync branch should be cut from to a commit
+// SHA. When no branch is known for the target, it falls back to whatever the
+// repository reports as its default.
 func (s *Syncer) getBaseSHA(ctx context.Context, owner, repo, branch string) (string, error) {
-	// Use GetFileContent on a known path to get the branch reference
-	// We use the branch name itself via GetDefaultBranch
-	sha, err := s.ghClient.Repos.GetDefaultBranch(ctx, owner, repo)
-	if err != nil {
-		return "", err
+	if branch == "" {
+		var err error
+		branch, err = s.ghClient.Repos.GetDefaultBranch(ctx, owner, repo)
+		if err != nil {
+			return "", fmt.Errorf("resolving default branch: %w", err)
+		}
 	}
-	return sha, nil
+	return s.ghClient.Repos.GetBranchSHA(ctx, owner, repo, branch)
 }
 
 func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, templateID string, currentPR int, label string) {
@@ -463,6 +475,23 @@ func shouldApplyTemplate(target registry.ResolvedTarget, templateID string) bool
 		}
 	}
 	return true
+}
+
+// isAlreadyExists reports whether err is the GitHub API's "Reference already
+// exists" response. Branch creation is idempotent from the caller's point of
+// view: on every run after the first, the sync branch is already there.
+//
+// The status alone is not enough to decide that. git/refs answers 422 for any
+// validation failure — an invalid ref name, or a base SHA that does not resolve
+// — and tolerating those would put us back where GH #31 started, with later
+// steps running against a branch that was never created. So the message has to
+// match as well.
+func isAlreadyExists(err error) bool {
+	var apiErr *gh.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusUnprocessableEntity {
+		return false
+	}
+	return strings.Contains(strings.ToLower(apiErr.Message), "already exists")
 }
 
 func splitRepo(fullName string) (owner, repo string) {
