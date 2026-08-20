@@ -97,7 +97,9 @@ docs/quickstart/     Example config + templates
 ## CI/CD
 
 - **ci.yml**: `go vet` + `go test -race` + golangci-lint + lint-extra (actionlint, shellcheck,
-  yamllint, markdownlint) on push/PR to main; 70% coverage threshold enforced; Codecov upload
+  yamllint, markdownlint) on push/PR to main; 70% coverage threshold enforced natively via
+  `go tool cover` (no third-party service), with the total written to the run summary and
+  `coverage.out` kept as a build artifact
 - **release.yml**: pre-flight `go test -race` + build smoke test, then GoReleaser on tag push (`v*`)
 
 ## Auth Pattern
