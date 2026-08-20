@@ -884,3 +884,62 @@ func TestBaseSHAResolutionFailureIsReported(t *testing.T) {
 		}
 	}
 }
+
+// git/refs answers 422 for any validation failure, not just an existing ref —
+// an unresolvable base SHA lands here too. Tolerating those on status alone
+// would put us back at GH #31, with later steps running against a branch that
+// was never created.
+func TestCreateBranch422OtherThanAlreadyExistsIsReported(t *testing.T) {
+	for _, message := range []string{
+		"Object does not exist",
+		"Reference cannot be created",
+	} {
+		t.Run(message, func(t *testing.T) {
+			repoSvc := newMockRepoService()
+			prSvc := newMockPRService()
+			prSvc.createBranchErr = &gh.APIError{
+				StatusCode: http.StatusUnprocessableEntity,
+				Message:    message,
+			}
+			setupMockRepos(repoSvc)
+
+			syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+			result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if result.Errors != 2 {
+				t.Errorf("expected 2 errors for a non-existence 422, got %d", result.Errors)
+			}
+			if len(prSvc.created) != 0 {
+				t.Errorf("expected no PRs after branch creation failed, got %d", len(prSvc.created))
+			}
+		})
+	}
+}
+
+func TestIsAlreadyExists(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"reference already exists", &gh.APIError{StatusCode: 422, Message: "Reference already exists"}, true},
+		{"lowercase message", &gh.APIError{StatusCode: 422, Message: "reference already exists"}, true},
+		{"wrapped", fmt.Errorf("create branch: %w", &gh.APIError{StatusCode: 422, Message: "Reference already exists"}), true},
+		{"422 invalid sha", &gh.APIError{StatusCode: 422, Message: "Object does not exist"}, false},
+		{"422 empty message", &gh.APIError{StatusCode: 422}, false},
+		{"404", &gh.APIError{StatusCode: 404, Message: "Not Found"}, false},
+		{"non-api error", fmt.Errorf("network unreachable"), false},
+		{"nil", nil, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isAlreadyExists(tt.err); got != tt.want {
+				t.Errorf("isAlreadyExists(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}

@@ -477,12 +477,21 @@ func shouldApplyTemplate(target registry.ResolvedTarget, templateID string) bool
 	return true
 }
 
-// isAlreadyExists reports whether err is the GitHub API's "reference already
-// exists" response (422). Branch creation is idempotent from the caller's point
-// of view: on every run after the first, the sync branch is already there.
+// isAlreadyExists reports whether err is the GitHub API's "Reference already
+// exists" response. Branch creation is idempotent from the caller's point of
+// view: on every run after the first, the sync branch is already there.
+//
+// The status alone is not enough to decide that. git/refs answers 422 for any
+// validation failure — an invalid ref name, or a base SHA that does not resolve
+// — and tolerating those would put us back where GH #31 started, with later
+// steps running against a branch that was never created. So the message has to
+// match as well.
 func isAlreadyExists(err error) bool {
 	var apiErr *gh.APIError
-	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusUnprocessableEntity
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusUnprocessableEntity {
+		return false
+	}
+	return strings.Contains(strings.ToLower(apiErr.Message), "already exists")
 }
 
 func splitRepo(fullName string) (owner, repo string) {
