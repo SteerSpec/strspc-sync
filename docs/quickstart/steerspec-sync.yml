@@ -19,29 +19,32 @@ variables:
   coding_standards_url: "https://acme-corp.dev/standards"
 
 templates:
+  # The marker strategy replaces the STEERSPEC:BEGIN/END sections it finds in
+  # the template, leaving the rest of the target file untouched. Which sections
+  # are managed is decided by the markers in templates/CLAUDE.md.mustache itself.
   - id: claude-md
+    version: "1.0.0"
     type: claude-md
     source: templates/CLAUDE.md.mustache
     destination: CLAUDE.md
     strategy: marker
-    variables:
-      managed_sections:
-        - project-standards
-        - coding-conventions
 
   - id: agent-code-review
+    version: "1.0.0"
     type: agent
     source: templates/agents/code-review.md
     destination: .claude/agents/code-review.md
     strategy: full-replace
 
   - id: skill-commit
+    version: "1.0.0"
     type: skill
     source: templates/skills/commit.md
     destination: .claude/skills/commit.md
     strategy: full-replace
 
   - id: claude-settings
+    version: "1.0.0"
     type: config
     source: templates/settings.json.mustache
     destination: .claude/settings/settings.json

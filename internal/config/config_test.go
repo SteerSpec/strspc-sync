@@ -352,3 +352,28 @@ func TestTemplateVersionField(t *testing.T) {
 		t.Errorf("expected template version 1.0.0, got %s", cfg.Templates[0].Version)
 	}
 }
+
+// TestShippedExampleConfigsLoad guards the configs that ship with the repo.
+// The quickstart config is the first thing the README points a new user at, and
+// it silently stopped parsing once: a template carried a YAML list under
+// `variables` (a map[string]string) and none of the templates declared the
+// `version` field Validate requires. Loading them here means CI catches that
+// rather than the user.
+func TestShippedExampleConfigsLoad(t *testing.T) {
+	paths := []string{
+		"../../docs/quickstart/steerspec-sync.yml",
+		"../../tests/fixtures/steerspec-sync.yml",
+	}
+
+	for _, path := range paths {
+		t.Run(filepath.Base(filepath.Dir(path)), func(t *testing.T) {
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("shipped config %s failed to load: %v", path, err)
+			}
+			if len(cfg.Templates) == 0 {
+				t.Errorf("shipped config %s has no templates", path)
+			}
+		})
+	}
+}
