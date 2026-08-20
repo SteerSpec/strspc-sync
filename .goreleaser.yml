@@ -15,12 +15,18 @@ builds:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}}
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: >-
       strspc_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     format_overrides:
       - goos: darwin
-        format: zip
+        formats: [zip]
+    # Listing files at all overrides GoReleaser's defaults, so LICENSE and
+    # README are re-listed here alongside NOTICE (not covered by the defaults).
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
 
 checksum:
   name_template: 'checksums.txt'
