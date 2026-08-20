@@ -1,8 +1,48 @@
 # SteerSpec Sync
 
+> Define your AI configuration once. Ship it everywhere, by pull request.
+
+<!-- markdownlint-disable MD013 -->
+[![CI](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/SteerSpec/strspc-sync)](https://github.com/SteerSpec/strspc-sync/releases)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Marketplace](https://img.shields.io/badge/Marketplace-SteerSpec%20Sync-blue?logo=github)](https://github.com/marketplace/actions/steerspec-sync)
+<!-- markdownlint-enable MD013 -->
+
 Synchronize AI configuration files (`CLAUDE.md`, `.claude/agents/`, `.claude/skills/`,
 `.claude/settings/`) across your GitHub organization. Define templates once in a central
 repo, then distribute them via pull requests.
+
+---
+
+## How it works
+
+Templates live in one central repo. On every run, `strspc` renders each template for each target
+repository, hashes the result with BLAKE3, and compares it against the recorded deployment state.
+Only genuine changes become pull requests — an unchanged render is skipped, so re-running is cheap
+and quiet.
+
+```mermaid
+flowchart LR
+    C["Central repo<br/><i>templates + steerspec-sync.yml</i>"]
+    R["Render<br/><i>mustache · marker · full-replace</i>"]
+    D{"Content<br/>changed?"}
+    X["Skip"]
+    P["Pull request<br/><i>one per template, per repo</i>"]
+    T["Target repos<br/><i>CLAUDE.md · agents · skills · settings</i>"]
+    S["Deployment state<br/><i>BLAKE3 hashes</i>"]
+
+    C --> R --> D
+    D -->|no| X
+    D -->|yes| P --> T
+    P --> S
+    S -.->|compared on next run| D
+```
+
+Nothing is force-pushed and nothing is merged for you: every change lands as a reviewable PR in the
+target repo. Two companion commands watch what happens afterwards — `monitor` reports files that
+have drifted away from their template, and `conflict` flags contradictions across the fleet.
 
 ## Quick Start
 
@@ -105,7 +145,7 @@ Detect conflicts across AI configuration files in target repositories.
 
 ```bash
 strspc conflict --config steerspec-sync.yml
-strspc conflict --config steerspec-sync.yml --tiers 1,2,3
+strspc conflict --config steerspec-sync.yml --tiers 1,2
 ```
 
 **Action usage:**
@@ -125,11 +165,10 @@ See [docs/quickstart/steerspec-sync.yml](docs/quickstart/steerspec-sync.yml) for
 and the [full specification](https://github.com/SteerSpec/strspc-spec/blob/main/rules/config/CONFIG.md)
 for the schema reference.
 
-## Specification
-
-This tool implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strspc-spec).
-
 ## Contributing
+
+Bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the build,
+test, and lint workflow. To report a security issue privately, see [SECURITY.md](SECURITY.md).
 
 Pull requests to `main` are reviewed automatically by GitHub Copilot. When that review
 comes back clean, [`pr-auto-approve`](https://github.com/SteerSpec/strspc-pr-review)
@@ -140,6 +179,18 @@ It approves only when every check has passed and Copilot's latest review is clea
 current commit. A push after Copilot reviewed dismisses the approval until Copilot
 re-reviews, and `CHANGES_REQUESTED` always blocks.
 
+## Related projects
+
+Part of the [SteerSpec](https://steerspec.dev) ecosystem:
+
+- [strspc-rules](https://github.com/SteerSpec/strspc-rules) — canonical rule format specification
+- [strspc-manager](https://github.com/SteerSpec/strspc-manager) — core enforcement engine
+- [strspc-CLI](https://github.com/SteerSpec/strspc-CLI) — render, validate, and manage rule files
+
+## Specification
+
+This tool implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strspc-spec).
+
 ## License
 
-MIT -- see [LICENSE](LICENSE).
+Apache 2.0 -- see [LICENSE](LICENSE).
