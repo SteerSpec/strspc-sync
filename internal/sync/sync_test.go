@@ -24,6 +24,8 @@ type mockRepoService struct {
 	defaultBranch string
 	createdFiles  []string
 	branchSHAErr  error
+	// createFileErr maps "owner/repo/path/branch" to an error to return.
+	createFileErr map[string]error
 }
 
 func newMockRepoService() *mockRepoService {
@@ -74,6 +76,9 @@ func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, owner, repo, pat
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := fmt.Sprintf("%s/%s/%s/%s", owner, repo, path, branch)
+	if err, ok := m.createFileErr[key]; ok {
+		return err
+	}
 	m.files[key] = content
 	m.fileSHAs[key] = "newsha"
 	m.createdFiles = append(m.createdFiles, key)
@@ -941,5 +946,33 @@ func TestIsAlreadyExists(t *testing.T) {
 				t.Errorf("isAlreadyExists(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+// A sync that cannot record its results has violated SYNCOP-008. It used to be
+// logged and dropped, so the run reported errors:0 while writing nothing.
+func TestSaveStateFailureIsCounted(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	setupMockRepos(repoSvc)
+	repoSvc.createFileErr = map[string]error{
+		"testorg/central/.steerspec/deployment-state.json/": &gh.APIError{
+			StatusCode: http.StatusNotFound, Message: "Branch  not found",
+		},
+	}
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The PRs still happened and must still be reported.
+	if result.PRsCreated != 2 {
+		t.Errorf("expected 2 PRs created, got %d", result.PRsCreated)
+	}
+	// But the run must not claim success.
+	if result.Errors != 1 {
+		t.Errorf("expected the state-save failure counted as 1 error, got %d", result.Errors)
 	}
 }
