@@ -49,6 +49,12 @@ func (s *repoService) ListByOrg(ctx context.Context, org string) ([]*Repository,
 // the token can see in any organization, which for a token-based auth method
 // means sync could target repositories the config never named (GH #41).
 func (s *repoService) ListByTopic(ctx context.Context, topic, org string) ([]*Repository, error) {
+	// Refuse rather than emit "topic:x org:", which GitHub may treat as an
+	// unscoped search — the exact failure this parameter exists to prevent.
+	if org == "" {
+		return nil, fmt.Errorf("list repos by topic %q: org must not be empty", topic)
+	}
+
 	var all []*Repository
 	page := 1
 

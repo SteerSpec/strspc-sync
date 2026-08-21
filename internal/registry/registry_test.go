@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
@@ -323,5 +324,56 @@ func TestResolveInvalidPattern(t *testing.T) {
 	_, err := reg.Resolve(context.Background(), targets, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid pattern")
+	}
+}
+
+// "/foo" and "foo/" parse as len-2 splits, so the original length check let them
+// through with an empty half. An empty owner reaches ListByTopic as an empty org
+// qualifier, turning the scoped search back into a global one (GH #41).
+func TestParsePatternRejectsEmptyHalves(t *testing.T) {
+	tests := []struct {
+		pattern string
+		wantErr bool
+	}{
+		{"acme-corp/*", false},
+		{"acme-corp/api-*", false},
+		{"/foo", true},
+		{"foo/", true},
+		{"/", true},
+		{"acme-corp", true},
+		{"", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pattern, func(t *testing.T) {
+			org, glob, err := parsePattern(tt.pattern)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected an error, got org=%q glob=%q", org, glob)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if org == "" || glob == "" {
+				t.Errorf("parsed to an empty half: org=%q glob=%q", org, glob)
+			}
+		})
+	}
+}
+
+func TestResolveRejectsMalformedInclude(t *testing.T) {
+	reg := New(newMockLister())
+
+	_, err := reg.Resolve(context.Background(), config.TargetsConfig{
+		Include: []string{"/foo"},
+		Topics:  []string{"claude-managed"},
+	}, nil)
+	if err == nil {
+		t.Fatal("expected an error for an include pattern with an empty owner")
+	}
+	if !strings.Contains(err.Error(), "owner is empty") {
+		t.Errorf("expected the error to name the empty owner, got: %v", err)
 	}
 }

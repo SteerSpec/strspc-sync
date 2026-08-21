@@ -170,10 +170,20 @@ func (r *Registry) Resolve(ctx context.Context, targets config.TargetsConfig, gl
 }
 
 // parsePattern splits "owner/glob" into owner and glob parts.
+//
+// Both halves must be non-empty. "/foo" would otherwise yield an empty owner,
+// which reaches ListByTopic as an empty org qualifier and turns a scoped search
+// back into a global one (GH #41).
 func parsePattern(pattern string) (org, glob string, err error) {
 	parts := strings.SplitN(pattern, "/", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("pattern must be in 'owner/glob' format")
+	}
+	if parts[0] == "" {
+		return "", "", fmt.Errorf("pattern must be in 'owner/glob' format: owner is empty")
+	}
+	if parts[1] == "" {
+		return "", "", fmt.Errorf("pattern must be in 'owner/glob' format: glob is empty")
 	}
 	return parts[0], parts[1], nil
 }

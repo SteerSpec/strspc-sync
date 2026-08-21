@@ -1126,3 +1126,20 @@ func TestGetBranchSHAEmptySHA(t *testing.T) {
 		t.Fatalf("expected an empty-sha error, got %v", err)
 	}
 }
+
+func TestRepoListByTopicRejectsEmptyOrg(t *testing.T) {
+	called := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/search/repositories", func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})
+
+	c := testClient(t, mux)
+	_, err := c.Repos.ListByTopic(context.Background(), "steerspec", "")
+	if err == nil {
+		t.Fatal("expected an error for an empty org")
+	}
+	if called {
+		t.Error("an unscoped search was issued despite the empty org")
+	}
+}
