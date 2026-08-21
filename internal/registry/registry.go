@@ -22,7 +22,7 @@ type ResolvedRepo struct {
 // RepoLister is the interface needed from the GitHub client.
 type RepoLister interface {
 	ListByOrg(ctx context.Context, org string) ([]*ResolvedRepo, error)
-	ListByTopic(ctx context.Context, topic string) ([]*ResolvedRepo, error)
+	ListByTopic(ctx context.Context, topic, org string) ([]*ResolvedRepo, error)
 }
 
 // ResolvedTarget represents a fully resolved target repository.
@@ -49,12 +49,17 @@ func New(lister RepoLister) *Registry {
 func (r *Registry) Resolve(ctx context.Context, targets config.TargetsConfig, globalVars map[string]string) ([]ResolvedTarget, error) {
 	repoMap := make(map[string]*ResolvedRepo)
 
+	// Orgs named by include patterns. Topic resolution is confined to these:
+	// include is org-scoped by construction, and topics must be too.
+	inScopeOrgs := make(map[string]bool)
+
 	// Process include patterns
 	for _, pattern := range targets.Include {
 		org, globPat, err := parsePattern(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid include pattern %q: %w", pattern, err)
 		}
+		inScopeOrgs[org] = true
 
 		repos, err := r.lister.ListByOrg(ctx, org)
 		if err != nil {
@@ -72,14 +77,32 @@ func (r *Registry) Resolve(ctx context.Context, targets config.TargetsConfig, gl
 		}
 	}
 
-	// Process topic-based includes
+	// Process topic-based includes, once per in-scope org.
+	//
+	// A bare "topic:x" search returns every repository the token can see, in any
+	// organization. Under a broadly-scoped PAT that meant sync could create
+	// branches and open PRs in repos the config never named, and targets.exclude
+	// could not prevent it because exclude only considers explicitly listed orgs
+	// (GH #41). The query below is org-qualified, and the owner is re-checked on
+	// the way in so a future caller of ListByTopic cannot reopen the gap.
+	orgs := make([]string, 0, len(inScopeOrgs))
+	for org := range inScopeOrgs {
+		orgs = append(orgs, org)
+	}
+	sort.Strings(orgs)
+
 	for _, topic := range targets.Topics {
-		repos, err := r.lister.ListByTopic(ctx, topic)
-		if err != nil {
-			return nil, fmt.Errorf("listing repos for topic %q: %w", topic, err)
-		}
-		for _, repo := range repos {
-			repoMap[repo.FullName] = repo
+		for _, org := range orgs {
+			repos, err := r.lister.ListByTopic(ctx, topic, org)
+			if err != nil {
+				return nil, fmt.Errorf("listing repos for topic %q in org %q: %w", topic, org, err)
+			}
+			for _, repo := range repos {
+				if !inScopeOrgs[repo.Owner] {
+					continue
+				}
+				repoMap[repo.FullName] = repo
+			}
 		}
 	}
 

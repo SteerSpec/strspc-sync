@@ -39,7 +39,7 @@ func (m *mockRepoService) ListByOrg(_ context.Context, org string) ([]*gh.Reposi
 	return m.repos[org], nil
 }
 
-func (m *mockRepoService) ListByTopic(_ context.Context, topic string) ([]*gh.Repository, error) {
+func (m *mockRepoService) ListByTopic(_ context.Context, topic, _ string) ([]*gh.Repository, error) {
 	return m.repos["topic:"+topic], nil
 }
 
