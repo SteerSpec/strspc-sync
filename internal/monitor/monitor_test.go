@@ -32,7 +32,7 @@ func (m *mockRepoService) ListByOrg(_ context.Context, _ string) ([]*gh.Reposito
 	return nil, nil
 }
 
-func (m *mockRepoService) ListByTopic(_ context.Context, _ string) ([]*gh.Repository, error) {
+func (m *mockRepoService) ListByTopic(_ context.Context, _, _ string) ([]*gh.Repository, error) {
 	return nil, nil
 }
 

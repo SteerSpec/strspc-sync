@@ -44,19 +44,29 @@ func (s *repoService) ListByOrg(ctx context.Context, org string) ([]*Repository,
 	return all, nil
 }
 
-func (s *repoService) ListByTopic(ctx context.Context, topic string) ([]*Repository, error) {
+// ListByTopic finds repositories carrying a topic within a single organization.
+// The org qualifier is not optional: a bare "topic:x" search returns every repo
+// the token can see in any organization, which for a token-based auth method
+// means sync could target repositories the config never named (GH #41).
+func (s *repoService) ListByTopic(ctx context.Context, topic, org string) ([]*Repository, error) {
+	// Refuse rather than emit "topic:x org:", which GitHub may treat as an
+	// unscoped search — the exact failure this parameter exists to prevent.
+	if org == "" {
+		return nil, fmt.Errorf("list repos by topic %q: org must not be empty", topic)
+	}
+
 	var all []*Repository
 	page := 1
 
 	for {
-		q := url.QueryEscape(fmt.Sprintf("topic:%s", topic))
+		q := url.QueryEscape(fmt.Sprintf("topic:%s org:%s", topic, org))
 		u := fmt.Sprintf("%s/search/repositories?q=%s&per_page=100&page=%d", s.client.baseURL, q, page)
 		resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			return nil, err
 		}
 		if err := checkResponse(resp); err != nil {
-			return nil, fmt.Errorf("list repos by topic %q: %w", topic, err)
+			return nil, fmt.Errorf("list repos by topic %q in org %q: %w", topic, org, err)
 		}
 
 		var result struct {

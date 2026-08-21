@@ -89,8 +89,8 @@ func (a *repoListerAdapter) ListByOrg(ctx context.Context, org string) ([]*regis
 	return result, nil
 }
 
-func (a *repoListerAdapter) ListByTopic(ctx context.Context, topic string) ([]*registry.ResolvedRepo, error) {
-	ghRepos, err := a.repos.ListByTopic(ctx, topic)
+func (a *repoListerAdapter) ListByTopic(ctx context.Context, topic, org string) ([]*registry.ResolvedRepo, error) {
+	ghRepos, err := a.repos.ListByTopic(ctx, topic, org)
 	if err != nil {
 		return nil, err
 	}

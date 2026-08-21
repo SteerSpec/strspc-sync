@@ -488,7 +488,9 @@ func TestRepoListByOrgPagination(t *testing.T) {
 
 func TestRepoListByTopic(t *testing.T) {
 	mux := http.NewServeMux()
+	var gotQuery string
 	mux.HandleFunc("/search/repositories", func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query().Get("q")
 		result := struct {
 			Items []apiRepo `json:"items"`
 		}{
@@ -500,12 +502,20 @@ func TestRepoListByTopic(t *testing.T) {
 	})
 
 	c := testClient(t, mux)
-	repos, err := c.Repos.ListByTopic(context.Background(), "steerspec")
+	repos, err := c.Repos.ListByTopic(context.Background(), "steerspec", "acme-corp")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(repos) != 1 || repos[0].Name != "r1" {
 		t.Fatalf("unexpected repos: %+v", repos)
+	}
+	// The org qualifier is the containment boundary: without it the search
+	// returns every repo the token can see, in any org (GH #41).
+	if !strings.Contains(gotQuery, "org:acme-corp") {
+		t.Errorf("query %q is missing the org qualifier", gotQuery)
+	}
+	if !strings.Contains(gotQuery, "topic:steerspec") {
+		t.Errorf("query %q is missing the topic", gotQuery)
 	}
 }
 
@@ -1114,5 +1124,22 @@ func TestGetBranchSHAEmptySHA(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "empty sha") {
 		t.Fatalf("expected an empty-sha error, got %v", err)
+	}
+}
+
+func TestRepoListByTopicRejectsEmptyOrg(t *testing.T) {
+	called := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/search/repositories", func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})
+
+	c := testClient(t, mux)
+	_, err := c.Repos.ListByTopic(context.Background(), "steerspec", "")
+	if err == nil {
+		t.Fatal("expected an error for an empty org")
+	}
+	if called {
+		t.Error("an unscoped search was issued despite the empty org")
 	}
 }
