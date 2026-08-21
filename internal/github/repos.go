@@ -166,7 +166,13 @@ func (s *repoService) CreateOrUpdateFile(ctx context.Context, owner, repo, path,
 	body := map[string]string{
 		"message": message,
 		"content": base64.StdEncoding.EncodeToString(content),
-		"branch":  branch,
+	}
+	// Only send "branch" when we actually have one. GitHub does not fall back to
+	// the repository default when the key is present but empty — it answers
+	// 404 "Branch  not found", which is how deployment state silently went
+	// unwritten for months (GH #43). Omitting the key selects the default branch.
+	if branch != "" {
+		body["branch"] = branch
 	}
 	if sha != "" {
 		body["sha"] = sha
