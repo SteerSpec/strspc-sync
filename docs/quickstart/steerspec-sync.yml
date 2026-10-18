@@ -1,12 +1,26 @@
 version: "1.0.0"
 
+# The repository this file lives in. Template `source` paths below are read
+# from the root of this repo, and `.steerspec/deployment-state.json` is
+# written back to it. Optional when running in GitHub Actions, where it
+# defaults to the repository running the workflow.
+central-repo: acme-corp/steerspec-config
+
 auth:
-  method: github-app
-  # Credentials resolved from env vars:
+  method: github-token
+  # The token is read from the GITHUB_TOKEN env var. In GitHub Actions the
+  # SteerSpec/strspc-sync action sets it from its `token` input; the default
+  # workflow token can only reach the current repository, so pass a PAT (or a
+  # GitHub App installation token) with `contents` and `pull_requests` write on
+  # every target repo. See workflows/steerspec-sync.yml.
+  #
+  # Alternative: a GitHub App, which is confined to the repos it is installed on.
+  #   method: github-app
+  # Credentials resolved from env vars (set by the action's app-id, private-key
+  # and installation-id inputs):
   #   STEERSPEC_APP_ID            — GitHub App ID
   #   STEERSPEC_PRIVATE_KEY       — PEM string or path to .pem file
   #   STEERSPEC_INSTALLATION_ID   — optional; auto-discovered from org if omitted
-  #
   # Required GitHub App permissions:
   #   Contents: Read & Write
   #   Pull requests: Read & Write
@@ -18,6 +32,9 @@ variables:
   default_model: "claude-sonnet-4-6"
   coding_standards_url: "https://acme-corp.dev/standards"
 
+# Every `source` is a path in this repo; every `destination` is the path Claude
+# Code reads in the target repo (CLAUDE.md, .claude/agents/<name>.md,
+# .claude/skills/<name>/SKILL.md, .claude/settings.json).
 templates:
   # The marker strategy replaces the STEERSPEC:BEGIN/END sections it finds in
   # the template, leaving the rest of the target file untouched. Which sections
@@ -39,15 +56,15 @@ templates:
   - id: skill-commit
     version: "1.0.0"
     type: skill
-    source: templates/skills/commit.md
-    destination: .claude/skills/commit.md
+    source: templates/skills/commit/SKILL.md
+    destination: .claude/skills/commit/SKILL.md
     strategy: full-replace
 
   - id: claude-settings
     version: "1.0.0"
     type: config
     source: templates/settings.json.mustache
-    destination: .claude/settings/settings.json
+    destination: .claude/settings.json
     strategy: mustache
 
 targets:
@@ -56,6 +73,7 @@ targets:
   exclude:
     - "acme-corp/archived-*"
     - "acme-corp/.github"
+    - "acme-corp/steerspec-config"
   topics:
     - claude-managed
   overrides:
