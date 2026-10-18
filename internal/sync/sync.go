@@ -217,11 +217,18 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 		result.Status = "failed"
 	}
 
-	// Save state back (skip on dry run)
+	// Save state back (skip on dry run).
+	//
+	// A sync that cannot record its results has violated SYNCOP-008 ("MUST
+	// record results in the DeploymentState"), and every later run depends on
+	// that state: without it the hash check never skips, and monitor and
+	// conflict have nothing to compare against. This used to be logged at WARN
+	// and dropped, so runs reported errors:0 while writing nothing (GH #43).
 	if !dryRun {
 		if err := s.saveState(ctx); err != nil {
-			sslog.L().Warn("could not save deployment state",
+			sslog.L().Error("could not save deployment state",
 				"operation", "sync", "err", err)
+			result.Errors++
 		}
 	}
 
