@@ -92,6 +92,11 @@ sync:
   concurrency: 5
   pr-label: steerspec-sync
   close-stale-prs: true
+  # Commit messages and PR titles are conventional commits:
+  #   <prefix>: update <template-id> to <version>
+  # Change the type(scope) if your target repos' commitlint rules need it.
+  # commit-prefix: chore(steerspec-sync)
+  # pr-title-prefix: chore(steerspec-sync)
 
 monitor:
   schedule: "0 8 * * 1"

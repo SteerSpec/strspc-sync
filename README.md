@@ -41,8 +41,10 @@ flowchart LR
 ```
 
 Nothing is force-pushed and nothing is merged for you: every change lands as a reviewable PR in the
-target repo. Two companion commands watch what happens afterwards — `monitor` reports files that
-have drifted away from their template, and `conflict` flags contradictions across the fleet.
+target repo, titled `chore(steerspec-sync): update <template-id> to <version>` (the type and
+scope are configurable) so commitlint and semantic-PR checks let it through. Two companion
+commands watch what happens afterwards — `monitor` reports files that have drifted away from their
+template, and `conflict` flags contradictions across the fleet.
 
 ## Quick Start
 
