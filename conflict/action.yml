@@ -19,6 +19,13 @@ inputs:
     description: 'Comma-separated detection tiers to run (e.g. "1,2,3")'
     required: false
     default: ''
+  token:
+    description: >-
+      GitHub token used when `auth.method` is `github-token`. Defaults to the workflow
+      token, which cannot open pull requests in other repositories — pass a PAT or App
+      installation token for cross-repo sync.
+    required: false
+    default: ${{ github.token }}
   app-id:
     description: 'GitHub App ID (for github-app auth method)'
     required: false
@@ -80,7 +87,7 @@ runs:
       id: run
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
         STEERSPEC_APP_ID: ${{ inputs.app-id }}
         STEERSPEC_PRIVATE_KEY: ${{ inputs.private-key }}
         STEERSPEC_INSTALLATION_ID: ${{ inputs.installation-id }}

@@ -12,8 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: SteerSpec/strspc-sync/sync@v0.2.0
+      - uses: SteerSpec/strspc-sync/sync@v0.2.1
         with:
           dry-run: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.STEERSPEC_TOKEN }}
+          # The default workflow token cannot open PRs in other repositories,
+          # so pass a PAT (or App installation token) with contents and
+          # pull_requests write on every target repo.
+          token: ${{ secrets.STEERSPEC_TOKEN }}
+          # For auth.method: github-app, pass these instead of token:
+          # app-id: ${{ secrets.STEERSPEC_APP_ID }}
+          # private-key: ${{ secrets.STEERSPEC_PRIVATE_KEY }}

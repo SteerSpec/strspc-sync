@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -373,6 +374,42 @@ func TestShippedExampleConfigsLoad(t *testing.T) {
 			}
 			if len(cfg.Templates) == 0 {
 				t.Errorf("shipped config %s has no templates", path)
+			}
+		})
+	}
+}
+
+// TestQuickstartTemplateSourcesExist keeps the quickstart honest. The quickstart
+// directory models a central repo root: sync reads each template's `source`
+// from the root of the central repo (internal/sync/sync.go, GetFileContent on
+// tmpl.Source), so every `source` must exist relative to the directory that
+// holds steerspec-sync.yml. The quickstart once referenced two template files
+// that were never committed, and nothing caught it.
+func TestQuickstartTemplateSourcesExist(t *testing.T) {
+	configPath := "../../docs/quickstart/steerspec-sync.yml"
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("quickstart config failed to load: %v", err)
+	}
+
+	root := filepath.Dir(configPath)
+	for _, tmpl := range cfg.Templates {
+		t.Run(tmpl.ID, func(t *testing.T) {
+			src := filepath.Join(root, tmpl.Source)
+			info, err := os.Stat(src)
+			if err != nil {
+				t.Fatalf("template %q source %q does not exist under %s: %v", tmpl.ID, tmpl.Source, root, err)
+			}
+			if info.IsDir() {
+				t.Fatalf("template %q source %q is a directory, want a file", tmpl.ID, tmpl.Source)
+			}
+			if tmpl.Type == "skill" && filepath.Base(tmpl.Destination) != "SKILL.md" {
+				t.Errorf("template %q is a skill but destination %q is not a .claude/skills/<name>/SKILL.md path",
+					tmpl.ID, tmpl.Destination)
+			}
+			if strings.Contains(tmpl.Destination, ".claude/settings/") {
+				t.Errorf("template %q destination %q uses .claude/settings/; Claude Code reads .claude/settings.json",
+					tmpl.ID, tmpl.Destination)
 			}
 		})
 	}

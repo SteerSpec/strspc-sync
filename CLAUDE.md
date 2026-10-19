@@ -3,7 +3,7 @@
 ## Project Overview
 
 SteerSpec Sync (`strspc`) is a Go CLI tool and GitHub Action that synchronizes AI configuration
-files (CLAUDE.md, `.claude/agents/`, `.claude/skills/`, `.claude/settings/`) across a GitHub
+files (CLAUDE.md, `.claude/agents/`, `.claude/skills/`, `.claude/settings.json`) across a GitHub
 organization. Define templates once in a central repo, distribute via PRs.
 
 Implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strspc-spec).
@@ -107,3 +107,10 @@ docs/quickstart/     Example config + templates
 Config uses `method: github-token` without a token field. The token is resolved from the
 `GITHUB_TOKEN` env var at runtime in `cmd/strspc/main.go:newGHClient()`. This is necessary
 because config files aren't workflow YAML and can't use `${{ secrets.X }}`.
+
+Each composite action sets that env var from its `token` input (default `${{ github.token }}`),
+so callers pass a PAT with `with: token:`, not `env:` — a step-level `env:` in the action
+overrides whatever the caller's `env:` says. The default workflow token is scoped to the
+current repository and cannot open PRs elsewhere, so cross-repo sync needs a PAT or an App
+installation token. `tests/action-inputs_test.sh` asserts all four action.yml files keep
+this wiring.

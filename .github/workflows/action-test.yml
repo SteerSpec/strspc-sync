@@ -24,6 +24,9 @@ jobs:
       - name: Test version
         run: strspc version
 
+      - name: Action inputs declare and use token
+        run: tests/action-inputs_test.sh
+
       - name: Test help
         run: strspc help
 
