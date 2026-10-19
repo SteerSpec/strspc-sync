@@ -1,0 +1,134 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "CMPREG",
+    "title": "ComponentRegistry",
+    "description": "The registry of target repositories for synchronization."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:4bd2297296ec736c2921fe21e5e7936bd39d7e7a86eee307d1e124e1b54bb467"
+  },
+  "rules": [
+    {
+      "id": "CMPREG-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS the registry of target repositories for synchronization.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CMPREG-002",
+      "revision": 0,
+      "state": "D",
+      "body": "IS defined within the SyncManifest or via a `$include` directive.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CMPREG-003",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS one or more ComponentTargets.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CMPREG-004",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY use glob patterns for repository name matching.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CMPREG-005",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY use GitHub topics for dynamic repository resolution.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "sub_entities": [
+    {
+      "$schema": "./_schema/entity.v1.schema.json",
+      "entity": {
+        "id": "CMPTGT",
+        "title": "ComponentTarget",
+        "description": "A target repository for synchronization within the ComponentRegistry.",
+        "parent": "CMPREG"
+      },
+      "rule_set": {
+        "version": "0.1.0",
+        "timestamp": "2026-10-19T19:40:07Z",
+        "hash": "blake3:3d4cb9728e9307d0f2d10f9fb60f1fb2f668e1b6d2728cb53ca6599c121af2e6"
+      },
+      "rules": [
+        {
+          "id": "CMPTGT-001",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a repository identifier in `owner/repo` format.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CMPTGT-002",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a default branch name.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CMPTGT-003",
+          "revision": 0,
+          "state": "D",
+          "body": "MAY include specific templates by identifier.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CMPTGT-004",
+          "revision": 0,
+          "state": "D",
+          "body": "MAY exclude specific templates by identifier.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CMPTGT-005",
+          "revision": 0,
+          "state": "D",
+          "body": "MAY define variable overrides for template rendering.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CMPTGT-006",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS an `enabled` boolean flag (default: true).",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "notes": []
+}

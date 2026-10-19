@@ -1,0 +1,61 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "DPLYST",
+    "title": "DeploymentState",
+    "description": "The record of what template versions are deployed to which repositories."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:534cbe062d78ce3d490d56ccdba0406806942c1bcc15315b74875d04aa6fd996"
+  },
+  "rules": [
+    {
+      "id": "DPLYST-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS the record of what template versions are deployed to which repositories.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "DPLYST-002",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST be stored as JSON at `.steerspec/deployment-state.json` in the central repository.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "DPLYST-003",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS per-repository records containing: deployed version, timestamp, PR number, and PR status.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "DPLYST-004",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST be updated after each SyncOperation.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "DPLYST-005",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a Blake3 hash for integrity verification.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "notes": []
+}

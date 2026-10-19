@@ -1,0 +1,171 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "SYNCOP",
+    "title": "SyncOperation",
+    "description": "A single execution of the synchronization process."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:466c5a4b60bf90d588ee49a694e86ea1f6f4db7e25b48c79f9efc8e3a56c5a3f"
+  },
+  "rules": [
+    {
+      "id": "SYNCOP-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS a single execution of the synchronization process.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCOP-002",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a UUID.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCOP-003",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a trigger type which MUST be one of: \"push\", \"manual\", \"schedule\".",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCOP-004",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a UTC timestamp.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCOP-005",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a status which MUST be one of: \"pending\", \"running\", \"completed\", \"failed\".",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCOP-006",
+      "revision": 0,
+      "state": "D",
+      "body": "Produces one or more SyncPullRequests for out-of-date repositories.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCOP-007",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY operate in dry-run mode where no PRs are created or updated.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCOP-008",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST record results in the DeploymentState.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "sub_entities": [
+    {
+      "$schema": "./_schema/entity.v1.schema.json",
+      "entity": {
+        "id": "SYNCPR",
+        "title": "SyncPullRequest",
+        "description": "A pull request created in a target repository to deliver a template update.",
+        "parent": "SYNCOP"
+      },
+      "rule_set": {
+        "version": "0.1.0",
+        "timestamp": "2026-10-19T19:40:07Z",
+        "hash": "blake3:2bbc4cd1f8a8419b3f3b3d2a9662df25095307e7c942e19144ef76e3f5cfae30"
+      },
+      "rules": [
+        {
+          "id": "SYNCPR-001",
+          "revision": 0,
+          "state": "D",
+          "body": "IS a pull request created in a target repository to deliver a template update.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "SYNCPR-002",
+          "revision": 0,
+          "state": "D",
+          "body": "MUST use a branch name in the format `steerspec-sync/<template-id>/<version>`.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "SYNCPR-003",
+          "revision": 0,
+          "state": "D",
+          "body": "The PR body MUST include: previous version, new version, changelog, and diff link.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "SYNCPR-004",
+          "revision": 0,
+          "state": "D",
+          "body": "MUST be labeled with a configurable label (default: `steerspec-sync`).",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "SYNCPR-005",
+          "revision": 0,
+          "state": "D",
+          "body": "MUST update an existing open PR for the same template rather than creating a duplicate.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "SYNCPR-006",
+          "revision": 0,
+          "state": "D",
+          "body": "MUST close stale version PRs for the same template when a newer version PR is created.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        }
+      ],
+      "notes": [
+        {
+          "id": "SYNCPR-005/01",
+          "rule_ref": "SYNCPR-005",
+          "type": "rationale",
+          "content": "This follows the Dependabot pattern of updating PRs in place to avoid PR flooding.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "revision": 0
+        }
+      ]
+    }
+  ],
+  "notes": []
+}

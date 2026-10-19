@@ -1,0 +1,36 @@
+# SteerSpec configuration
+# Reference: https://github.com/SteerSpec/strspc-CLI#readme
+
+# Rule sources — where to fetch rules from
+rules:
+  # Core rules from the SteerSpec specification
+  - source: github://SteerSpec/strspc-rules@v1.6.0/rules/core
+    scope: global
+
+  # This repository's own rules (dev.steerspec.sync realm). They govern the
+  # Go sources and actions, so the scope is global: "local" would limit
+  # them to files under rules/ itself.
+  - source: ./rules/
+    scope: global
+
+  # Local rules (uncomment after strspc realm init)
+  # - source: ./rules/
+  #   scope: local
+
+# AI evaluator settings
+evaluator:
+  provider: claude          # requires ANTHROPIC_API_KEY; use "null" to skip AI evaluation
+  # model: claude-sonnet-5-5   # model override
+  # effort: medium             # low | medium | high
+
+# Local cache settings
+cache:
+  ttl: 24h                # how long cached evaluations stay valid
+
+# Which rule states cause a failure (state codes: D, A, P, I, R, T)
+fail_on:
+  - I                     # Implemented rules block merges when violated
+  # - P                   # uncomment to also enforce Published rules
+
+# Which rule states are sent to the AI evaluator (default: D, P, I)
+# evaluate_on: [D, P, I]

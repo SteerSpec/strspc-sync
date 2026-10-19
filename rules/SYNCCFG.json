@@ -1,0 +1,241 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "SYNCCFG",
+    "title": "SyncConfig",
+    "description": "The schema for the steerspec-sync.yml configuration file."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:8dea4fada461add9254a2c6bf472da9ce6dabc4548b1f670c80f75a9812a1bd0"
+  },
+  "rules": [
+    {
+      "id": "SYNCCFG-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS the schema for the `steerspec-sync.yml` configuration file.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-002",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST be expressed as a YAML file named `steerspec-sync.yml` at the repository root.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-003",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST contain a `version` field specifying the config schema version in semver format.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-004",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST contain an `auth` section specifying the authentication method.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-005",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY contain a `variables` section for global template variables.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-006",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST contain a `templates` section defining one or more templates.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-007",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST contain a `targets` section defining the ComponentRegistry.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-008",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY contain a `sync` section for sync behavior configuration.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-009",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY contain a `monitor` section for monitoring behavior configuration.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-010",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY contain a `conflicts` section for conflict detection configuration.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-011",
+      "revision": 0,
+      "state": "D",
+      "body": "The `auth` section MUST specify a `method` which MUST be one of: \"github-app\", \"pat\", \"github-token\".",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-012",
+      "revision": 0,
+      "state": "D",
+      "body": "The \"github-app\" method IS RECOMMENDED for production use due to better rate limits and audit trails.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-013",
+      "revision": 0,
+      "state": "D",
+      "body": "When using \"github-app\", the section MUST include `app-id` and `private-key` fields (MAY reference secrets).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-014",
+      "revision": 0,
+      "state": "D",
+      "body": "When using \"pat\" or \"github-token\", the section MUST include a `token` field (MAY reference secrets).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-015",
+      "revision": 0,
+      "state": "D",
+      "body": "The `sync` section MAY define `concurrency` as an integer (default: 5) controlling parallel PR creation.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-016",
+      "revision": 0,
+      "state": "D",
+      "body": "The `sync` section MAY define `pr-label` as a string (default: \"steerspec-sync\").",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-017",
+      "revision": 0,
+      "state": "D",
+      "body": "The `sync` section MAY define `close-stale-prs` as a boolean (default: true).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-018",
+      "revision": 0,
+      "state": "D",
+      "body": "The `sync` section MAY define `dry-run` as a boolean (default: false).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-019",
+      "revision": 0,
+      "state": "D",
+      "body": "The `monitor` section MAY define `schedule` as a cron expression (default: \"0 8 * * 1\" -- weekly Monday 08:00 UTC).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-020",
+      "revision": 0,
+      "state": "D",
+      "body": "The `monitor` section MAY define `issue-label` as a string (default: \"steerspec-drift\").",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-021",
+      "revision": 0,
+      "state": "D",
+      "body": "The `monitor` section MAY define `auto-close` as a boolean (default: true) controlling whether resolved drift issues are auto-closed.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-022",
+      "revision": 0,
+      "state": "D",
+      "body": "The `conflicts` section MAY define `schedule` as a cron expression (default: \"0 9 * * 1\" -- weekly Monday 09:00 UTC).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-023",
+      "revision": 0,
+      "state": "D",
+      "body": "The `conflicts` section MAY define `tiers` as a list of enabled detection tiers (default: [1, 2]).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-024",
+      "revision": 0,
+      "state": "D",
+      "body": "Tier 3 (LLM-assisted) MUST be explicitly opted into and MUST NOT be enabled by default.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-025",
+      "revision": 0,
+      "state": "D",
+      "body": "The `conflicts` section MAY define `issue-label` as a string (default: \"steerspec-conflict\").",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "notes": []
+}

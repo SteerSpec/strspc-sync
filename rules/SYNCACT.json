@@ -1,0 +1,224 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "SYNCACT",
+    "title": "SyncAction",
+    "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:addbe5b7dfd15ba16d398a2751802e3da6fe69f499f7084da20ed624181b0e39"
+  },
+  "rules": [
+    {
+      "id": "SYNCACT-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS a GitHub Action that synchronizes templates from the central repository to target repositories.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-002",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST be triggered on push to the central repository when template or manifest files change.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-003",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST support manual dispatch via `workflow_dispatch`.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-004",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST read the SyncManifest to determine templates and targets.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-005",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST resolve target repositories via the GitHub API using the ComponentRegistry.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-006",
+      "revision": 0,
+      "state": "D",
+      "body": "For each target repository, MUST check the DeploymentState to determine if an update is needed.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-007",
+      "revision": 0,
+      "state": "D",
+      "body": "For each out-of-date target, MUST render the template using the configured strategy and create or update a SyncPullRequest.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-008",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST NOT fail the entire workflow when a single target repository fails; errors MUST be isolated per repository.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-009",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST handle GitHub API rate limiting with exponential backoff.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-010",
+      "revision": 0,
+      "state": "D",
+      "body": "SHOULD use concurrency groups to prevent parallel sync operations from conflicting.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-011",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `dry-run` (boolean, default: false) which when true prevents any PRs from being created or updated.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-012",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `target-filter` (string, optional) to limit sync to repositories matching a glob pattern.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-013",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `template-filter` (string, optional) to limit sync to specific template identifiers.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-014",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `force` (boolean, default: false) which when true forces sync even if DeploymentState shows current version.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-015",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `config-path` (string, default: \"steerspec-sync.yml\") to specify an alternate config file path.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-016",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `prs-created` (integer) counting the number of new PRs created.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-017",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `prs-updated` (integer) counting the number of existing PRs updated.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-018",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `repos-skipped` (integer) counting repositories that were already up to date.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-019",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `errors` (integer) counting repositories that encountered errors.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-020",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `summary` (JSON string) containing a detailed summary of the sync operation including per-repo results.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-021",
+      "revision": 0,
+      "state": "D",
+      "body": "A reference implementation IS RECOMMENDED in Go as a composite GitHub Action.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-022",
+      "revision": 0,
+      "state": "D",
+      "body": "The reference implementation SHOULD be published as a reusable GitHub Action (e.g., `steerspec/sync-action@v1`).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "notes": [
+    {
+      "id": "SYNCACT-008/01",
+      "rule_ref": "SYNCACT-008",
+      "type": "rationale",
+      "content": "Per-repo error isolation prevents a single misconfigured or inaccessible repo from blocking updates to all other repos.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "revision": 0
+    }
+  ]
+}

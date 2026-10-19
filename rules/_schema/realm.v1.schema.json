@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://steerspec.dev/schemas/realm/v1.json",
+  "title": "SteerSpec Realm Manifest Schema",
+  "description": "Schema for realm.json manifest files. Hand-maintained axiom.",
+  "type": "object",
+  "required": ["$schema", "realm"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "realm": {
+      "type": "object",
+      "required": ["id", "title", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["realm_id", "version"],
+        "properties": {
+          "realm_id": { "type": "string" },
+          "version": { "type": "string" },
+          "source": {
+            "type": "string",
+            "description": "Fetch location for this dependency (e.g. github://owner/repo@version/path)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "sub_realms": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*$",
+            "description": "Single directory name satisfying the realm-id segment grammar."
+          },
+          "uniqueItems": true
+        },
+        { "type": "null" }
+      ],
+      "description": "Subdirectory names of child Realms (RLM-010). Null or absent if none."
+    },
+    "rule_identifier_format": {
+      "oneOf": [
+        { "type": "object" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "additionalProperties": false
+}
