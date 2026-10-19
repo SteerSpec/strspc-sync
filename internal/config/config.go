@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -58,7 +59,23 @@ type SyncBehavior struct {
 	PRLabel       string `yaml:"pr-label,omitempty"`
 	CloseStalePRs *bool  `yaml:"close-stale-prs,omitempty"`
 	DryRun        bool   `yaml:"dry-run,omitempty"`
+	// CommitPrefix is what precedes ": update <template-id> to <version>" in
+	// the commit messages sync writes to target repos and to the central repo's
+	// deployment state. Defaults to DefaultCommitPrefix, a conventional-commit
+	// type and scope, so commitlint and semantic-PR checks accept sync commits.
+	CommitPrefix string `yaml:"commit-prefix,omitempty"`
+	// PRTitlePrefix is the same for SyncPullRequest titles. Defaults to
+	// DefaultPRTitlePrefix.
+	PRTitlePrefix string `yaml:"pr-title-prefix,omitempty"`
 }
+
+// DefaultCommitPrefix and DefaultPRTitlePrefix are the conventional-commit
+// type(scope) used for sync commits and PR titles when the config does not set
+// sync.commit-prefix or sync.pr-title-prefix.
+const (
+	DefaultCommitPrefix  = "chore(steerspec-sync)"
+	DefaultPRTitlePrefix = "chore(steerspec-sync)"
+)
 
 type MonitorBehavior struct {
 	Schedule   string `yaml:"schedule,omitempty"`
@@ -111,6 +128,12 @@ func ApplyDefaults(cfg *SyncConfig) {
 		t := true
 		cfg.Sync.CloseStalePRs = &t
 	}
+	if cfg.Sync.CommitPrefix == "" {
+		cfg.Sync.CommitPrefix = DefaultCommitPrefix
+	}
+	if cfg.Sync.PRTitlePrefix == "" {
+		cfg.Sync.PRTitlePrefix = DefaultPRTitlePrefix
+	}
 
 	if cfg.Monitor.Schedule == "" {
 		cfg.Monitor.Schedule = "0 8 * * 1"
@@ -152,6 +175,12 @@ func Validate(cfg *SyncConfig) error {
 		}
 	case "github-token":
 		// Token can be empty in config; resolved from GITHUB_TOKEN env var at runtime
+	}
+
+	for name, v := range map[string]string{"sync.commit-prefix": cfg.Sync.CommitPrefix, "sync.pr-title-prefix": cfg.Sync.PRTitlePrefix} {
+		if strings.ContainsAny(v, "\r\n") || strings.TrimSpace(v) != v {
+			return fmt.Errorf("%s %q must be a single line without surrounding whitespace", name, v)
+		}
 	}
 
 	if cfg.CentralRepo != "" {

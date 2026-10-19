@@ -26,14 +26,18 @@ type mockRepoService struct {
 	branchSHAErr  error
 	// createFileErr maps "owner/repo/path/branch" to an error to return.
 	createFileErr map[string]error
+	// commitMessages records, per CreateOrUpdateFile call, the "owner/repo/path/branch"
+	// key and the commit message used.
+	commitMessages map[string]string
 }
 
 func newMockRepoService() *mockRepoService {
 	return &mockRepoService{
-		repos:         make(map[string][]*gh.Repository),
-		files:         make(map[string][]byte),
-		fileSHAs:      make(map[string]string),
-		defaultBranch: "main",
+		repos:          make(map[string][]*gh.Repository),
+		files:          make(map[string][]byte),
+		fileSHAs:       make(map[string]string),
+		commitMessages: make(map[string]string),
+		defaultBranch:  "main",
 	}
 }
 
@@ -82,6 +86,7 @@ func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, owner, repo, pat
 	m.files[key] = content
 	m.fileSHAs[key] = "newsha"
 	m.createdFiles = append(m.createdFiles, key)
+	m.commitMessages[key] = message
 	return nil
 }
 
@@ -565,6 +570,8 @@ func TestSplitRepo(t *testing.T) {
 	}
 }
 
+// Sync commits and PR titles are conventional commits, so target repos gated by
+// commitlint or action-semantic-pull-request can merge them.
 func TestPRTitleFormat(t *testing.T) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()
@@ -579,12 +586,103 @@ func TestPRTitleFormat(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	const want = "chore(steerspec-sync): update claude-md to 1.0.0"
+	if len(prSvc.created) == 0 {
+		t.Fatal("expected PRs to be created")
+	}
 	for _, pr := range prSvc.created {
-		if !strings.HasPrefix(pr.Title, "[SteerSpec] Update ") {
-			t.Errorf("PR title should start with '[SteerSpec] Update', got: %s", pr.Title)
+		if pr.Title != want {
+			t.Errorf("PR title = %q, want %q", pr.Title, want)
 		}
 		if pr.Head != "steerspec-sync/claude-md/1.0.0" {
 			t.Errorf("branch should be 'steerspec-sync/claude-md/1.0.0', got: %s", pr.Head)
+		}
+	}
+	for key, msg := range repoSvc.commitMessages {
+		if strings.Contains(key, "deployment-state.json") {
+			continue
+		}
+		if msg != want {
+			t.Errorf("commit message for %s = %q, want %q", key, msg, want)
+		}
+	}
+}
+
+// sync.commit-prefix and sync.pr-title-prefix replace the type(scope) part of
+// the message; the ": update <id> to <version>" tail is fixed.
+func TestConfigurablePrefixes(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	setupMockRepos(repoSvc)
+
+	cfg := makeTestConfig()
+	cfg.Sync.CommitPrefix = "chore(ai-config)"
+	cfg.Sync.PRTitlePrefix = "ci(steerspec)"
+	client := makeTestClient(repoSvc, prSvc)
+
+	syncer := New(cfg, client, "testorg", "central")
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "push"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, pr := range prSvc.created {
+		if pr.Title != "ci(steerspec): update claude-md to 1.0.0" {
+			t.Errorf("PR title = %q, want the configured pr-title-prefix", pr.Title)
+		}
+	}
+	for key, msg := range repoSvc.commitMessages {
+		want := "chore(ai-config): update claude-md to 1.0.0"
+		if strings.Contains(key, "deployment-state.json") {
+			want = "chore(ai-config): update deployment state"
+		}
+		if msg != want {
+			t.Errorf("commit message for %s = %q, want %q", key, msg, want)
+		}
+	}
+}
+
+// The deployment-state commit lands directly on the central repo's default
+// branch, so it has to pass that repo's commitlint too.
+func TestStateCommitMessageIsConventional(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	setupMockRepos(repoSvc)
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "push"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	msg, ok := repoSvc.commitMessages["testorg/central/.steerspec/deployment-state.json/"]
+	if !ok {
+		t.Fatalf("deployment state was not written; commits: %v", repoSvc.commitMessages)
+	}
+	if msg != "chore(steerspec-sync): update deployment state" {
+		t.Errorf("state commit message = %q", msg)
+	}
+}
+
+func TestUpdateMessageAndMatching(t *testing.T) {
+	if got := updateMessage("chore(steerspec-sync)", "claude-md", "1.2.0"); got != "chore(steerspec-sync): update claude-md to 1.2.0" {
+		t.Errorf("updateMessage = %q", got)
+	}
+
+	tests := []struct {
+		title string
+		want  bool
+	}{
+		{"chore(steerspec-sync): update claude-md to 1.0.0", true},
+		{"chore(steerspec-sync): update claude-md to 0.9.0", true},
+		{"[SteerSpec] Update claude-md", true},
+		{"[SteerSpec] Update claude-md (old v1)", true},
+		{"chore(steerspec-sync): update claude-md-extra to 1.0.0", false},
+		{"chore(steerspec-sync): update claude-md", false},
+		{"ci(other): update claude-md to 1.0.0", false},
+		{"fix: unrelated", false},
+	}
+	for _, tt := range tests {
+		if got := isSyncPRForTemplate(tt.title, "chore(steerspec-sync)", "claude-md"); got != tt.want {
+			t.Errorf("isSyncPRForTemplate(%q) = %v, want %v", tt.title, got, tt.want)
 		}
 	}
 }
@@ -593,10 +691,12 @@ func TestPRTitleFormat(t *testing.T) {
 type trackingPRService struct {
 	*mockPRService
 	updateCalls int
+	lastUpdate  *gh.PullRequestUpdate
 }
 
 func (tp *trackingPRService) Update(ctx context.Context, owner, repo string, number int, pr *gh.PullRequestUpdate) error {
 	tp.updateCalls++
+	tp.lastUpdate = pr
 	return tp.mockPRService.Update(ctx, owner, repo, number, pr)
 }
 
@@ -680,7 +780,10 @@ func TestSYNCPR006_CloseStalePRs(t *testing.T) {
 	}
 	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
 
-	// Pre-populate 2 old stale PRs with matching title prefix and label
+	// Pre-populate stale PRs: two in the legacy "[SteerSpec] Update" format an
+	// older release opened, one in the current conventional format for an
+	// earlier version, and one current-format PR for a *different* template
+	// whose ID shares the prefix, which must stay open.
 	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{
 		{
 			Number: 10,
@@ -694,6 +797,20 @@ func TestSYNCPR006_CloseStalePRs(t *testing.T) {
 			Title:  "[SteerSpec] Update claude-md (old v2)",
 			State:  "open",
 			Head:   "steerspec-sync/claude-md-old2",
+			Labels: []string{"steerspec-sync"},
+		},
+		{
+			Number: 12,
+			Title:  "chore(steerspec-sync): update claude-md to 0.9.0",
+			State:  "open",
+			Head:   "steerspec-sync/claude-md/0.9.0",
+			Labels: []string{"steerspec-sync"},
+		},
+		{
+			Number: 13,
+			Title:  "chore(steerspec-sync): update claude-md-extra to 0.9.0",
+			State:  "open",
+			Head:   "steerspec-sync/claude-md-extra/0.9.0",
 			Labels: []string{"steerspec-sync"},
 		},
 	}
@@ -711,9 +828,94 @@ func TestSYNCPR006_CloseStalePRs(t *testing.T) {
 		t.Errorf("SYNCPR-006: expected 1 new PR created, got %d", result.PRsCreated)
 	}
 
-	// The 2 old PRs should be closed
-	if len(prSvc.closed) != 2 {
-		t.Errorf("SYNCPR-006: expected 2 stale PRs closed, got %d: %v", len(prSvc.closed), prSvc.closed)
+	// The 3 stale PRs for claude-md should be closed, in both title formats.
+	if len(prSvc.closed) != 3 {
+		t.Errorf("SYNCPR-006: expected 3 stale PRs closed, got %d: %v", len(prSvc.closed), prSvc.closed)
+	}
+	for _, n := range prSvc.closed {
+		if n == 13 {
+			t.Errorf("SYNCPR-006: PR #13 belongs to template claude-md-extra and must not be closed")
+		}
+	}
+}
+
+// SYNCPR-003: the body carries previous version, new version, a changelog and
+// a diff link. On a first deployment there is no previous version to report.
+func TestSYNCPR003_BodyFirstDeployment(t *testing.T) {
+	t.Setenv("GITHUB_SERVER_URL", "https://ghe.example.com/")
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	setupMockRepos(repoSvc)
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "push"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prSvc.created) == 0 {
+		t.Fatal("expected PRs to be created")
+	}
+
+	body := prSvc.created[0].Body
+	for _, want := range []string{
+		"| Previous version | none (first deployment) |",
+		"| New version | `1.0.0` |",
+		"**Changelog:**",
+		"https://ghe.example.com/testorg/central/commits/HEAD/templates/CLAUDE.md",
+		"**Diff:**",
+		"https://ghe.example.com/testorg/central/blob/HEAD/templates/CLAUDE.md",
+		"`CLAUDE.md`",
+		"`claude-md`",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("SYNCPR-003: body missing %q\n%s", want, body)
+		}
+	}
+}
+
+// SYNCPR-003: when deployment state records an earlier version, the body names
+// it, including under --force, which skips the hash comparison.
+func TestSYNCPR003_BodyPreviousVersion(t *testing.T) {
+	repoSvc := newMockRepoService()
+	basePR := newMockPRService()
+	prSvc := &trackingPRService{mockPRService: basePR}
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	repoSvc.files["testorg/central/.steerspec/deployment-state.json/"] = []byte(`{
+	  "repositories": {"testorg/repo-a": {"claude-md": {"version": "0.9.0", "hash": "blake3:stale"}}}
+	}`)
+	// An open PR on the branch, so the update path is exercised too.
+	basePR.prs["testorg/repo-a"] = []*gh.PullRequest{{
+		Number: 7,
+		Title:  "chore(steerspec-sync): update claude-md to 1.0.0",
+		State:  "open",
+		Head:   "steerspec-sync/claude-md/1.0.0",
+		Labels: []string{"steerspec-sync"},
+	}}
+
+	cfg := makeTestConfig()
+	syncer := New(cfg, &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central")
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual", Force: true}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if prSvc.lastUpdate == nil || prSvc.lastUpdate.Body == nil {
+		t.Fatal("expected the existing PR to be updated with a body")
+	}
+	body := *prSvc.lastUpdate.Body
+	for _, want := range []string{
+		"| Previous version | `0.9.0` |",
+		"| New version | `1.0.0` |",
+		"https://github.com/testorg/central/commits/HEAD/templates/CLAUDE.md",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("SYNCPR-003: body missing %q\n%s", want, body)
+		}
+	}
+	if prSvc.lastUpdate.Title == nil || *prSvc.lastUpdate.Title != "chore(steerspec-sync): update claude-md to 1.0.0" {
+		t.Errorf("updated PR title = %v", prSvc.lastUpdate.Title)
 	}
 }
 
@@ -974,5 +1176,188 @@ func TestSaveStateFailureIsCounted(t *testing.T) {
 	// But the run must not claim success.
 	if result.Errors != 1 {
 		t.Errorf("expected the state-save failure counted as 1 error, got %d", result.Errors)
+	}
+}
+
+// SYNCPR-003: a forced re-run of an open PR keeps reporting the version that
+// was deployed before the PR, not the version the PR proposes. The first run
+// records 1.0.0 (previous 0.9.0) in state; the forced second run must not turn
+// the body into "1.0.0 → 1.0.0".
+func TestSYNCPR003_ForceRerunKeepsBaseline(t *testing.T) {
+	repoSvc := newMockRepoService()
+	basePR := newMockPRService()
+	prSvc := &trackingPRService{mockPRService: basePR}
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	repoSvc.files["testorg/central/.steerspec/deployment-state.json/"] = []byte(`{
+	  "repositories": {"testorg/repo-a": {"claude-md": {"version": "0.9.0", "hash": "blake3:stale"}}}
+	}`)
+
+	cfg := makeTestConfig()
+	syncer := New(cfg, &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central")
+
+	// First run creates the PR and records the proposed version in state.
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	if len(basePR.created) != 1 {
+		t.Fatalf("expected 1 PR created, got %d", len(basePR.created))
+	}
+	if !strings.Contains(basePR.created[0].Body, "| Previous version | `0.9.0` |") {
+		t.Errorf("first body should report 0.9.0 as previous:\n%s", basePR.created[0].Body)
+	}
+	ts := syncer.state.GetTemplateState("testorg/repo-a", "claude-md")
+	if ts == nil || ts.Version != "1.0.0" || ts.PreviousVersion != "0.9.0" {
+		t.Fatalf("state after first run = %+v, want version 1.0.0 previous 0.9.0", ts)
+	}
+
+	// Make the PR the first run created visible to the update path.
+	basePR.prs["testorg/repo-a"] = []*gh.PullRequest{{
+		Number: 1, // the mock numbers created PRs from 1
+		Title:  basePR.created[0].Title,
+		State:  "open",
+		Head:   "steerspec-sync/claude-md/1.0.0",
+		Labels: []string{"steerspec-sync"},
+	}}
+
+	// Forced second run updates the same PR.
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual", Force: true}); err != nil {
+		t.Fatalf("forced run: %v", err)
+	}
+	if prSvc.lastUpdate == nil || prSvc.lastUpdate.Body == nil {
+		t.Fatal("expected the open PR to be updated")
+	}
+	if !strings.Contains(*prSvc.lastUpdate.Body, "| Previous version | `0.9.0` |") {
+		t.Errorf("forced re-run must keep the 0.9.0 baseline:\n%s", *prSvc.lastUpdate.Body)
+	}
+	ts = syncer.state.GetTemplateState("testorg/repo-a", "claude-md")
+	if ts == nil || ts.PreviousVersion != "0.9.0" {
+		t.Errorf("state after forced run = %+v, want previous 0.9.0", ts)
+	}
+}
+
+// SYNCPR-003: link targets are URL-encoded per path segment so spaces and
+// reserved characters in a template source do not break the Markdown links
+// or get read as a fragment or query.
+func TestPRBody_EscapesSourcePath(t *testing.T) {
+	t.Setenv("GITHUB_SERVER_URL", "https://github.com")
+	s := New(makeTestConfig(), makeTestClient(newMockRepoService(), newMockPRService()), "testorg", "central")
+	tmpl := config.TemplateConfig{
+		ID:          "guide",
+		Source:      "templates/Claude Guide#1.md?v2",
+		Destination: "CLAUDE.md",
+		Version:     "1.0.0",
+	}
+	body := s.prBody(tmpl, "", "blake3:abc")
+	for _, want := range []string{
+		"https://github.com/testorg/central/commits/HEAD/templates/Claude%20Guide%231.md%3Fv2",
+		"https://github.com/testorg/central/blob/HEAD/templates/Claude%20Guide%231.md%3Fv2",
+		"`templates/Claude Guide#1.md?v2`",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "HEAD/templates/Claude Guide") {
+		t.Errorf("body contains an unescaped link target\n%s", body)
+	}
+}
+
+// SYNCPR-006: a PR opened under an earlier pr-title-prefix is still stale
+// once a newer version supersedes it; the head branch identifies it.
+func TestSYNCPR006_CloseStalePRs_AcrossPrefixChange(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{
+		{
+			Number: 20,
+			Title:  "ci(steerspec): update claude-md to 0.9.0", // opened under the old prefix
+			State:  "open",
+			Head:   "steerspec-sync/claude-md/0.9.0",
+			Labels: []string{"steerspec-sync"},
+		},
+		{
+			Number: 21,
+			Title:  "ci(steerspec): update claude-md-extra to 0.9.0",
+			State:  "open",
+			Head:   "steerspec-sync/claude-md-extra/0.9.0",
+			Labels: []string{"steerspec-sync"},
+		},
+	}
+
+	cfg := makeTestConfig()
+	cfg.Sync.PRTitlePrefix = "chore(steerspec-sync)"
+	syncer := New(cfg, makeTestClient(repoSvc, prSvc), "testorg", "central")
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prSvc.closed) != 1 || prSvc.closed[0] != 20 {
+		t.Errorf("SYNCPR-006: expected only PR #20 closed, got %v", prSvc.closed)
+	}
+}
+
+// SYNCPR-006: template IDs may contain "/", so "guide" must not close the
+// open PR of template "guide/team" even though its branch starts with
+// "steerspec-sync/guide/".
+func TestSYNCPR006_CloseStalePRs_SlashInTemplateID(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{
+		{
+			Number: 30,
+			Title:  "ci(steerspec): update guide to 0.9.0",
+			State:  "open",
+			Head:   "steerspec-sync/guide/0.9.0",
+			Labels: []string{"steerspec-sync"},
+		},
+		{
+			Number: 31,
+			Title:  "ci(steerspec): update guide/team to 0.9.0",
+			State:  "open",
+			Head:   "steerspec-sync/guide/team/0.9.0",
+			Labels: []string{"steerspec-sync"},
+		},
+	}
+
+	cfg := makeTestConfig()
+	cfg.Templates[0].ID = "guide"
+	syncer := New(cfg, makeTestClient(repoSvc, prSvc), "testorg", "central")
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prSvc.closed) != 1 || prSvc.closed[0] != 30 {
+		t.Errorf("SYNCPR-006: expected only PR #30 closed, got %v", prSvc.closed)
+	}
+}
+
+func TestIsSyncBranchForTemplate(t *testing.T) {
+	cases := []struct {
+		head, id string
+		want     bool
+	}{
+		{"steerspec-sync/guide/1.0.0", "guide", true},
+		{"steerspec-sync/guide/team/1.0.0", "guide", false},
+		{"steerspec-sync/guide/team/1.0.0", "guide/team", true},
+		{"steerspec-sync/guide-extra/1.0.0", "guide", false},
+		{"steerspec-sync/guide/", "guide", false},
+		{"feature/guide/1.0.0", "guide", false},
+	}
+	for _, c := range cases {
+		if got := isSyncBranchForTemplate(c.head, c.id); got != c.want {
+			t.Errorf("isSyncBranchForTemplate(%q, %q) = %v, want %v", c.head, c.id, got, c.want)
+		}
 	}
 }
