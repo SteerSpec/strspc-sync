@@ -1,0 +1,162 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "TMPLT",
+    "title": "Template",
+    "description": "A managed file synchronized to target repositories."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:22ef700b175eb068cab401b5d5051d714141b16080b2ec484ddf22f864d1ecc7"
+  },
+  "rules": [
+    {
+      "id": "TMPLT-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS a managed file synchronized to target repositories.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-002",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a unique template identifier (e.g., \"claude-md\", \"agent-code-review\").",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-003",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a type which MUST be one of: \"claude-md\", \"skill\", \"agent\", \"config\", \"custom\".",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-004",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a source path relative to the central repository.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-005",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a destination path relative to the target repository (supports `.claude/` tree paths).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-006",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST support a rendering strategy which MUST be one of: \"mustache\", \"marker\", \"full-replace\".",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-007",
+      "revision": 0,
+      "state": "D",
+      "body": "When using the marker strategy, managed sections MUST be delimited by `<!-- STEERSPEC:BEGIN:section_name -->` and `<!-- STEERSPEC:END:section_name -->`.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-008",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY define template-specific variables.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "sub_entities": [
+    {
+      "$schema": "./_schema/entity.v1.schema.json",
+      "entity": {
+        "id": "TMPLTVRS",
+        "title": "TemplateVersion",
+        "description": "A versioned snapshot of a template's content.",
+        "parent": "TMPLT"
+      },
+      "rule_set": {
+        "version": "0.1.0",
+        "timestamp": "2026-10-19T19:40:07Z",
+        "hash": "blake3:d01e0c7f4a7ca52dcbec789c2751a737bbf3e96c4984778de67d87572670d187"
+      },
+      "rules": [
+        {
+          "id": "TMPLTVRS-001",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a version in semver format (MAJOR.MINOR.PATCH).",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "TMPLTVRS-002",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a Blake3 hash of the template content.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "TMPLTVRS-003",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a UTC timestamp.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "TMPLTVRS-004",
+          "revision": 0,
+          "state": "D",
+          "body": "MUST be immutable once created.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "TMPLTVRS-005",
+          "revision": 0,
+          "state": "D",
+          "body": "IS tracked via git tags in the format `tmpl/<template-id>/v<version>`.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "notes": [
+    {
+      "id": "TMPLT-006/01",
+      "rule_ref": "TMPLT-006",
+      "type": "rationale",
+      "content": "Mustache is best for fully templated files. Marker is best for CLAUDE.md files where repos may have local sections between managed markers. Full-replace is best for agents and skills that should be identical everywhere.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "revision": 0
+    }
+  ]
+}

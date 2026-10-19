@@ -1,0 +1,179 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "MNRACT",
+    "title": "MonitorAction",
+    "description": "A GitHub Action that monitors target repositories for synchronization drift."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:0e14c09d8699942fe802fc8516ad9d30217eb14c9a90c30f72da47953568f1b5"
+  },
+  "rules": [
+    {
+      "id": "MNRACT-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS a GitHub Action that monitors target repositories for synchronization drift.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-002",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST support scheduled execution via cron.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-003",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST support manual dispatch via `workflow_dispatch`.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-004",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST read the DeploymentState to determine expected template versions per repository.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-005",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST verify actual file content in target repositories against expected versions using Blake3 hash comparison.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-006",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST create a GitHub issue in the central repository for each out-of-sync target repository.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-007",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST link created issues to existing SyncPullRequests when applicable.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-008",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST NOT create duplicate issues for the same drift; an existing open issue for the same repo/template combination MUST be updated instead.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-009",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST auto-close drift issues when the drift is resolved (configurable via `auto-close`).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-010",
+      "revision": 0,
+      "state": "D",
+      "body": "Each drift issue MUST include: repository name, template identifier, expected version, actual version (or hash), link to related PR, and time since drift was first detected.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-011",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `config-path` (string, default: \"steerspec-sync.yml\") to specify an alternate config file path.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-012",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `target-filter` (string, optional) to limit monitoring to repositories matching a glob pattern.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-013",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `repos-in-sync` (integer) counting repositories with current versions.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-014",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `repos-drifted` (integer) counting repositories with detected drift.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-015",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `issues-created` (integer) counting new issues created.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-016",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `issues-closed` (integer) counting drift issues auto-closed.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-017",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `summary` (JSON string) containing a detailed monitoring report.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "notes": [
+    {
+      "id": "MNRACT-005/01",
+      "rule_ref": "MNRACT-005",
+      "type": "rationale",
+      "content": "Hash comparison is preferred over version string comparison because it detects manual modifications to managed files that wouldn't change the version metadata.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "revision": 0
+    }
+  ]
+}

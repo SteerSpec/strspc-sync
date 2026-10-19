@@ -6,7 +6,9 @@ SteerSpec Sync (`strspc`) is a Go CLI tool and GitHub Action that synchronizes A
 files (CLAUDE.md, `.claude/agents/`, `.claude/skills/`, `.claude/settings/`) across a GitHub
 organization. Define templates once in a central repo, distribute via PRs.
 
-Implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strspc-spec).
+Implements the SteerSpec Sync specification, which lives in this repository as the
+`dev.steerspec.sync` realm under [`rules/`](rules/) (166 rules across 11 entities, authored and
+validated with the `strspc` CLI; see [Rules](#rules) below).
 
 ## Workflow Rules
 
@@ -93,6 +95,15 @@ monitor/action.yml   Sub-action for monitor command
 conflict/action.yml  Sub-action for conflict command
 docs/quickstart/     Example config + templates
 ```
+
+## Rules
+
+`rules/` is the `dev.steerspec.sync` realm: the specification of this tool as SteerSpec entity
+files, one per entity (`SYNCCFG.json`, `SYNCACT.json`, ...). Edit them only through the CLI so
+versions and hashes stay consistent: `strspc rule add <EUID> --body ... --added-by @you`,
+`strspc rule promote <RULE>`, `strspc note add`. Validate with `strspc realm validate rules
+--recursive --strict`, `strspc lint rules --strict` and `strspc diff rules --base origin/main`.
+`.strspc/config.yaml` resolves these rules plus `dev.steerspec.core` for `strspc check`.
 
 ## CI/CD
 

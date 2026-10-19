@@ -14,3 +14,4 @@ coverage.out
 
 # macOS
 .DS_Store
+.strspc/cache.db

@@ -1,0 +1,315 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "CNFLRPT",
+    "title": "ConflictReport",
+    "description": "The result of a conflict detection scan across target repositories."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:ef1d70f087632476e0bd2862af4f8484422cab04620b6e416f17a2f11c9e8bdf"
+  },
+  "rules": [
+    {
+      "id": "CNFLRPT-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS the result of a conflict detection scan across target repositories.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLRPT-002",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a UUID.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLRPT-003",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a UTC timestamp.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLRPT-004",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS zero or more ConflictEntries.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLRPT-005",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS a severity summary containing counts per severity level (critical, warning, info).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "sub_entities": [
+    {
+      "$schema": "./_schema/entity.v1.schema.json",
+      "entity": {
+        "id": "CNFLENT",
+        "title": "ConflictEntry",
+        "description": "A single detected conflict or inconsistency.",
+        "parent": "CNFLRPT"
+      },
+      "rule_set": {
+        "version": "0.1.0",
+        "timestamp": "2026-10-19T19:40:07Z",
+        "hash": "blake3:02ae43356166a5b855e71c8e98501b36203db934122544a1f7489143bc7c2be1"
+      },
+      "rules": [
+        {
+          "id": "CNFLENT-001",
+          "revision": 0,
+          "state": "D",
+          "body": "IS a single detected conflict or inconsistency.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-002",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a severity which MUST be one of: \"critical\", \"warning\", \"info\".",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-003",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a type which MUST be one of: \"version-drift\", \"manual-override\", \"cross-reference-broken\", \"duplicate-skill\", \"contradictory-instruction\", \"unmanaged-file\".",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-004",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a repository identifier in `owner/repo` format.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-005",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a file path relative to the repository root.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-006",
+          "revision": 0,
+          "state": "D",
+          "body": "HAS a human-readable description of the conflict.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-007",
+          "revision": 0,
+          "state": "D",
+          "body": "MAY have a suggested resolution.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-008",
+          "revision": 0,
+          "state": "D",
+          "body": "`version-drift` IS a managed file at a version different from the expected version in DeploymentState; severity: critical.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-009",
+          "revision": 0,
+          "state": "D",
+          "body": "`manual-override` IS a modification to managed sections (between STEERSPEC markers) outside of the sync process; severity: warning.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-010",
+          "revision": 0,
+          "state": "D",
+          "body": "`cross-reference-broken` IS a reference in CLAUDE.md to a skill or agent file that does not exist in the repository; severity: critical.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-011",
+          "revision": 0,
+          "state": "D",
+          "body": "`duplicate-skill` IS the same skill defined with different content across repositories that should be identical; severity: warning.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-012",
+          "revision": 0,
+          "state": "D",
+          "body": "`contradictory-instruction` IS conflicting directives within the same repository's AI configuration files; severity: warning.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-013",
+          "revision": 0,
+          "state": "D",
+          "body": "`unmanaged-file` IS an AI configuration file (CLAUDE.md or `.claude/**`) not tracked in the SyncManifest; severity: info.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        }
+      ],
+      "notes": [
+        {
+          "id": "CNFLENT-012/01",
+          "rule_ref": "CNFLENT-012",
+          "type": "rationale",
+          "content": "Contradictory instructions require semantic analysis and are only reliably detectable at Tier 3 (LLM-assisted).",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "revision": 0
+        }
+      ]
+    },
+    {
+      "$schema": "./_schema/entity.v1.schema.json",
+      "entity": {
+        "id": "CNFLDTS",
+        "title": "ConflictDetectionStrategy",
+        "description": "A tiered approach to detecting conflicts with increasing sophistication and cost.",
+        "parent": "CNFLRPT"
+      },
+      "rule_set": {
+        "version": "0.1.0",
+        "timestamp": "2026-10-19T19:40:07Z",
+        "hash": "blake3:4f628e2940396a3f517cd14526863f5e240be4131c14e1aab2d8fd5331370891"
+      },
+      "rules": [
+        {
+          "id": "CNFLDTS-001",
+          "revision": 0,
+          "state": "D",
+          "body": "IS a tiered approach to detecting conflicts with increasing sophistication and cost.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-002",
+          "revision": 0,
+          "state": "D",
+          "body": "Tier 1 (deterministic) MUST include: version drift detection via hash comparison, missing file references, and unmanaged file detection.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-003",
+          "revision": 0,
+          "state": "D",
+          "body": "Tier 2 (heuristic) MUST include: duplicate skill detection via filename and content hash comparison, and section overlap detection between managed files.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-004",
+          "revision": 0,
+          "state": "D",
+          "body": "Tier 3 (LLM-assisted) MAY include: semantic contradiction detection and redundant content identification.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-005",
+          "revision": 0,
+          "state": "D",
+          "body": "Tier 3 MUST be explicitly opted into via configuration and MUST NOT be enabled by default.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-006",
+          "revision": 0,
+          "state": "D",
+          "body": "Tier 3 SHOULD document estimated cost per scan based on repository count and file sizes.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-007",
+          "revision": 0,
+          "state": "D",
+          "body": "Each tier MUST be independently enableable.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-008",
+          "revision": 0,
+          "state": "D",
+          "body": "Results from all enabled tiers MUST be combined into a single ConflictReport.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "supersedes": null
+        }
+      ],
+      "notes": [
+        {
+          "id": "CNFLDTS-002/01",
+          "rule_ref": "CNFLDTS-002",
+          "type": "rationale",
+          "content": "Deterministic checks are fast, cheap, and reliable. They should catch the majority of real-world conflicts.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "revision": 0
+        },
+        {
+          "id": "CNFLDTS-004/01",
+          "rule_ref": "CNFLDTS-004",
+          "type": "rationale",
+          "content": "LLM-assisted detection is non-deterministic and expensive. It is best suited for periodic deep audits rather than continuous monitoring.",
+          "added_by": "@pleberre",
+          "added_at": "2026-03-07",
+          "revision": 0
+        }
+      ]
+    }
+  ],
+  "notes": []
+}

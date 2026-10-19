@@ -10,6 +10,26 @@ permissions:
   contents: read
 
 jobs:
+  # Dogfood: the released CLI validates this repository's realm (rules/,
+  # dev.steerspec.sync) and evaluates the change through the org reusable
+  # workflows (SteerSpec/.github). Without ANTHROPIC_API_KEY the check is
+  # static-only.
+  rules:
+    uses: SteerSpec/.github/.github/workflows/strspc-lint.yml@main
+    permissions:
+      contents: read
+      pull-requests: read
+    with:
+      path: rules/
+
+  check:
+    uses: SteerSpec/.github/.github/workflows/strspc-check.yml@main
+    permissions:
+      contents: read
+      pull-requests: read
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
   test:
     runs-on: ubuntu-latest
     permissions:

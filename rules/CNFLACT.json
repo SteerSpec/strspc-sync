@@ -1,0 +1,151 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "CNFLACT",
+    "title": "ConflictAction",
+    "description": "A GitHub Action that detects conflicts and inconsistencies across target repositories."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:aaf80bcc108ee5b71725d946dafe65aa0f15f965bee66d50046f8130bb8c1de5"
+  },
+  "rules": [
+    {
+      "id": "CNFLACT-001",
+      "revision": 0,
+      "state": "D",
+      "body": "IS a GitHub Action that detects conflicts and inconsistencies across target repositories.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-002",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST support scheduled execution via cron.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-003",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST support manual dispatch via `workflow_dispatch`.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-004",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST scan all target repositories for `CLAUDE.md` and `.claude/` tree contents.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-005",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST produce a ConflictReport as output.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-006",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST create GitHub issues in the central repository for conflicts at or above the configured severity threshold.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-007",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST NOT create duplicate issues for the same conflict; existing open issues MUST be updated instead.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-008",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `config-path` (string, default: \"steerspec-sync.yml\") to specify an alternate config file path.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-009",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `target-filter` (string, optional) to limit scanning to repositories matching a glob pattern.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-010",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an input `tiers` (string, optional) to override the configured detection tiers (e.g., \"1,2,3\").",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-011",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `conflicts-found` (integer) counting total conflicts detected.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-012",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `critical-count` (integer) counting critical-severity conflicts.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-013",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `warning-count` (integer) counting warning-severity conflicts.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-014",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `info-count` (integer) counting info-severity conflicts.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "CNFLACT-015",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS an output `report` (JSON string) containing the full ConflictReport.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "notes": []
+}

@@ -1,0 +1,125 @@
+{
+  "$schema": "./_schema/entity.v1.schema.json",
+  "entity": {
+    "id": "SYNCVRS",
+    "title": "SyncVersioning",
+    "description": "Versioning strategy for synchronized templates."
+  },
+  "rule_set": {
+    "version": "0.1.0",
+    "timestamp": "2026-10-19T19:40:07Z",
+    "hash": "blake3:5025d0f0bd895b648e51fcdbf0c5778cd11ed39716e305516f1cac65b1b7e8ca"
+  },
+  "rules": [
+    {
+      "id": "SYNCVRS-001",
+      "revision": 0,
+      "state": "D",
+      "body": "All template versions MUST use semantic versioning (MAJOR.MINOR.PATCH).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-002",
+      "revision": 0,
+      "state": "D",
+      "body": "A MAJOR version bump IS REQUIRED for breaking changes: rendering strategy change, required variable addition or removal, or destination path change.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-003",
+      "revision": 0,
+      "state": "D",
+      "body": "A MINOR version bump IS REQUIRED for new optional content or new optional variables.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-004",
+      "revision": 0,
+      "state": "D",
+      "body": "A PATCH version bump IS REQUIRED for content corrections, typo fixes, or formatting changes.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-005",
+      "revision": 0,
+      "state": "D",
+      "body": "Version bumps MUST be determined by the template author and MUST NOT be auto-inferred.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-006",
+      "revision": 0,
+      "state": "D",
+      "body": "Each template version MUST be tracked via a git tag in the format `tmpl/<template-id>/v<version>`.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-007",
+      "revision": 0,
+      "state": "D",
+      "body": "The specification version MUST be tracked in a `VERSION` file at the repository root.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-008",
+      "revision": 0,
+      "state": "D",
+      "body": "Per-template version metadata MUST be stored in `.steerspec/versions.json` in the central repository.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-009",
+      "revision": 0,
+      "state": "D",
+      "body": "Each entry in `versions.json` MUST contain: version string, Blake3 hash, UTC timestamp, and author.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCVRS-010",
+      "revision": 0,
+      "state": "D",
+      "body": "Version entries in `versions.json` MUST be append-only; previous entries MUST NOT be modified or deleted.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "supersedes": null
+    }
+  ],
+  "notes": [
+    {
+      "id": "SYNCVRS-002/01",
+      "rule_ref": "SYNCVRS-002",
+      "type": "rationale",
+      "content": "Breaking changes force target repos to potentially update their local sections or variable definitions, warranting a major bump.",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "revision": 0
+    },
+    {
+      "id": "SYNCVRS-005/01",
+      "rule_ref": "SYNCVRS-005",
+      "type": "rationale",
+      "content": "Auto-inferring version bumps from diffs is fragile and cannot reliably distinguish between content corrections (patch) and meaningful additions (minor).",
+      "added_by": "@pleberre",
+      "added_at": "2026-03-07",
+      "revision": 0
+    }
+  ]
+}

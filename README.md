@@ -162,8 +162,7 @@ strspc conflict --config steerspec-sync.yml --tiers 1,2
 
 All configuration lives in `steerspec-sync.yml`.
 See [docs/quickstart/steerspec-sync.yml](docs/quickstart/steerspec-sync.yml) for an example
-and the [full specification](https://github.com/SteerSpec/strspc-spec/blob/main/rules/config/CONFIG.md)
-for the schema reference.
+and the `SYNCCFG` entity in [`rules/`](rules/SYNCCFG.json) for the specification of every key.
 
 ## Contributing
 
@@ -189,7 +188,13 @@ Part of the [SteerSpec](https://steerspec.dev) ecosystem:
 
 ## Specification
 
-This tool implements the [SteerSpec Sync specification](https://github.com/SteerSpec/strspc-spec).
+The SteerSpec Sync specification is the `dev.steerspec.sync` realm in [`rules/`](rules/):
+166 rules across 11 entities (configuration, manifest, templates, sync, monitor and conflict
+actions, deployment state, component registry, versioning), depending on
+[`dev.steerspec.core`](https://github.com/SteerSpec/strspc-rules). Rules are authored with the
+[`strspc` CLI](https://github.com/SteerSpec/strspc-CLI) (`strspc rule add`, `strspc rule promote`)
+and validated in CI (`strspc realm validate`, `strspc lint`, `strspc diff`); every pull request is
+also evaluated against them by `strspc check`.
 
 ## License
 
