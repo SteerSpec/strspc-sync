@@ -1303,3 +1303,61 @@ func TestSYNCPR006_CloseStalePRs_AcrossPrefixChange(t *testing.T) {
 		t.Errorf("SYNCPR-006: expected only PR #20 closed, got %v", prSvc.closed)
 	}
 }
+
+// SYNCPR-006: template IDs may contain "/", so "guide" must not close the
+// open PR of template "guide/team" even though its branch starts with
+// "steerspec-sync/guide/".
+func TestSYNCPR006_CloseStalePRs_SlashInTemplateID(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{
+		{
+			Number: 30,
+			Title:  "ci(steerspec): update guide to 0.9.0",
+			State:  "open",
+			Head:   "steerspec-sync/guide/0.9.0",
+			Labels: []string{"steerspec-sync"},
+		},
+		{
+			Number: 31,
+			Title:  "ci(steerspec): update guide/team to 0.9.0",
+			State:  "open",
+			Head:   "steerspec-sync/guide/team/0.9.0",
+			Labels: []string{"steerspec-sync"},
+		},
+	}
+
+	cfg := makeTestConfig()
+	cfg.Templates[0].ID = "guide"
+	syncer := New(cfg, makeTestClient(repoSvc, prSvc), "testorg", "central")
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prSvc.closed) != 1 || prSvc.closed[0] != 30 {
+		t.Errorf("SYNCPR-006: expected only PR #30 closed, got %v", prSvc.closed)
+	}
+}
+
+func TestIsSyncBranchForTemplate(t *testing.T) {
+	cases := []struct {
+		head, id string
+		want     bool
+	}{
+		{"steerspec-sync/guide/1.0.0", "guide", true},
+		{"steerspec-sync/guide/team/1.0.0", "guide", false},
+		{"steerspec-sync/guide/team/1.0.0", "guide/team", true},
+		{"steerspec-sync/guide-extra/1.0.0", "guide", false},
+		{"steerspec-sync/guide/", "guide", false},
+		{"feature/guide/1.0.0", "guide", false},
+	}
+	for _, c := range cases {
+		if got := isSyncBranchForTemplate(c.head, c.id); got != c.want {
+			t.Errorf("isSyncBranchForTemplate(%q, %q) = %v, want %v", c.head, c.id, got, c.want)
+		}
+	}
+}

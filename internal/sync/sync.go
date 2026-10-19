@@ -521,10 +521,14 @@ func escapePath(p string) string {
 	return strings.Join(segs, "/")
 }
 
-// syncBranchPrefix is the head-branch prefix every sync PR for templateID
-// uses, whatever title prefix was configured when it was opened.
-func syncBranchPrefix(templateID string) string {
-	return "steerspec-sync/" + templateID + "/"
+// isSyncBranchForTemplate reports whether head is the branch of a sync PR for
+// templateID: "steerspec-sync/<template-id>/<version>", whatever title prefix
+// was configured when the PR was opened. Template IDs may contain "/", so the
+// remainder after the prefix must be exactly one version segment: "guide"
+// must not claim "steerspec-sync/guide/team/1.0.0" (template "guide/team").
+func isSyncBranchForTemplate(head, templateID string) bool {
+	rest, ok := strings.CutPrefix(head, "steerspec-sync/"+templateID+"/")
+	return ok && rest != "" && !strings.Contains(rest, "/")
 }
 
 // getBaseSHA resolves the branch a sync branch should be cut from to a commit
@@ -550,14 +554,13 @@ func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, templateID stri
 		return
 	}
 	prefix := s.prTitlePrefix()
-	branchPrefix := syncBranchPrefix(templateID)
 	for _, pr := range prs {
 		if pr.Number == currentPR {
 			continue
 		}
 		// The head branch is stable across title-prefix changes; the title
 		// match keeps closing PRs whose branch was named by an older release.
-		if strings.HasPrefix(pr.Head, branchPrefix) || isSyncPRForTemplate(pr.Title, prefix, templateID) {
+		if isSyncBranchForTemplate(pr.Head, templateID) || isSyncPRForTemplate(pr.Title, prefix, templateID) {
 			_ = s.ghClient.PullRequests.Close(ctx, owner, repo, pr.Number)
 		}
 	}
