@@ -22,11 +22,14 @@ for action in "${actions[@]}"; do
     echo "FAIL: $action inputs.token does not default to github.token"
     failures=$((failures + 1))
   fi
-  if ! grep -Eq '^        GITHUB_TOKEN: \$\{\{ inputs\.token \}\}$' "$action"; then
-    echo "FAIL: $action run step does not set GITHUB_TOKEN from inputs.token"
+  # `inputs.token || github.token`: an unset caller secret arrives as an empty
+  # string, which overrides the input default, so the run step must fall back
+  # itself (SteerSpec/strspc-sync#51).
+  if ! grep -Eq '^        GITHUB_TOKEN: \$\{\{ inputs\.token \|\| github\.token \}\}$' "$action"; then
+    echo "FAIL: $action run step does not set GITHUB_TOKEN from inputs.token with a github.token fallback"
     failures=$((failures + 1))
   fi
-  if grep -Eq 'GITHUB_TOKEN: \$\{\{ github\.token \}\}' "$action"; then
+  if grep -Eq 'GITHUB_TOKEN: \$\{\{ github\.token \}\}$' "$action"; then
     echo "FAIL: $action still hardcodes GITHUB_TOKEN to github.token"
     failures=$((failures + 1))
   fi
