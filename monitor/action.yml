@@ -83,7 +83,9 @@ runs:
       id: run
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ inputs.token }}
+        # `||` so a caller that passes an unset secret (empty string) still gets
+        # the workflow token instead of a hard "token is required" failure.
+        GITHUB_TOKEN: ${{ inputs.token || github.token }}
         STEERSPEC_APP_ID: ${{ inputs.app-id }}
         STEERSPEC_PRIVATE_KEY: ${{ inputs.private-key }}
         STEERSPEC_INSTALLATION_ID: ${{ inputs.installation-id }}
