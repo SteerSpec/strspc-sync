@@ -27,8 +27,8 @@ Not exercised here: the `github-token` auth path. It was run the same day from
 `cashflytic/cashflytic-spec` on v0.2.1 and v0.2.2 in dry-run mode; see #51 for
 the empty-token failure that produced v0.2.2.
 
-Follow-ups opened from this run: #51 (empty `token` input, fixed in v0.2.2),
-#55 (conflict issues are never closed), #56 (`pr_status` stays `open` in the
+Follow-ups opened from this run: #51 (empty `token` input, fixed in v0.2.2), #55
+(conflict issues are never closed) and #56 (`pr_status` stays `open` in the
 deployment state after the PR merges).
 
 Notes for the next run:
