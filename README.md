@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: SteerSpec/strspc-sync/sync@v0.2.1
+      - uses: SteerSpec/strspc-sync/sync@v0.2.2
         with:
           dry-run: false
           token: ${{ secrets.STEERSPEC_TOKEN }}
@@ -85,14 +85,14 @@ Use the composite actions directly from the Marketplace:
 
 ```yaml
 # Full action (specify command)
-- uses: SteerSpec/strspc-sync@v0.2.1
+- uses: SteerSpec/strspc-sync@v0.2.2
   with:
     command: sync
 
 # Convenience sub-actions
-- uses: SteerSpec/strspc-sync/sync@v0.2.1
-- uses: SteerSpec/strspc-sync/monitor@v0.2.1
-- uses: SteerSpec/strspc-sync/conflict@v0.2.1
+- uses: SteerSpec/strspc-sync/sync@v0.2.2
+- uses: SteerSpec/strspc-sync/monitor@v0.2.2
+- uses: SteerSpec/strspc-sync/conflict@v0.2.2
 ```
 
 ### CLI Binary
@@ -121,7 +121,7 @@ strspc sync --config steerspec-sync.yml --template-filter claude-md --force
 **Action usage:**
 
 ```yaml
-- uses: SteerSpec/strspc-sync/sync@v0.2.1
+- uses: SteerSpec/strspc-sync/sync@v0.2.2
   with:
     dry-run: true
     target-filter: 'my-org/api-*'
@@ -140,7 +140,7 @@ strspc monitor --config steerspec-sync.yml
 **Action usage:**
 
 ```yaml
-- uses: SteerSpec/strspc-sync/monitor@v0.2.1
+- uses: SteerSpec/strspc-sync/monitor@v0.2.2
 ```
 
 **Outputs:** `repos-in-sync`, `repos-drifted`, `issues-created`, `issues-closed`, `summary`
@@ -157,7 +157,7 @@ strspc conflict --config steerspec-sync.yml --tiers 1,2
 **Action usage:**
 
 ```yaml
-- uses: SteerSpec/strspc-sync/conflict@v0.2.1
+- uses: SteerSpec/strspc-sync/conflict@v0.2.2
   with:
     tiers: '1,2'
 ```
