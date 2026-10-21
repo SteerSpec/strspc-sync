@@ -12,6 +12,7 @@ import (
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
+	"github.com/SteerSpec/strspc-sync/internal/hash"
 	"github.com/SteerSpec/strspc-sync/internal/registry"
 )
 
@@ -110,6 +111,17 @@ func newMockPRService() *mockPRService {
 		prs:    make(map[string][]*gh.PullRequest),
 		nextPR: 1,
 	}
+}
+
+func (m *mockPRService) Get(_ context.Context, owner, repo string, number int) (*gh.PullRequest, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, pr := range m.prs[owner+"/"+repo] {
+		if pr.Number == number {
+			return pr, nil
+		}
+	}
+	return nil, fmt.Errorf("pull request %s/%s#%d not found", owner, repo, number)
 }
 
 func (m *mockPRService) List(_ context.Context, owner, repo string, opts *gh.PullRequestListOptions) ([]*gh.PullRequest, error) {
@@ -434,6 +446,10 @@ func (f *failingPRService) Update(ctx context.Context, owner, repo string, numbe
 	return f.inner.Update(ctx, owner, repo, number, pr)
 }
 
+func (f *failingPRService) Get(ctx context.Context, owner, repo string, number int) (*gh.PullRequest, error) {
+	return f.inner.Get(ctx, owner, repo, number)
+}
+
 func (f *failingPRService) Close(ctx context.Context, owner, repo string, number int) error {
 	return f.inner.Close(ctx, owner, repo, number)
 }
@@ -513,6 +529,10 @@ func (s *slowPRService) Create(ctx context.Context, owner, repo string, pr *gh.P
 
 func (s *slowPRService) Update(ctx context.Context, owner, repo string, number int, pr *gh.PullRequestUpdate) error {
 	return s.inner.Update(ctx, owner, repo, number, pr)
+}
+
+func (s *slowPRService) Get(ctx context.Context, owner, repo string, number int) (*gh.PullRequest, error) {
+	return s.inner.Get(ctx, owner, repo, number)
 }
 
 func (s *slowPRService) Close(ctx context.Context, owner, repo string, number int) error {
@@ -920,6 +940,72 @@ func TestSYNCPR003_BodyPreviousVersion(t *testing.T) {
 	if prSvc.lastUpdate.Title == nil || *prSvc.lastUpdate.Title != "chore(steerspec-sync): update claude-md to 1.0.0" {
 		t.Errorf("updated PR title = %v", prSvc.lastUpdate.Title)
 	}
+}
+
+// GH #56: once the target is in sync, a pr_status recorded as "open" at
+// creation time is brought up to date from the PR itself.
+func TestSkippedRepoRefreshesPRStatus(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	// Rendered content for org_name=testorg, so the hash matches the state.
+	rendered := []byte("# Hello testorg")
+	repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = rendered
+	repoSvc.files["testorg/central/.steerspec/deployment-state.json/"] = []byte(`{
+	  "repositories": {"testorg/repo-a": {"claude-md": {"version": "1.0.0", "hash": "` + hash.HashBytes(rendered) + `", "pr_number": 7, "pr_status": "open"}}}
+	}`)
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{{Number: 7, State: "closed", Merged: true, Head: "steerspec-sync/claude-md/1.0.0"}}
+
+	syncer := New(makeTestConfig(), &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ReposSkipped != 1 {
+		t.Fatalf("expected the in-sync repo to be skipped, got %+v", result)
+	}
+	saved := string(repoSvc.files["testorg/central/.steerspec/deployment-state.json/"])
+	if !strings.Contains(saved, `"pr_status": "merged"`) && !strings.Contains(saved, `"pr_status":"merged"`) {
+		t.Errorf("saved state should record pr_status merged, got:\n%s", saved)
+	}
+}
+
+// GH #56: "closed" is not terminal. A PR closed unmerged, reopened and
+// merged ends up recorded as merged across successive no-op syncs.
+func TestPRStatusFollowsCloseReopenMerge(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	rendered := []byte("# Hello testorg")
+	repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = rendered
+	repoSvc.files["testorg/central/.steerspec/deployment-state.json/"] = []byte(`{
+	  "repositories": {"testorg/repo-a": {"claude-md": {"version": "1.0.0", "hash": "` + hash.HashBytes(rendered) + `", "pr_number": 7, "pr_status": "open"}}}
+	}`)
+	pr := &gh.PullRequest{Number: 7, State: "closed", Merged: false, Head: "steerspec-sync/claude-md/1.0.0"}
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{pr}
+	syncer := New(makeTestConfig(), &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central")
+
+	run := func(want string) {
+		t.Helper()
+		if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		saved := string(repoSvc.files["testorg/central/.steerspec/deployment-state.json/"])
+		if !strings.Contains(saved, `"pr_status": "`+want+`"`) && !strings.Contains(saved, `"pr_status":"`+want+`"`) {
+			t.Fatalf("after PR state %s/merged=%v, saved pr_status should be %q, got:\n%s", pr.State, pr.Merged, want, saved)
+		}
+	}
+	run("closed")
+	pr.State = "open"
+	run("open")
+	pr.State, pr.Merged = "closed", true
+	run("merged")
 }
 
 func TestSYNCACT_ResultCounts(t *testing.T) {

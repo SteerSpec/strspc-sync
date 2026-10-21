@@ -177,7 +177,9 @@ type apiPullRequest struct {
 	Labels []struct {
 		Name string `json:"name"`
 	} `json:"labels"`
-	HTMLURL string `json:"html_url"`
+	HTMLURL  string  `json:"html_url"`
+	Merged   bool    `json:"merged"`
+	MergedAt *string `json:"merged_at"`
 }
 
 func (p *apiPullRequest) toDomain() *PullRequest {
@@ -194,7 +196,27 @@ func (p *apiPullRequest) toDomain() *PullRequest {
 		Base:   p.Base.Ref,
 		Labels: labels,
 		URL:    p.HTMLURL,
+		// The list endpoint omits "merged" but carries merged_at; the single
+		// endpoint carries both.
+		Merged: p.Merged || p.MergedAt != nil,
 	}
+}
+
+// Get fetches a single pull request.
+func (s *pullRequestService) Get(ctx context.Context, owner, repo string, number int) (*PullRequest, error) {
+	u := fmt.Sprintf("%s/repos/%s/%s/pulls/%d", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), number)
+	resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkResponse(resp); err != nil {
+		return nil, fmt.Errorf("get pull request %s/%s#%d: %w", owner, repo, number, err)
+	}
+	var pr apiPullRequest
+	if err := decodeBody(resp, &pr); err != nil {
+		return nil, err
+	}
+	return pr.toDomain(), nil
 }
 
 func hasAllLabels(have, want []string) bool {

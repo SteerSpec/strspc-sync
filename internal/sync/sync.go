@@ -312,6 +312,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	// Check state - skip if hash matches and not forced
 	if !force && prev != nil && prev.Hash == contentHash {
 		rr.Status = "skipped"
+		s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
 		return rr
 	}
 
@@ -419,6 +420,35 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	s.stateMu.Unlock()
 
 	return rr
+}
+
+// refreshPRStatus brings a recorded pr_status up to date once the target is
+// in sync: the PR has usually been merged by then, but the state only ever
+// recorded "open" at creation time (GH #56). Only "merged" is terminal; an
+// unmerged "closed" PR can be reopened and merged later, so it is looked up
+// again. Best-effort: a lookup failure leaves the state as it was.
+func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, templateID string, prev *state.TemplateState) {
+	if prev == nil || prev.PRNumber == 0 || prev.PRStatus == "merged" {
+		return
+	}
+	pr, err := s.ghClient.PullRequests.Get(ctx, owner, repo, prev.PRNumber)
+	if err != nil || pr == nil {
+		return
+	}
+	status := pr.State // "open" or "closed"
+	if pr.State == "closed" && pr.Merged {
+		status = "merged"
+	}
+	if status == prev.PRStatus {
+		return
+	}
+	updated := *prev
+	updated.PRStatus = status
+	s.stateMu.Lock()
+	s.state.SetTemplateState(fullName, templateID, updated)
+	s.stateMu.Unlock()
+	sslog.L().Info("deployment state: pull request status updated",
+		"operation", "sync", "repo", fullName, "template_id", templateID, "pr", prev.PRNumber, "pr_status", status)
 }
 
 func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string, error) {
