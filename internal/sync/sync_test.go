@@ -235,6 +235,9 @@ func TestRunBasic(t *testing.T) {
 	if result.Status != "completed" {
 		t.Errorf("expected status completed, got %s", result.Status)
 	}
+	if result.ReposTargeted != 2 {
+		t.Errorf("expected 2 repos targeted, got %d", result.ReposTargeted)
+	}
 	if result.PRsCreated != 2 {
 		t.Errorf("expected 2 PRs created, got %d", result.PRsCreated)
 	}
