@@ -39,6 +39,8 @@ type PullRequestService interface {
 	Update(ctx context.Context, owner, repo string, number int, pr *PullRequestUpdate) error
 	Close(ctx context.Context, owner, repo string, number int) error
 	CreateBranch(ctx context.Context, owner, repo, branch, baseSHA string) error
+	// Get fetches one pull request, including whether it was merged.
+	Get(ctx context.Context, owner, repo string, number int) (*PullRequest, error)
 }
 
 // IssueService provides access to issue-related GitHub API endpoints.
@@ -67,6 +69,9 @@ type PullRequest struct {
 	Base   string
 	Labels []string
 	URL    string
+	// Merged is true for a closed pull request that was merged rather
+	// than closed unmerged.
+	Merged bool
 }
 
 type PullRequestCreate struct {
