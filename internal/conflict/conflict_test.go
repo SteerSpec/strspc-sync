@@ -49,7 +49,7 @@ func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, _, _, _, _ strin
 }
 
 type mockIssueService struct {
-	issues  []*gh.Issue
+	issues []*gh.Issue
 	// repoIssues, when set, scopes List to the "owner/repo" asked for, as the
 	// real API does; tests that predate it keep the flat issues slice.
 	repoIssues map[string][]*gh.Issue
