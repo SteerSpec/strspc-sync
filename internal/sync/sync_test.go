@@ -970,6 +970,41 @@ func TestSkippedRepoRefreshesPRStatus(t *testing.T) {
 	}
 }
 
+// GH #56: "closed" is not terminal. A PR closed unmerged, reopened and
+// merged ends up recorded as merged across successive no-op syncs.
+func TestPRStatusFollowsCloseReopenMerge(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	rendered := []byte("# Hello testorg")
+	repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = rendered
+	repoSvc.files["testorg/central/.steerspec/deployment-state.json/"] = []byte(`{
+	  "repositories": {"testorg/repo-a": {"claude-md": {"version": "1.0.0", "hash": "` + hash.HashBytes(rendered) + `", "pr_number": 7, "pr_status": "open"}}}
+	}`)
+	pr := &gh.PullRequest{Number: 7, State: "closed", Merged: false, Head: "steerspec-sync/claude-md/1.0.0"}
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{pr}
+	syncer := New(makeTestConfig(), &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central")
+
+	run := func(want string) {
+		t.Helper()
+		if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		saved := string(repoSvc.files["testorg/central/.steerspec/deployment-state.json/"])
+		if !strings.Contains(saved, `"pr_status": "`+want+`"`) && !strings.Contains(saved, `"pr_status":"`+want+`"`) {
+			t.Fatalf("after PR state %s/merged=%v, saved pr_status should be %q, got:\n%s", pr.State, pr.Merged, want, saved)
+		}
+	}
+	run("closed")
+	pr.State = "open"
+	run("open")
+	pr.State, pr.Merged = "closed", true
+	run("merged")
+}
+
 func TestSYNCACT_ResultCounts(t *testing.T) {
 	repoSvc := newMockRepoService()
 

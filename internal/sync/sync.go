@@ -405,21 +405,25 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	return rr
 }
 
-// refreshPRStatus brings a recorded "open" pr_status up to date once the
-// target is in sync: the PR has usually been merged by then, but the state
-// only ever recorded "open" at creation time (GH #56). Best-effort: a lookup
-// failure leaves the state as it was.
+// refreshPRStatus brings a recorded pr_status up to date once the target is
+// in sync: the PR has usually been merged by then, but the state only ever
+// recorded "open" at creation time (GH #56). Only "merged" is terminal; an
+// unmerged "closed" PR can be reopened and merged later, so it is looked up
+// again. Best-effort: a lookup failure leaves the state as it was.
 func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, templateID string, prev *state.TemplateState) {
-	if prev == nil || prev.PRNumber == 0 || prev.PRStatus != "open" {
+	if prev == nil || prev.PRNumber == 0 || prev.PRStatus == "merged" {
 		return
 	}
 	pr, err := s.ghClient.PullRequests.Get(ctx, owner, repo, prev.PRNumber)
-	if err != nil || pr == nil || pr.State != "closed" {
+	if err != nil || pr == nil {
 		return
 	}
-	status := "closed"
-	if pr.Merged {
+	status := pr.State // "open" or "closed"
+	if pr.State == "closed" && pr.Merged {
 		status = "merged"
+	}
+	if status == prev.PRStatus {
+		return
 	}
 	updated := *prev
 	updated.PRStatus = status
