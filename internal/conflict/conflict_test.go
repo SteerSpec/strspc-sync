@@ -84,6 +84,14 @@ func (m *mockIssueService) Create(_ context.Context, _, _ string, issue *gh.Issu
 
 func (m *mockIssueService) Update(_ context.Context, owner, repo string, number int, issue *gh.IssueUpdate) error {
 	m.updated = append(m.updated, issueUpdateCall{owner, repo, number, issue})
+	// Persist the body like the real API so a later run sees it.
+	if issue.Body != nil {
+		for _, iss := range append(m.issues, m.repoIssues[owner+"/"+repo]...) {
+			if iss.Number == number {
+				iss.Body = *issue.Body
+			}
+		}
+	}
 	return nil
 }
 
@@ -710,6 +718,44 @@ func TestCentralLocalIssueKeptWhenCentralNotScanned(t *testing.T) {
 	}
 	if len(issues.closed) != 0 {
 		t.Errorf("central's own issue must stay open when central was not a target, closed %v", issues.closed)
+	}
+}
+
+func TestAggregateUpdateKeepsUncheckedParticipants(t *testing.T) {
+	// Run 1: A and B still differ, C's read fails (502): the existing A/B/C
+	// issue is updated and must keep C. Run 2: A and B agree, C still fails:
+	// cleanup must keep the issue because C was never vouched for.
+	skillA := "org/a/.claude/skills/test.md"
+	skillB := "org/b/.claude/skills/test.md"
+	skillC := "org/c/.claude/skills/test.md"
+	repos := &mockRepoService{
+		files:     map[string][]byte{skillA: []byte("v1"), skillB: []byte("v2")},
+		failPaths: map[string]bool{skillC: true},
+	}
+	fp := hash.Fingerprint(string(TypeDuplicateSkill), "org/a, org/b", "test.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 20, Title: "[SteerSpec Conflict] duplicate-skill: test.md", State: "open",
+		Body: fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix + "\n" + reposPrefix + "org/a, org/b, org/c" + fingerprintSuffix,
+	}}}}
+	targets := []string{"org/a", "org/b", "org/c"}
+	scanner := New(testConfig(), newTestClient(repos, issues), "org", "central")
+
+	if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), targets, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Fatalf("run 1 must not close anything, closed %v", issues.closed)
+	}
+	if !strings.Contains(issues.repoIssues["org/central"][0].Body, "org/c") {
+		t.Fatalf("run 1 should keep the unchecked participant org/c in the marker, got:\n%s", issues.repoIssues["org/central"][0].Body)
+	}
+
+	repos.files[skillB] = []byte("v1") // A and B now agree; C still fails
+	if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), targets, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("run 2 must keep the issue while org/c cannot be read, closed %v", issues.closed)
 	}
 }
 

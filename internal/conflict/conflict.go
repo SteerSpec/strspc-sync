@@ -102,6 +102,31 @@ func issueType(issue *gh.Issue) ConflictType {
 	return typeFromTitle(issue.Title)
 }
 
+// mergeParticipants returns current plus every previously recorded
+// participant that was not scanned in this run or whose read failed; a
+// participant that was scanned cleanly and no longer conflicts is dropped.
+func (s *Scanner) mergeParticipants(current, previous, targets []string) []string {
+	scanned := make(map[string]bool, len(targets))
+	for _, t := range targets {
+		scanned[t] = true
+	}
+	have := make(map[string]bool, len(current))
+	for _, c := range current {
+		have[c] = true
+	}
+	merged := append([]string{}, current...)
+	for _, p := range previous {
+		if have[p] {
+			continue
+		}
+		if !scanned[p] || s.incomplete[p] {
+			merged = append(merged, p)
+			have[p] = true
+		}
+	}
+	return merged
+}
+
 // issueRepos recovers the participant list of an aggregate issue from its
 // body marker; nil when the marker is absent (an issue created before it).
 func issueRepos(issue *gh.Issue) []string {
@@ -229,15 +254,19 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		remember(repo, fp)
 		remember(repo, title)
 
-		body := entry.Description
-		if entry.SuggestedResolution != "" {
-			body += "\n\n**Suggested resolution:** " + entry.SuggestedResolution
+		renderBody := func(participants []string) string {
+			body := entry.Description
+			if entry.SuggestedResolution != "" {
+				body += "\n\n**Suggested resolution:** " + entry.SuggestedResolution
+			}
+			body += "\n\n" + fingerprintPrefix + fp + fingerprintSuffix
+			body += "\n" + typePrefix + string(entry.Type) + fingerprintSuffix
+			if len(participants) > 0 {
+				body += "\n" + reposPrefix + strings.Join(participants, ", ") + fingerprintSuffix
+			}
+			return body
 		}
-		body += "\n\n" + fingerprintPrefix + fp + fingerprintSuffix
-		body += "\n" + typePrefix + string(entry.Type) + fingerprintSuffix
-		if len(participants) > 0 {
-			body += "\n" + reposPrefix + strings.Join(participants, ", ") + fingerprintSuffix
-		}
+		body := renderBody(participants)
 
 		// Check if an issue already exists
 		existing, err := s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{
@@ -252,6 +281,12 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		for _, issue := range existing {
 			if extractFingerprint(issue.Body) == fp || issue.Title == title {
 				found = true
+				if len(participants) > 0 {
+					// Keep previously recorded participants this run could
+					// not vouch for (unscanned or failed read), so a later
+					// cleanup still requires their coverage.
+					body = renderBody(s.mergeParticipants(participants, issueRepos(issue), targets))
+				}
 				if err := s.ghClient.Issues.Update(ctx, owner, repoName, issue.Number, &gh.IssueUpdate{Body: &body}); err != nil {
 					return fmt.Errorf("updating issue for %s: %w", repo, err)
 				}
