@@ -62,7 +62,7 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 			continue // a failed read marks the repo incomplete
 		}
 		if !found {
-			s.missingTracked[target] = true
+			s.noteMissingTracked(target, tmplCfg.Destination)
 			continue // file may not exist yet (PR not merged) or was deleted
 		}
 

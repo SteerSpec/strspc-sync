@@ -650,6 +650,29 @@ func TestDeletedTrackedFileKeepsDriftIssue(t *testing.T) {
 	}
 }
 
+func TestMissingFileOnlyProtectsItsOwnIssue(t *testing.T) {
+	// CLAUDE.md is back in sync (its issue closes); the skill file is
+	// missing (its issue stays), in the same repo.
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
+	fpMD := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	fpSkill := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", ".claude/skills/test.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {
+		{Number: 16, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open", Body: fingerprintPrefix + fpMD + fingerprintSuffix},
+		{Number: 17, Title: "renamed by a human", State: "open", Body: fingerprintPrefix + fpSkill + fingerprintSuffix + "\n" + typePrefix + string(TypeVersionDrift) + fingerprintSuffix},
+	}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
+	ds.SetTemplateState("org/repo1", "skill-test", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("skill")), Timestamp: time.Now()})
+
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 || issues.closed[0] != 16 {
+		t.Errorf("only the resolved CLAUDE.md issue (#16) should close, closed %v", issues.closed)
+	}
+}
+
 func TestAutoCloseOffKeepsResolvedIssues(t *testing.T) {
 	content := []byte("# In sync")
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}

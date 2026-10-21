@@ -41,10 +41,19 @@ type Scanner struct {
 	// for a reason other than "not found" during the current run. Their
 	// findings may be missing, so cleanup must not treat them as resolved.
 	incomplete map[string]bool
-	// missingTracked lists the repos where a file the deployment state
-	// tracks was absent: version drift is not checked there, so its issues
-	// cannot be called resolved.
-	missingTracked map[string]bool
+	// missingTracked lists, per repo, the destination paths the deployment
+	// state tracks that were absent (404): version drift is not checked for
+	// them, so their issues cannot be called resolved. Other files in the
+	// same repo are unaffected.
+	missingTracked map[string]map[string]bool
+}
+
+// noteMissingTracked records that a tracked destination was absent.
+func (s *Scanner) noteMissingTracked(repo, path string) {
+	if s.missingTracked[repo] == nil {
+		s.missingTracked[repo] = make(map[string]bool)
+	}
+	s.missingTracked[repo][path] = true
 }
 
 // readFile fetches a file from a target. A 404 is a normal outcome (the
@@ -126,7 +135,7 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 		tiers = s.cfg.Conflicts.Tiers
 	}
 	s.incomplete = make(map[string]bool)
-	s.missingTracked = make(map[string]bool)
+	s.missingTracked = make(map[string]map[string]bool)
 	ran := make(map[int]bool, len(tiers))
 
 	for _, tier := range tiers {
@@ -271,6 +280,13 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 		if err != nil {
 			continue
 		}
+		// Version-drift issues about a tracked file that was absent this
+		// run were not checked; recognise them by fingerprint or title.
+		unchecked := make(map[string]bool)
+		for path := range s.missingTracked[repo] {
+			unchecked[hash.Fingerprint(string(TypeVersionDrift), repo, path)] = true
+			unchecked[fmt.Sprintf("[SteerSpec Conflict] %s: %s", TypeVersionDrift, path)] = true
+		}
 		existing, err := s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{
 			State:  "open",
 			Labels: []string{s.cfg.Conflicts.IssueLabel},
@@ -290,8 +306,8 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 			if repo == central && tier == 2 && anyIncomplete {
 				continue // multi-repo findings cannot be vouched for
 			}
-			if typ == TypeVersionDrift && s.missingTracked[repo] {
-				continue // the tracked file is gone, so drift was not checked
+			if typ == TypeVersionDrift && (unchecked[extractFingerprint(issue.Body)] || unchecked[issue.Title]) {
+				continue // that tracked file is gone, so its drift was not checked
 			}
 			if err := s.ghClient.Issues.Close(ctx, owner, repoName, issue.Number); err != nil {
 				return fmt.Errorf("closing resolved issue #%d in %s: %w", issue.Number, repo, err)
