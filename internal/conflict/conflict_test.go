@@ -16,14 +16,20 @@ import (
 // --- Mock implementations ---
 
 type mockRepoService struct {
-	files map[string][]byte // key: "owner/repo/path"
+	// failPaths lists "owner/repo/path" keys whose read fails with a
+	// non-404 API error, as a transient outage would.
+	failPaths map[string]bool
+	files     map[string][]byte // key: "owner/repo/path"
 }
 
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, _ string) ([]byte, string, error) {
 	key := owner + "/" + repo + "/" + path
+	if m.failPaths[key] {
+		return nil, "", &gh.APIError{StatusCode: 502, Message: "bad gateway"}
+	}
 	content, ok := m.files[key]
 	if !ok {
-		return nil, "", fmt.Errorf("file not found: %s", key)
+		return nil, "", &gh.APIError{StatusCode: 404, Message: "file not found: " + key}
 	}
 	return content, "sha-fake", nil
 }
@@ -49,9 +55,13 @@ func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, _, _, _, _ strin
 }
 
 type mockIssueService struct {
-	issues  []*gh.Issue
-	created []*gh.IssueCreate
-	updated []issueUpdateCall
+	issues []*gh.Issue
+	// repoIssues, when set, scopes List to the "owner/repo" asked for, as the
+	// real API does; tests that predate it keep the flat issues slice.
+	repoIssues map[string][]*gh.Issue
+	created    []*gh.IssueCreate
+	updated    []issueUpdateCall
+	closed     []int
 }
 
 type issueUpdateCall struct {
@@ -60,7 +70,10 @@ type issueUpdateCall struct {
 	update      *gh.IssueUpdate
 }
 
-func (m *mockIssueService) List(_ context.Context, _, _ string, _ *gh.IssueListOptions) ([]*gh.Issue, error) {
+func (m *mockIssueService) List(_ context.Context, owner, repo string, _ *gh.IssueListOptions) ([]*gh.Issue, error) {
+	if m.repoIssues != nil {
+		return m.repoIssues[owner+"/"+repo], nil
+	}
 	return m.issues, nil
 }
 
@@ -71,10 +84,19 @@ func (m *mockIssueService) Create(_ context.Context, _, _ string, issue *gh.Issu
 
 func (m *mockIssueService) Update(_ context.Context, owner, repo string, number int, issue *gh.IssueUpdate) error {
 	m.updated = append(m.updated, issueUpdateCall{owner, repo, number, issue})
+	// Persist the body like the real API so a later run sees it.
+	if issue.Body != nil {
+		for _, iss := range append(m.issues, m.repoIssues[owner+"/"+repo]...) {
+			if iss.Number == number {
+				iss.Body = *issue.Body
+			}
+		}
+	}
 	return nil
 }
 
-func (m *mockIssueService) Close(_ context.Context, _, _ string, _ int) error {
+func (m *mockIssueService) Close(_ context.Context, _, _ string, number int) error {
+	m.closed = append(m.closed, number)
 	return nil
 }
 
@@ -460,6 +482,330 @@ func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {
 	}
 	if len(issues.updated) != 1 {
 		t.Errorf("CNFLACT-007: expected 1 issue updated, got %d", len(issues.updated))
+	}
+}
+
+func TestResolvedConflictIssueIsClosed(t *testing.T) {
+	// The file is back in sync, so the conflict issue opened by an earlier
+	// run must be closed (SteerSpec/strspc-sync#55).
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{
+		repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+			Number: 7,
+			Title:  fmt.Sprintf("[SteerSpec Conflict] %s: %s", TypeVersionDrift, "CLAUDE.md"),
+			Body:   "stale\n\n<!-- steerspec-fingerprint: " + fp + " -->",
+			State:  "open",
+			Labels: []string{"steerspec-conflict"},
+		}}},
+	}
+	client := newTestClient(repos, issues)
+	cfg := testConfig()
+
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now(),
+	})
+
+	report, err := New(cfg, client, "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 || issues.closed[0] != 7 {
+		t.Errorf("expected issue #7 closed, got %v", issues.closed)
+	}
+	if report.IssuesClosed != 1 || report.IssuesCreated != 0 {
+		t.Errorf("report counters = created %d closed %d", report.IssuesCreated, report.IssuesClosed)
+	}
+}
+
+func TestStillPresentConflictIssueStaysOpen(t *testing.T) {
+	original := []byte("# Original")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{
+		repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+			Number: 8,
+			Title:  "some other title",
+			Body:   "<!-- steerspec-fingerprint: " + fp + " -->",
+			State:  "open",
+			Labels: []string{"steerspec-conflict"},
+		}}},
+	}
+	client := newTestClient(repos, issues)
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: hash.HashBytes(original), Timestamp: time.Now(),
+	})
+
+	report, err := New(testConfig(), client, "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("a conflict that is still present must keep its issue open, closed %v", issues.closed)
+	}
+	if report.IssuesClosed != 0 {
+		t.Errorf("IssuesClosed = %d, want 0", report.IssuesClosed)
+	}
+}
+
+func TestCleanupKeepsIssuesOfTiersThatDidNotRun(t *testing.T) {
+	// A tier-2-only run produces no version-drift findings, so it must not
+	// close a tier-1 issue even though the file still drifts.
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 11, Title: fmt.Sprintf("[SteerSpec Conflict] %s: CLAUDE.md", TypeVersionDrift), State: "open",
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
+
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("tier-1 issue must survive a tier-2-only run, closed %v", issues.closed)
+	}
+}
+
+func TestCleanupSkipsWhenNoTargetsScanned(t *testing.T) {
+	// An empty target list (e.g. the deployment state failed to load) must
+	// not sweep the central repo's conflict issues.
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 12, Title: fmt.Sprintf("[SteerSpec Conflict] %s: skills/x.md", TypeDuplicateSkill), State: "open",
+	}}}}
+	if _, err := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central").Run(context.Background(), state.NewDeploymentState(), nil, Options{Tiers: []int{1, 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("no targets scanned, nothing may be closed; closed %v", issues.closed)
+	}
+}
+
+func TestCleanupKeepsIssuesWhenAReadFailed(t *testing.T) {
+	// The file read fails with a non-404 error, so the missing finding does
+	// not prove the conflict is gone.
+	repos := &mockRepoService{
+		files:     map[string][]byte{},
+		failPaths: map[string]bool{"org/repo1/CLAUDE.md": true},
+	}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 13, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", Body: "<!-- steerspec-fingerprint: " + fp + " -->", State: "open",
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
+
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("a failed read must keep the issue open, closed %v", issues.closed)
+	}
+}
+
+func TestRenamedIssueIsClosedByBodyType(t *testing.T) {
+	// The title was edited by a human; the body still carries the type
+	// marker, so cleanup knows the tier and closes it once resolved.
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 14, Title: "please look at this", State: "open",
+		Body: "drifted\n\n" + fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeVersionDrift) + fingerprintSuffix,
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
+
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 || issues.closed[0] != 14 {
+		t.Errorf("renamed issue with a type marker should be closed once resolved, closed %v", issues.closed)
+	}
+}
+
+func TestNewIssuesCarryTheTypeMarker(t *testing.T) {
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.created) != 1 || !strings.Contains(issues.created[0].Body, typePrefix+string(TypeVersionDrift)+fingerprintSuffix) {
+		t.Errorf("created issue should carry the type marker, got %+v", issues.created)
+	}
+}
+
+func TestDeletedTrackedFileKeepsDriftIssue(t *testing.T) {
+	// The tracked file is gone (404): version drift was not checked, so the
+	// existing drift issue must not be called resolved.
+	repos := &mockRepoService{files: map[string][]byte{}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 15, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+		Body: fingerprintPrefix + fp + fingerprintSuffix,
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("drift issue must stay open while the tracked file is missing, closed %v", issues.closed)
+	}
+}
+
+func TestMissingFileOnlyProtectsItsOwnIssue(t *testing.T) {
+	// CLAUDE.md is back in sync (its issue closes); the skill file is
+	// missing (its issue stays), in the same repo.
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
+	fpMD := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	fpSkill := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", ".claude/skills/test.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {
+		{Number: 16, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open", Body: fingerprintPrefix + fpMD + fingerprintSuffix},
+		{Number: 17, Title: "renamed by a human", State: "open", Body: fingerprintPrefix + fpSkill + fingerprintSuffix + "\n" + typePrefix + string(TypeVersionDrift) + fingerprintSuffix},
+	}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
+	ds.SetTemplateState("org/repo1", "skill-test", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("skill")), Timestamp: time.Now()})
+
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 || issues.closed[0] != 16 {
+		t.Errorf("only the resolved CLAUDE.md issue (#16) should close, closed %v", issues.closed)
+	}
+}
+
+func TestCentralAggregateIssueNeedsFullCoverage(t *testing.T) {
+	// The duplicate-skill issue involves repo1 and repo2; a run scanning only
+	// repo1 cannot vouch for it, so it stays open.
+	repos := &mockRepoService{files: map[string][]byte{}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 18, Title: "[SteerSpec Conflict] duplicate-skill: .claude/skills/test.md", State: "open",
+		Body: typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix + "\n" + reposPrefix + "org/repo1, org/repo2" + fingerprintSuffix,
+	}}}}
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), state.NewDeploymentState(), []string{"org/repo1"}, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("aggregate issue with an unscanned participant must stay open, closed %v", issues.closed)
+	}
+
+	// Scanning both participants with no duplicate finding closes it.
+	issues.closed = nil
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), state.NewDeploymentState(), []string{"org/repo1", "org/repo2"}, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 || issues.closed[0] != 18 {
+		t.Errorf("aggregate issue should close once every participant was scanned, closed %v", issues.closed)
+	}
+}
+
+func TestCentralLocalIssueKeptWhenCentralNotScanned(t *testing.T) {
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# ok")}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 19, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# ok")), Timestamp: time.Now()})
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("central's own issue must stay open when central was not a target, closed %v", issues.closed)
+	}
+}
+
+func TestAggregateUpdateKeepsUncheckedParticipants(t *testing.T) {
+	// Run 1: A and B still differ, C's read fails (502): the existing A/B/C
+	// issue is updated and must keep C. Run 2: A and B agree, C still fails:
+	// cleanup must keep the issue because C was never vouched for.
+	skillA := "org/a/.claude/skills/test.md"
+	skillB := "org/b/.claude/skills/test.md"
+	skillC := "org/c/.claude/skills/test.md"
+	repos := &mockRepoService{
+		files:     map[string][]byte{skillA: []byte("v1"), skillB: []byte("v2")},
+		failPaths: map[string]bool{skillC: true},
+	}
+	fp := hash.Fingerprint(string(TypeDuplicateSkill), "org/a, org/b", "test.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 20, Title: "[SteerSpec Conflict] duplicate-skill: test.md", State: "open",
+		Body: fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix + "\n" + reposPrefix + "org/a, org/b, org/c" + fingerprintSuffix,
+	}}}}
+	targets := []string{"org/a", "org/b", "org/c"}
+	scanner := New(testConfig(), newTestClient(repos, issues), "org", "central")
+
+	if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), targets, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Fatalf("run 1 must not close anything, closed %v", issues.closed)
+	}
+	if !strings.Contains(issues.repoIssues["org/central"][0].Body, "org/c") {
+		t.Fatalf("run 1 should keep the unchecked participant org/c in the marker, got:\n%s", issues.repoIssues["org/central"][0].Body)
+	}
+
+	repos.files[skillB] = []byte("v1") // A and B now agree; C still fails
+	if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), targets, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("run 2 must keep the issue while org/c cannot be read, closed %v", issues.closed)
+	}
+}
+
+func TestLegacyAggregateIssueStaysWithoutMarker(t *testing.T) {
+	// A duplicate-skill issue created before the participants marker has an
+	// unknown coverage. A partial scan that still finds A/B differing must
+	// not write a marker naming only A/B, or a later partial scan where A/B
+	// agree would close it without ever checking C.
+	skillA := "org/a/.claude/skills/test.md"
+	skillB := "org/b/.claude/skills/test.md"
+	repos := &mockRepoService{files: map[string][]byte{skillA: []byte("v1"), skillB: []byte("v2")}}
+	fp := hash.Fingerprint(string(TypeDuplicateSkill), "org/a, org/b", "test.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 21, Title: "[SteerSpec Conflict] duplicate-skill: test.md", State: "open",
+		Body: "legacy\n\n" + fingerprintPrefix + fp + fingerprintSuffix,
+	}}}}
+	targets := []string{"org/a", "org/b"}
+	scanner := New(testConfig(), newTestClient(repos, issues), "org", "central")
+
+	if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), targets, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(issues.repoIssues["org/central"][0].Body, reposPrefix) {
+		t.Fatalf("a legacy issue must not gain a participants marker from a partial scan, got:\n%s", issues.repoIssues["org/central"][0].Body)
+	}
+
+	repos.files[skillB] = []byte("v1") // A and B agree now; C was never scanned
+	if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), targets, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("legacy aggregate issue with unknown coverage must stay open, closed %v", issues.closed)
+	}
+}
+
+func TestAutoCloseOffKeepsResolvedIssues(t *testing.T) {
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{Number: 9, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open"}}}}
+	cfg := testConfig()
+	off := false
+	cfg.Conflicts.AutoClose = &off
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
+
+	if _, err := New(cfg, newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("auto-close off must not close issues, closed %v", issues.closed)
 	}
 }
 
