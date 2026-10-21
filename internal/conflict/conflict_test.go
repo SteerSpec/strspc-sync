@@ -673,6 +673,46 @@ func TestMissingFileOnlyProtectsItsOwnIssue(t *testing.T) {
 	}
 }
 
+func TestCentralAggregateIssueNeedsFullCoverage(t *testing.T) {
+	// The duplicate-skill issue involves repo1 and repo2; a run scanning only
+	// repo1 cannot vouch for it, so it stays open.
+	repos := &mockRepoService{files: map[string][]byte{}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 18, Title: "[SteerSpec Conflict] duplicate-skill: .claude/skills/test.md", State: "open",
+		Body: typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix + "\n" + reposPrefix + "org/repo1, org/repo2" + fingerprintSuffix,
+	}}}}
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), state.NewDeploymentState(), []string{"org/repo1"}, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("aggregate issue with an unscanned participant must stay open, closed %v", issues.closed)
+	}
+
+	// Scanning both participants with no duplicate finding closes it.
+	issues.closed = nil
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), state.NewDeploymentState(), []string{"org/repo1", "org/repo2"}, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 || issues.closed[0] != 18 {
+		t.Errorf("aggregate issue should close once every participant was scanned, closed %v", issues.closed)
+	}
+}
+
+func TestCentralLocalIssueKeptWhenCentralNotScanned(t *testing.T) {
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# ok")}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 19, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# ok")), Timestamp: time.Now()})
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("central's own issue must stay open when central was not a target, closed %v", issues.closed)
+	}
+}
+
 func TestAutoCloseOffKeepsResolvedIssues(t *testing.T) {
 	content := []byte("# In sync")
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}

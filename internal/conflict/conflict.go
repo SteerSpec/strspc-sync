@@ -22,6 +22,9 @@ const (
 	// typePrefix marks the conflict type in an issue body so cleanup can
 	// recover it after the title was edited.
 	typePrefix = "<!-- steerspec-conflict-type: "
+	// reposPrefix lists the repositories an aggregate (multi-repo) finding
+	// involves, so cleanup only closes it once every one of them was scanned.
+	reposPrefix = "<!-- steerspec-conflict-repos: "
 )
 
 // Options controls what the scanner checks.
@@ -97,6 +100,27 @@ func issueType(issue *gh.Issue) ConflictType {
 		}
 	}
 	return typeFromTitle(issue.Title)
+}
+
+// issueRepos recovers the participant list of an aggregate issue from its
+// body marker; nil when the marker is absent (an issue created before it).
+func issueRepos(issue *gh.Issue) []string {
+	idx := strings.Index(issue.Body, reposPrefix)
+	if idx < 0 {
+		return nil
+	}
+	rest := issue.Body[idx+len(reposPrefix):]
+	end := strings.Index(rest, fingerprintSuffix)
+	if end < 0 {
+		return nil
+	}
+	var repos []string
+	for _, r := range strings.Split(rest[:end], ",") {
+		if r = strings.TrimSpace(r); r != "" {
+			repos = append(repos, r)
+		}
+	}
+	return repos
 }
 
 // typeFromTitle recovers the conflict type from an issue title of the form
@@ -188,8 +212,10 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 
 		// Determine which repo to file the issue against
 		repo := entry.Repo
+		var participants []string
 		if strings.Contains(repo, ", ") {
 			// Multi-repo entries (e.g., duplicate skills) go to the central repo
+			participants = strings.Split(repo, ", ")
 			repo = s.centralOwner + "/" + s.centralRepo
 		}
 
@@ -209,6 +235,9 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		}
 		body += "\n\n" + fingerprintPrefix + fp + fingerprintSuffix
 		body += "\n" + typePrefix + string(entry.Type) + fingerprintSuffix
+		if len(participants) > 0 {
+			body += "\n" + reposPrefix + strings.Join(participants, ", ") + fingerprintSuffix
+		}
 
 		// Check if an issue already exists
 		existing, err := s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{
@@ -264,7 +293,23 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 		return nil
 	}
 	central := s.centralOwner + "/" + s.centralRepo
-	anyIncomplete := len(s.incomplete) > 0
+	scanned := make(map[string]bool, len(targets))
+	for _, t := range targets {
+		scanned[t] = true
+	}
+	// An aggregate issue can only be closed when every participant was
+	// scanned this run and none of them had a failed read.
+	covered := func(participants []string) bool {
+		if len(participants) == 0 {
+			return false // legacy issue without the marker: coverage unknown
+		}
+		for _, p := range participants {
+			if !scanned[p] || s.incomplete[p] {
+				return false
+			}
+		}
+		return true
+	}
 	repos := append([]string{}, targets...)
 	repos = append(repos, central)
 	seen := make(map[string]bool, len(repos))
@@ -303,8 +348,14 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 			if tier == 0 || !ran[tier] {
 				continue // unknown type, or a tier this run did not check
 			}
-			if repo == central && tier == 2 && anyIncomplete {
-				continue // multi-repo findings cannot be vouched for
+			if repo == central {
+				if typ == TypeDuplicateSkill {
+					if !covered(issueRepos(issue)) {
+						continue // not every participant was scanned this run
+					}
+				} else if !scanned[central] {
+					continue // central's own files were not checked this run
+				}
 			}
 			if typ == TypeVersionDrift && (unchecked[extractFingerprint(issue.Body)] || unchecked[issue.Title]) {
 				continue // that tracked file is gone, so its drift was not checked
