@@ -759,6 +759,38 @@ func TestAggregateUpdateKeepsUncheckedParticipants(t *testing.T) {
 	}
 }
 
+func TestLegacyAggregateIssueStaysWithoutMarker(t *testing.T) {
+	// A duplicate-skill issue created before the participants marker has an
+	// unknown coverage. A partial scan that still finds A/B differing must
+	// not write a marker naming only A/B, or a later partial scan where A/B
+	// agree would close it without ever checking C.
+	skillA := "org/a/.claude/skills/test.md"
+	skillB := "org/b/.claude/skills/test.md"
+	repos := &mockRepoService{files: map[string][]byte{skillA: []byte("v1"), skillB: []byte("v2")}}
+	fp := hash.Fingerprint(string(TypeDuplicateSkill), "org/a, org/b", "test.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 21, Title: "[SteerSpec Conflict] duplicate-skill: test.md", State: "open",
+		Body: "legacy\n\n" + fingerprintPrefix + fp + fingerprintSuffix,
+	}}}}
+	targets := []string{"org/a", "org/b"}
+	scanner := New(testConfig(), newTestClient(repos, issues), "org", "central")
+
+	if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), targets, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(issues.repoIssues["org/central"][0].Body, reposPrefix) {
+		t.Fatalf("a legacy issue must not gain a participants marker from a partial scan, got:\n%s", issues.repoIssues["org/central"][0].Body)
+	}
+
+	repos.files[skillB] = []byte("v1") // A and B agree now; C was never scanned
+	if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), targets, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("legacy aggregate issue with unknown coverage must stay open, closed %v", issues.closed)
+	}
+}
+
 func TestAutoCloseOffKeepsResolvedIssues(t *testing.T) {
 	content := []byte("# In sync")
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}

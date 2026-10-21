@@ -284,8 +284,15 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 				if len(participants) > 0 {
 					// Keep previously recorded participants this run could
 					// not vouch for (unscanned or failed read), so a later
-					// cleanup still requires their coverage.
-					body = renderBody(s.mergeParticipants(participants, issueRepos(issue), targets))
+					// cleanup still requires their coverage. An issue that
+					// predates the marker has an unknown participant list:
+					// leave it without one, so cleanup never closes it on
+					// partial evidence (it needs a human to close).
+					if prev := issueRepos(issue); prev == nil {
+						body = renderBody(nil)
+					} else {
+						body = renderBody(s.mergeParticipants(participants, prev, targets))
+					}
 				}
 				if err := s.ghClient.Issues.Update(ctx, owner, repoName, issue.Number, &gh.IssueUpdate{Body: &body}); err != nil {
 					return fmt.Errorf("updating issue for %s: %w", repo, err)
