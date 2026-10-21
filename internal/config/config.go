@@ -87,6 +87,9 @@ type ConflictBehavior struct {
 	Schedule   string `yaml:"schedule,omitempty"`
 	Tiers      []int  `yaml:"tiers,omitempty"`
 	IssueLabel string `yaml:"issue-label,omitempty"`
+	// AutoClose closes a conflict issue once the conflict it reported is gone
+	// (same semantics as monitor.auto-close). Defaults to true.
+	AutoClose *bool `yaml:"auto-close,omitempty"`
 }
 
 var (
@@ -154,6 +157,10 @@ func ApplyDefaults(cfg *SyncConfig) {
 	}
 	if cfg.Conflicts.IssueLabel == "" {
 		cfg.Conflicts.IssueLabel = "steerspec-conflict"
+	}
+	if cfg.Conflicts.AutoClose == nil {
+		t := true
+		cfg.Conflicts.AutoClose = &t
 	}
 }
 

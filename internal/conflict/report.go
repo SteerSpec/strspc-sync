@@ -29,6 +29,10 @@ type ConflictReport struct {
 	Timestamp       time.Time       `json:"timestamp"`
 	Entries         []ConflictEntry `json:"entries"`
 	SeveritySummary SeveritySummary `json:"severity_summary"`
+	// IssuesCreated and IssuesClosed count the conflict issues this run opened
+	// and the ones it closed because their conflict no longer exists.
+	IssuesCreated int `json:"issues_created"`
+	IssuesClosed  int `json:"issues_closed"`
 }
 
 // ConflictEntry describes a single detected conflict.

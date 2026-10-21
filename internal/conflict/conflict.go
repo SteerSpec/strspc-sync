@@ -79,14 +79,24 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 
 	report.ComputeSummary()
 
-	if err := s.createIssuesForConflicts(ctx, report); err != nil {
+	if err := s.createIssuesForConflicts(ctx, report, targets); err != nil {
 		return report, fmt.Errorf("creating issues: %w", err)
 	}
 
 	return report, nil
 }
 
-func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport) error {
+func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport, targets []string) error {
+	// Fingerprints and titles reported this run, per repo, so issues whose
+	// conflict is gone can be closed afterwards (SteerSpec/strspc-sync#55).
+	current := make(map[string]map[string]bool)
+	remember := func(repo, key string) {
+		if current[repo] == nil {
+			current[repo] = make(map[string]bool)
+		}
+		current[repo][key] = true
+	}
+
 	// Only create issues for critical and warning entries
 	for _, entry := range report.Entries {
 		if entry.Severity == SeverityInfo {
@@ -107,6 +117,8 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 
 		title := fmt.Sprintf("[SteerSpec Conflict] %s: %s", entry.Type, entry.FilePath)
 		fp := hash.Fingerprint(string(entry.Type), repo, entry.FilePath)
+		remember(repo, fp)
+		remember(repo, title)
 
 		body := entry.Description
 		if entry.SuggestedResolution != "" {
@@ -143,9 +155,51 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 			if err != nil {
 				return fmt.Errorf("creating issue for %s: %w", repo, err)
 			}
+			report.IssuesCreated++
 		}
 	}
 
+	if s.cfg.Conflicts.AutoClose != nil && !*s.cfg.Conflicts.AutoClose {
+		return nil
+	}
+	return s.closeResolvedIssues(ctx, report, targets, current)
+}
+
+// closeResolvedIssues closes, in every scanned repo and in the central repo,
+// the open issues carrying the conflict label whose fingerprint (or title)
+// was not reported by this run: the conflict they described is gone.
+// Monitor has done the same for drift issues since v0.2.0; conflict issues
+// used to stay open forever (SteerSpec/strspc-sync#55).
+func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictReport, targets []string, current map[string]map[string]bool) error {
+	repos := append([]string{}, targets...)
+	repos = append(repos, s.centralOwner+"/"+s.centralRepo)
+	seen := make(map[string]bool, len(repos))
+	for _, repo := range repos {
+		if seen[repo] {
+			continue
+		}
+		seen[repo] = true
+		owner, repoName, err := splitRepo(repo)
+		if err != nil {
+			continue
+		}
+		existing, err := s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{
+			State:  "open",
+			Labels: []string{s.cfg.Conflicts.IssueLabel},
+		})
+		if err != nil {
+			return fmt.Errorf("listing issues for %s: %w", repo, err)
+		}
+		for _, issue := range existing {
+			if current[repo][extractFingerprint(issue.Body)] || current[repo][issue.Title] {
+				continue
+			}
+			if err := s.ghClient.Issues.Close(ctx, owner, repoName, issue.Number); err != nil {
+				return fmt.Errorf("closing resolved issue #%d in %s: %w", issue.Number, repo, err)
+			}
+			report.IssuesClosed++
+		}
+	}
 	return nil
 }
 

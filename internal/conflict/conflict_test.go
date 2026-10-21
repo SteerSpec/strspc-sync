@@ -50,8 +50,12 @@ func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, _, _, _, _ strin
 
 type mockIssueService struct {
 	issues  []*gh.Issue
-	created []*gh.IssueCreate
-	updated []issueUpdateCall
+	// repoIssues, when set, scopes List to the "owner/repo" asked for, as the
+	// real API does; tests that predate it keep the flat issues slice.
+	repoIssues map[string][]*gh.Issue
+	created    []*gh.IssueCreate
+	updated    []issueUpdateCall
+	closed     []int
 }
 
 type issueUpdateCall struct {
@@ -60,7 +64,10 @@ type issueUpdateCall struct {
 	update      *gh.IssueUpdate
 }
 
-func (m *mockIssueService) List(_ context.Context, _, _ string, _ *gh.IssueListOptions) ([]*gh.Issue, error) {
+func (m *mockIssueService) List(_ context.Context, owner, repo string, _ *gh.IssueListOptions) ([]*gh.Issue, error) {
+	if m.repoIssues != nil {
+		return m.repoIssues[owner+"/"+repo], nil
+	}
 	return m.issues, nil
 }
 
@@ -74,7 +81,8 @@ func (m *mockIssueService) Update(_ context.Context, owner, repo string, number 
 	return nil
 }
 
-func (m *mockIssueService) Close(_ context.Context, _, _ string, _ int) error {
+func (m *mockIssueService) Close(_ context.Context, _, _ string, number int) error {
+	m.closed = append(m.closed, number)
 	return nil
 }
 
@@ -460,6 +468,90 @@ func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {
 	}
 	if len(issues.updated) != 1 {
 		t.Errorf("CNFLACT-007: expected 1 issue updated, got %d", len(issues.updated))
+	}
+}
+
+func TestResolvedConflictIssueIsClosed(t *testing.T) {
+	// The file is back in sync, so the conflict issue opened by an earlier
+	// run must be closed (SteerSpec/strspc-sync#55).
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{
+		repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+			Number: 7,
+			Title:  fmt.Sprintf("[SteerSpec Conflict] %s: %s", TypeVersionDrift, "CLAUDE.md"),
+			Body:   "stale\n\n<!-- steerspec-fingerprint: " + fp + " -->",
+			State:  "open",
+			Labels: []string{"steerspec-conflict"},
+		}}},
+	}
+	client := newTestClient(repos, issues)
+	cfg := testConfig()
+
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now(),
+	})
+
+	report, err := New(cfg, client, "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 || issues.closed[0] != 7 {
+		t.Errorf("expected issue #7 closed, got %v", issues.closed)
+	}
+	if report.IssuesClosed != 1 || report.IssuesCreated != 0 {
+		t.Errorf("report counters = created %d closed %d", report.IssuesCreated, report.IssuesClosed)
+	}
+}
+
+func TestStillPresentConflictIssueStaysOpen(t *testing.T) {
+	original := []byte("# Original")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{
+		repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+			Number: 8,
+			Title:  "some other title",
+			Body:   "<!-- steerspec-fingerprint: " + fp + " -->",
+			State:  "open",
+			Labels: []string{"steerspec-conflict"},
+		}}},
+	}
+	client := newTestClient(repos, issues)
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: hash.HashBytes(original), Timestamp: time.Now(),
+	})
+
+	report, err := New(testConfig(), client, "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("a conflict that is still present must keep its issue open, closed %v", issues.closed)
+	}
+	if report.IssuesClosed != 0 {
+		t.Errorf("IssuesClosed = %d, want 0", report.IssuesClosed)
+	}
+}
+
+func TestAutoCloseOffKeepsResolvedIssues(t *testing.T) {
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{Number: 9, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open"}}}}
+	cfg := testConfig()
+	off := false
+	cfg.Conflicts.AutoClose = &off
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
+
+	if _, err := New(cfg, newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("auto-close off must not close issues, closed %v", issues.closed)
 	}
 }
 
