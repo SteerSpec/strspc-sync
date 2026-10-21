@@ -25,15 +25,20 @@ import (
 
 // Result represents the outcome of a sync operation.
 type Result struct {
-	ID           string       `json:"id"`
-	Trigger      string       `json:"trigger"`
-	Timestamp    time.Time    `json:"timestamp"`
-	Status       string       `json:"status"`
-	PRsCreated   int          `json:"prs_created"`
-	PRsUpdated   int          `json:"prs_updated"`
-	ReposSkipped int          `json:"repos_skipped"`
-	Errors       int          `json:"errors"`
-	RepoResults  []RepoResult `json:"repo_results"`
+	ID        string    `json:"id"`
+	Trigger   string    `json:"trigger"`
+	Timestamp time.Time `json:"timestamp"`
+	Status    string    `json:"status"`
+	// ReposTargeted is how many repositories the targets section resolved
+	// to after include, exclude, topics and the --target-filter. Zero means
+	// the token could not list the organization or nothing matched, which
+	// otherwise looks exactly like a run with nothing to do (GH #59).
+	ReposTargeted int          `json:"repos_targeted"`
+	PRsCreated    int          `json:"prs_created"`
+	PRsUpdated    int          `json:"prs_updated"`
+	ReposSkipped  int          `json:"repos_skipped"`
+	Errors        int          `json:"errors"`
+	RepoResults   []RepoResult `json:"repo_results"`
 }
 
 // RepoResult represents the outcome of syncing a single template to a single repo.
@@ -140,6 +145,18 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 	// Filter targets
 	if opts.TargetFilter != "" {
 		targets = filterTargets(targets, opts.TargetFilter)
+	}
+	result.ReposTargeted = len(targets)
+	if len(targets) == 0 {
+		sslog.L().Warn("no target repositories resolved; check that the token can list the organization's repositories (a fine-grained PAT only sees the organization it was issued for) and that targets.include matches",
+			"operation", "sync", "include", s.cfg.Targets.Include, "target_filter", opts.TargetFilter)
+	} else {
+		names := make([]string, 0, len(targets))
+		for _, t := range targets {
+			names = append(names, t.Repo)
+		}
+		sslog.L().Info("resolved target repositories",
+			"operation", "sync", "count", len(targets), "repos", names)
 	}
 
 	// Load deployment state from central repo

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
+	sslog "github.com/SteerSpec/strspc-sync/internal/log"
 )
 
 // ResolvedRepo represents a repository resolved from the GitHub API.
@@ -65,6 +66,8 @@ func (r *Registry) Resolve(ctx context.Context, targets config.TargetsConfig, gl
 		if err != nil {
 			return nil, fmt.Errorf("listing repos for org %q: %w", org, err)
 		}
+		sslog.L().Info("listed organization repositories",
+			"operation", "resolve", "org", org, "pattern", pattern, "discovered", len(repos))
 
 		for _, repo := range repos {
 			matched, err := path.Match(globPat, repo.Name)
