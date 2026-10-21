@@ -91,6 +91,10 @@ jobs:
       - uses: golangci/golangci-lint-action@v7
         with:
           version: v2.11.2
+          # `config verify` downloads the JSON schema from golangci-lint.run on
+          # every run and has timed out repeatedly; the pre-commit golangci-lint
+          # hook (.pre-commit-config.yaml) still verifies the config locally.
+          verify: false
 
   lint-extra:
     runs-on: ubuntu-latest
