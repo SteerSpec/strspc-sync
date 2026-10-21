@@ -2,7 +2,9 @@ package conflict
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -32,6 +34,54 @@ type Scanner struct {
 	ghClient     *gh.Client
 	centralOwner string
 	centralRepo  string
+	// incomplete lists the repos ("owner/name") where a content read failed
+	// for a reason other than "not found" during the current run. Their
+	// findings may be missing, so cleanup must not treat them as resolved.
+	incomplete map[string]bool
+}
+
+// readFile fetches a file from a target. A 404 is a normal outcome (the
+// file does not exist) and comes back as found=false with no error; any
+// other failure marks the repo incomplete for this run and is returned.
+func (s *Scanner) readFile(ctx context.Context, owner, repo, path string) (content []byte, found bool, err error) {
+	content, _, err = s.ghClient.Repos.GetFileContent(ctx, owner, repo, path, "")
+	if err == nil {
+		return content, true, nil
+	}
+	var apiErr *gh.APIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+		return nil, false, nil
+	}
+	s.incomplete[owner+"/"+repo] = true
+	return nil, false, err
+}
+
+// tierOfType maps a conflict type to the detection tier that produces it, so
+// cleanup only touches issues of tiers that actually ran.
+func tierOfType(t ConflictType) int {
+	switch t {
+	case TypeVersionDrift, TypeCrossReferenceBroken, TypeUnmanagedFile:
+		return 1
+	case TypeDuplicateSkill, TypeManualOverride:
+		return 2
+	case TypeContradictoryInstruction:
+		return 3
+	}
+	return 0
+}
+
+// typeFromTitle recovers the conflict type from an issue title of the form
+// "[SteerSpec Conflict] <type>: <path>".
+func typeFromTitle(title string) ConflictType {
+	const prefix = "[SteerSpec Conflict] "
+	if !strings.HasPrefix(title, prefix) {
+		return ""
+	}
+	rest := strings.TrimPrefix(title, prefix)
+	if i := strings.Index(rest, ":"); i > 0 {
+		return ConflictType(rest[:i])
+	}
+	return ""
 }
 
 // New creates a new conflict Scanner.
@@ -55,8 +105,11 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 	if len(tiers) == 0 {
 		tiers = s.cfg.Conflicts.Tiers
 	}
+	s.incomplete = make(map[string]bool)
+	ran := make(map[int]bool, len(tiers))
 
 	for _, tier := range tiers {
+		ran[tier] = true
 		var entries []ConflictEntry
 		var err error
 
@@ -79,14 +132,14 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 
 	report.ComputeSummary()
 
-	if err := s.createIssuesForConflicts(ctx, report, targets); err != nil {
+	if err := s.createIssuesForConflicts(ctx, report, targets, ran); err != nil {
 		return report, fmt.Errorf("creating issues: %w", err)
 	}
 
 	return report, nil
 }
 
-func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport, targets []string) error {
+func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport, targets []string, ran map[int]bool) error {
 	// Fingerprints and titles reported this run, per repo, so issues whose
 	// conflict is gone can be closed afterwards (SteerSpec/strspc-sync#55).
 	current := make(map[string]map[string]bool)
@@ -162,7 +215,7 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 	if s.cfg.Conflicts.AutoClose != nil && !*s.cfg.Conflicts.AutoClose {
 		return nil
 	}
-	return s.closeResolvedIssues(ctx, report, targets, current)
+	return s.closeResolvedIssues(ctx, report, targets, current, ran)
 }
 
 // closeResolvedIssues closes, in every scanned repo and in the central repo,
@@ -170,15 +223,28 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 // was not reported by this run: the conflict they described is gone.
 // Monitor has done the same for drift issues since v0.2.0; conflict issues
 // used to stay open forever (SteerSpec/strspc-sync#55).
-func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictReport, targets []string, current map[string]map[string]bool) error {
+//
+// An issue is only closed when this run can vouch for it: at least one
+// target was scanned, the issue's type belongs to a tier that ran, and no
+// content read failed in the repo the issue is about (for a central-repo
+// issue about several repos, in any repo).
+func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictReport, targets []string, current map[string]map[string]bool, ran map[int]bool) error {
+	if len(targets) == 0 {
+		return nil
+	}
+	central := s.centralOwner + "/" + s.centralRepo
+	anyIncomplete := len(s.incomplete) > 0
 	repos := append([]string{}, targets...)
-	repos = append(repos, s.centralOwner+"/"+s.centralRepo)
+	repos = append(repos, central)
 	seen := make(map[string]bool, len(repos))
 	for _, repo := range repos {
 		if seen[repo] {
 			continue
 		}
 		seen[repo] = true
+		if s.incomplete[repo] {
+			continue
+		}
 		owner, repoName, err := splitRepo(repo)
 		if err != nil {
 			continue
@@ -193,6 +259,13 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 		for _, issue := range existing {
 			if current[repo][extractFingerprint(issue.Body)] || current[repo][issue.Title] {
 				continue
+			}
+			tier := tierOfType(typeFromTitle(issue.Title))
+			if tier == 0 || !ran[tier] {
+				continue // unknown type, or a tier this run did not check
+			}
+			if repo == central && tier == 2 && anyIncomplete {
+				continue // multi-repo findings cannot be vouched for
 			}
 			if err := s.ghClient.Issues.Close(ctx, owner, repoName, issue.Number); err != nil {
 				return fmt.Errorf("closing resolved issue #%d in %s: %w", issue.Number, repo, err)

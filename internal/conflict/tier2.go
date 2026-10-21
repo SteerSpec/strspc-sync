@@ -50,8 +50,8 @@ func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([
 		}
 
 		for _, path := range skillTemplates {
-			content, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, path, "")
-			if err != nil {
+			content, found, err := s.readFile(ctx, owner, repo, path)
+			if err != nil || !found {
 				continue
 			}
 			// Extract just the filename from the path
@@ -110,8 +110,8 @@ func (s *Scanner) checkSectionOverlap(ctx context.Context, targets []string) ([]
 				continue
 			}
 
-			content, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, "")
-			if err != nil {
+			content, found, err := s.readFile(ctx, owner, repo, tmpl.Destination)
+			if err != nil || !found {
 				continue
 			}
 

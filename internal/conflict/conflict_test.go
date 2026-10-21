@@ -16,14 +16,20 @@ import (
 // --- Mock implementations ---
 
 type mockRepoService struct {
-	files map[string][]byte // key: "owner/repo/path"
+	// failPaths lists "owner/repo/path" keys whose read fails with a
+	// non-404 API error, as a transient outage would.
+	failPaths map[string]bool
+	files     map[string][]byte // key: "owner/repo/path"
 }
 
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, _ string) ([]byte, string, error) {
 	key := owner + "/" + repo + "/" + path
+	if m.failPaths[key] {
+		return nil, "", &gh.APIError{StatusCode: 502, Message: "bad gateway"}
+	}
 	content, ok := m.files[key]
 	if !ok {
-		return nil, "", fmt.Errorf("file not found: %s", key)
+		return nil, "", &gh.APIError{StatusCode: 404, Message: "file not found: " + key}
 	}
 	return content, "sha-fake", nil
 }
@@ -534,6 +540,60 @@ func TestStillPresentConflictIssueStaysOpen(t *testing.T) {
 	}
 	if report.IssuesClosed != 0 {
 		t.Errorf("IssuesClosed = %d, want 0", report.IssuesClosed)
+	}
+}
+
+func TestCleanupKeepsIssuesOfTiersThatDidNotRun(t *testing.T) {
+	// A tier-2-only run produces no version-drift findings, so it must not
+	// close a tier-1 issue even though the file still drifts.
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 11, Title: fmt.Sprintf("[SteerSpec Conflict] %s: CLAUDE.md", TypeVersionDrift), State: "open",
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
+
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("tier-1 issue must survive a tier-2-only run, closed %v", issues.closed)
+	}
+}
+
+func TestCleanupSkipsWhenNoTargetsScanned(t *testing.T) {
+	// An empty target list (e.g. the deployment state failed to load) must
+	// not sweep the central repo's conflict issues.
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 12, Title: fmt.Sprintf("[SteerSpec Conflict] %s: skills/x.md", TypeDuplicateSkill), State: "open",
+	}}}}
+	if _, err := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central").Run(context.Background(), state.NewDeploymentState(), nil, Options{Tiers: []int{1, 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("no targets scanned, nothing may be closed; closed %v", issues.closed)
+	}
+}
+
+func TestCleanupKeepsIssuesWhenAReadFailed(t *testing.T) {
+	// The file read fails with a non-404 error, so the missing finding does
+	// not prove the conflict is gone.
+	repos := &mockRepoService{
+		files:     map[string][]byte{},
+		failPaths: map[string]bool{"org/repo1/CLAUDE.md": true},
+	}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 13, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", Body: "<!-- steerspec-fingerprint: " + fp + " -->", State: "open",
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
+
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("a failed read must keep the issue open, closed %v", issues.closed)
 	}
 }
 

@@ -57,9 +57,9 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 			continue
 		}
 
-		content, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmplCfg.Destination, "")
-		if err != nil {
-			continue // file may not exist yet
+		content, found, err := s.readFile(ctx, owner, repo, tmplCfg.Destination)
+		if err != nil || !found {
+			continue // file may not exist yet; a failed read marks the repo incomplete
 		}
 
 		actualHash := hash.HashBytes(content)
@@ -81,9 +81,9 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 func (s *Scanner) checkCrossReferences(ctx context.Context, owner, repo, target string) ([]ConflictEntry, error) {
 	var entries []ConflictEntry
 
-	content, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, "CLAUDE.md", "")
-	if err != nil {
-		return nil, nil // no CLAUDE.md, nothing to check
+	content, found, err := s.readFile(ctx, owner, repo, "CLAUDE.md")
+	if err != nil || !found {
+		return nil, nil // no CLAUDE.md, nothing to check; a failed read marks the repo incomplete
 	}
 
 	refs := crossRefPattern.FindAllStringSubmatch(string(content), -1)
@@ -93,8 +93,11 @@ func (s *Scanner) checkCrossReferences(ctx context.Context, owner, repo, target 
 			refPath = match[1]
 		}
 
-		_, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, refPath, "")
+		_, found, err := s.readFile(ctx, owner, repo, refPath)
 		if err != nil {
+			continue // transient; the repo is marked incomplete
+		}
+		if !found {
 			entries = append(entries, ConflictEntry{
 				Severity:            SeverityCritical,
 				Type:                TypeCrossReferenceBroken,
