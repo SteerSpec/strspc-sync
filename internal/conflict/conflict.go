@@ -19,6 +19,9 @@ import (
 const (
 	fingerprintPrefix = "<!-- steerspec-fingerprint: "
 	fingerprintSuffix = " -->"
+	// typePrefix marks the conflict type in an issue body so cleanup can
+	// recover it after the title was edited.
+	typePrefix = "<!-- steerspec-conflict-type: "
 )
 
 // Options controls what the scanner checks.
@@ -38,6 +41,10 @@ type Scanner struct {
 	// for a reason other than "not found" during the current run. Their
 	// findings may be missing, so cleanup must not treat them as resolved.
 	incomplete map[string]bool
+	// missingTracked lists the repos where a file the deployment state
+	// tracks was absent: version drift is not checked there, so its issues
+	// cannot be called resolved.
+	missingTracked map[string]bool
 }
 
 // readFile fetches a file from a target. A 404 is a normal outcome (the
@@ -68,6 +75,19 @@ func tierOfType(t ConflictType) int {
 		return 3
 	}
 	return 0
+}
+
+// issueType recovers the conflict type of an issue: from the body marker
+// written since cleanup exists, else from the title (issues created before
+// the marker, or whose body was edited).
+func issueType(issue *gh.Issue) ConflictType {
+	if idx := strings.Index(issue.Body, typePrefix); idx >= 0 {
+		rest := issue.Body[idx+len(typePrefix):]
+		if end := strings.Index(rest, fingerprintSuffix); end >= 0 {
+			return ConflictType(strings.TrimSpace(rest[:end]))
+		}
+	}
+	return typeFromTitle(issue.Title)
 }
 
 // typeFromTitle recovers the conflict type from an issue title of the form
@@ -106,6 +126,7 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 		tiers = s.cfg.Conflicts.Tiers
 	}
 	s.incomplete = make(map[string]bool)
+	s.missingTracked = make(map[string]bool)
 	ran := make(map[int]bool, len(tiers))
 
 	for _, tier := range tiers {
@@ -178,6 +199,7 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 			body += "\n\n**Suggested resolution:** " + entry.SuggestedResolution
 		}
 		body += "\n\n" + fingerprintPrefix + fp + fingerprintSuffix
+		body += "\n" + typePrefix + string(entry.Type) + fingerprintSuffix
 
 		// Check if an issue already exists
 		existing, err := s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{
@@ -260,12 +282,16 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 			if current[repo][extractFingerprint(issue.Body)] || current[repo][issue.Title] {
 				continue
 			}
-			tier := tierOfType(typeFromTitle(issue.Title))
+			typ := issueType(issue)
+			tier := tierOfType(typ)
 			if tier == 0 || !ran[tier] {
 				continue // unknown type, or a tier this run did not check
 			}
 			if repo == central && tier == 2 && anyIncomplete {
 				continue // multi-repo findings cannot be vouched for
+			}
+			if typ == TypeVersionDrift && s.missingTracked[repo] {
+				continue // the tracked file is gone, so drift was not checked
 			}
 			if err := s.ghClient.Issues.Close(ctx, owner, repoName, issue.Number); err != nil {
 				return fmt.Errorf("closing resolved issue #%d in %s: %w", issue.Number, repo, err)

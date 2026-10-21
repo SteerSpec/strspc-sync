@@ -597,6 +597,59 @@ func TestCleanupKeepsIssuesWhenAReadFailed(t *testing.T) {
 	}
 }
 
+func TestRenamedIssueIsClosedByBodyType(t *testing.T) {
+	// The title was edited by a human; the body still carries the type
+	// marker, so cleanup knows the tier and closes it once resolved.
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 14, Title: "please look at this", State: "open",
+		Body: "drifted\n\n" + fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeVersionDrift) + fingerprintSuffix,
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
+
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 || issues.closed[0] != 14 {
+		t.Errorf("renamed issue with a type marker should be closed once resolved, closed %v", issues.closed)
+	}
+}
+
+func TestNewIssuesCarryTheTypeMarker(t *testing.T) {
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.created) != 1 || !strings.Contains(issues.created[0].Body, typePrefix+string(TypeVersionDrift)+fingerprintSuffix) {
+		t.Errorf("created issue should carry the type marker, got %+v", issues.created)
+	}
+}
+
+func TestDeletedTrackedFileKeepsDriftIssue(t *testing.T) {
+	// The tracked file is gone (404): version drift was not checked, so the
+	// existing drift issue must not be called resolved.
+	repos := &mockRepoService{files: map[string][]byte{}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 15, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+		Body: fingerprintPrefix + fp + fingerprintSuffix,
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
+	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("drift issue must stay open while the tracked file is missing, closed %v", issues.closed)
+	}
+}
+
 func TestAutoCloseOffKeepsResolvedIssues(t *testing.T) {
 	content := []byte("# In sync")
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}

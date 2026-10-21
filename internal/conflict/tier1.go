@@ -58,8 +58,12 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 		}
 
 		content, found, err := s.readFile(ctx, owner, repo, tmplCfg.Destination)
-		if err != nil || !found {
-			continue // file may not exist yet; a failed read marks the repo incomplete
+		if err != nil {
+			continue // a failed read marks the repo incomplete
+		}
+		if !found {
+			s.missingTracked[target] = true
+			continue // file may not exist yet (PR not merged) or was deleted
 		}
 
 		actualHash := hash.HashBytes(content)
