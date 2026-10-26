@@ -288,7 +288,16 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	vars["repo_full_name"] = target.Repo
 
 	// Read existing file from target repo (may not exist)
-	existingContent, _, _ := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
+	existingContent, _, existErr := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
+	if errors.Is(existErr, gh.ErrSymlink) {
+		// Writing through the Contents API would store the rendered template as the
+		// symlink's target path, which git cannot check out (GH #82).
+		sslog.L().Warn("destination is a symlink, skipping",
+			"operation", "sync", "template_id", tmpl.ID, "repo", target.Repo, "destination", tmpl.Destination)
+		rr.Status = "skipped"
+		rr.Error = fmt.Sprintf("destination %s is a symlink; point the template at the real file", tmpl.Destination)
+		return rr
+	}
 
 	// Render template
 	rendered, err := template.Render(template.Strategy(tmpl.Strategy), templateContent, existingContent, vars)

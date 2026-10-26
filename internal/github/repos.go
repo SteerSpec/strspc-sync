@@ -5,11 +5,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 )
+
+// ErrSymlink is returned by GetFileContent when the path is a symlink.
+var ErrSymlink = errors.New("path is a symlink")
 
 type repoService struct {
 	client *Client
@@ -145,12 +149,18 @@ func (s *repoService) GetFileContent(ctx context.Context, owner, repo, path, ref
 	}
 
 	var content struct {
+		Type     string `json:"type"`
 		Content  string `json:"content"`
 		SHA      string `json:"sha"`
 		Encoding string `json:"encoding"`
 	}
 	if err := decodeBody(resp, &content); err != nil {
 		return nil, "", err
+	}
+	// A symlink has no content, only a target path. Writing to it through the
+	// Contents API stores the new bytes as the target (GH #82).
+	if content.Type == "symlink" {
+		return nil, content.SHA, fmt.Errorf("get file %s/%s/%s: %w", owner, repo, path, ErrSymlink)
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(content.Content)

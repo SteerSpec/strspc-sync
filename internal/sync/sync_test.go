@@ -24,8 +24,10 @@ type mockRepoService struct {
 	files         map[string][]byte           // "owner/repo/path/ref" -> content
 	fileSHAs      map[string]string           // "owner/repo/path/ref" -> sha
 	defaultBranch string
-	createdFiles  []string
-	branchSHAErr  error
+	// symlinks holds "owner/repo/path" entries that GetFileContent reports as symlinks.
+	symlinks     map[string]bool
+	createdFiles []string
+	branchSHAErr error
 	// createFileErr maps "owner/repo/path/branch" to an error to return.
 	createFileErr map[string]error
 	// commitMessages records, per CreateOrUpdateFile call, the "owner/repo/path/branch"
@@ -65,6 +67,9 @@ func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, _ string) (strin
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, ref string) ([]byte, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if m.symlinks[fmt.Sprintf("%s/%s/%s", owner, repo, path)] {
+		return nil, "", fmt.Errorf("get file: %w", gh.ErrSymlink)
+	}
 	key := fmt.Sprintf("%s/%s/%s/%s", owner, repo, path, ref)
 	data, ok := m.files[key]
 	if !ok {
@@ -859,6 +864,39 @@ func TestSyncRecordsPRWhenLabelingFails(t *testing.T) {
 	}
 	if result.PRsCreated != 0 || result.PRsUpdated != 1 || len(prSvc.created) != 1 {
 		t.Errorf("forced repeat must reuse the unlabeled PR, got %+v, created=%d", result, len(prSvc.created))
+	}
+}
+
+func TestSyncSkipsSymlinkedDestination(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+		{Owner: "testorg", Name: "repo-b", FullName: "testorg/repo-b", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	repoSvc.symlinks = map[string]bool{"testorg/repo-a/CLAUDE.md": true}
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.PRsCreated != 1 || result.Errors != 0 {
+		t.Fatalf("only the regular-file repo gets a PR and a symlink is not an error, got %+v", result)
+	}
+	for _, f := range repoSvc.createdFiles {
+		if strings.Contains(f, "repo-a") {
+			t.Errorf("nothing may be written to the symlinked repo, wrote %v", repoSvc.createdFiles)
+		}
+	}
+	for _, r := range result.RepoResults {
+		if r.Repo == "testorg/repo-a" && (r.Status != "skipped" || !strings.Contains(r.Error, "symlink")) {
+			t.Errorf("symlinked repo must be skipped with a reason, got %+v", r)
+		}
+	}
+	if ts := syncer.state.GetTemplateState("testorg/repo-a", "claude-md"); ts != nil {
+		t.Errorf("a skipped symlink must not be recorded in state, got %+v", ts)
 	}
 }
 

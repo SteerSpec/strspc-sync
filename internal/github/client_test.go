@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -542,6 +543,23 @@ func TestRepoGetFileContent(t *testing.T) {
 	}
 	if sha != "abc123" {
 		t.Fatalf("expected sha abc123, got %q", sha)
+	}
+}
+
+func TestRepoGetFileContentSymlink(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/contents/CLAUDE.md", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{ //nolint:errcheck // test handler write
+			"type":   "symlink",
+			"sha":    "abc123",
+			"target": "AGENTS.md",
+		})
+	})
+
+	c := testClient(t, mux)
+	_, _, err := c.Repos.GetFileContent(context.Background(), "o", "r", "CLAUDE.md", "main")
+	if !errors.Is(err, ErrSymlink) {
+		t.Fatalf("expected ErrSymlink, got %v", err)
 	}
 }
 
