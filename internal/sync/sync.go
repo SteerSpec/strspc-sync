@@ -305,8 +305,14 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		return rr
 	}
 
-	// Read existing file from target repo (may not exist)
-	existingContent, _, _ := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
+	// Read existing file from target repo. Only a 404 means it does not exist yet: after any other failure the
+	// marker strategy would see an empty file and render the bare template over the whole destination.
+	existingContent, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
+	if err != nil && !isNotFound(err) {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("reading existing %s: %v", tmpl.Destination, err)
+		return rr
+	}
 
 	// Render template
 	rendered, err := template.Render(template.Strategy(tmpl.Strategy), templateContent, existingContent, vars)
@@ -680,6 +686,12 @@ func shouldApplyTemplate(target registry.ResolvedTarget, templateID string) bool
 		}
 	}
 	return true
+}
+
+// isNotFound reports whether err is a GitHub API 404.
+func isNotFound(err error) bool {
+	var apiErr *gh.APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
 // isAlreadyExists reports whether err is the GitHub API's "Reference already

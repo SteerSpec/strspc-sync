@@ -578,6 +578,11 @@ func TestRepoIsSymlink(t *testing.T) {
 			{"path": "docs/link.md", "type": "symlink"},
 		})
 	})
+	// An explicit 404: the "/contents/" pattern above is a subtree and would otherwise answer 200 here.
+	mux.HandleFunc("/repos/o/r/contents/nodir", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"message":"Not Found"}`) //nolint:errcheck // test handler write
+	})
 	c := testClient(t, mux)
 
 	for _, tc := range []struct {

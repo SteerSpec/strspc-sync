@@ -26,7 +26,9 @@ type mockRepoService struct {
 	defaultBranch string
 	// symlinks holds "owner/repo/path" entries that IsSymlink reports. GetFileContent still returns their
 	// content as a regular file, as the Contents API does for a working in-repo link.
-	symlinks     map[string]bool
+	symlinks map[string]bool
+	// getFileErr maps "owner/repo/path" to an error GetFileContent returns instead of the content.
+	getFileErr   map[string]error
 	createdFiles []string
 	branchSHAErr error
 	// createFileErr maps "owner/repo/path/branch" to an error to return.
@@ -74,6 +76,9 @@ func (m *mockRepoService) IsSymlink(_ context.Context, owner, repo, path, _ stri
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, ref string) ([]byte, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := m.getFileErr[fmt.Sprintf("%s/%s/%s", owner, repo, path)]; err != nil {
+		return nil, "", err
+	}
 	key := fmt.Sprintf("%s/%s/%s/%s", owner, repo, path, ref)
 	data, ok := m.files[key]
 	if !ok {
@@ -868,6 +873,32 @@ func TestSyncRecordsPRWhenLabelingFails(t *testing.T) {
 	}
 	if result.PRsCreated != 0 || result.PRsUpdated != 1 || len(prSvc.created) != 1 {
 		t.Errorf("forced repeat must reuse the unlabeled PR, got %+v, created=%d", result, len(prSvc.created))
+	}
+}
+
+func TestSyncDoesNotOverwriteWhenDestinationReadFails(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	repoSvc.getFileErr = map[string]error{
+		"testorg/repo-a/CLAUDE.md": &gh.APIError{StatusCode: http.StatusBadGateway, Message: "bad gateway"},
+	}
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Errors != 1 || result.PRsCreated != 0 {
+		t.Fatalf("a failed read must be an error, not a rewrite from the bare template, got %+v", result)
+	}
+	for _, f := range repoSvc.createdFiles {
+		if strings.Contains(f, "repo-a") {
+			t.Errorf("nothing may be written after a failed read, wrote %v", repoSvc.createdFiles)
+		}
 	}
 }
 
