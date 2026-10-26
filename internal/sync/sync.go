@@ -397,10 +397,17 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 			Base:   target.DefaultBranch,
 			Labels: []string{prLabel},
 		})
-		if err != nil {
+		if err != nil && pr == nil {
 			rr.Status = "error"
 			rr.Error = fmt.Sprintf("creating PR: %v", err)
 			return rr
+		}
+		if err != nil {
+			// The PR exists but could not be labeled. Keep it so it is recorded in
+			// the deployment state instead of orphaned and re-created on the next run.
+			sslog.L().Warn("PR created but not labeled",
+				"operation", "sync", "template_id", tmpl.ID, "repo", target.Repo,
+				"pr_number", pr.Number, "error", err.Error())
 		}
 		rr.Status = "created"
 		rr.PRNumber = pr.Number

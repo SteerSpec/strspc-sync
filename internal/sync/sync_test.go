@@ -104,6 +104,9 @@ type mockPRService struct {
 
 	// createBranchErr, when set, is returned by CreateBranch instead of nil.
 	createBranchErr error
+	// createLabelErr, when set, is returned by Create alongside the created PR,
+	// like the real client does when adding the label fails.
+	createLabelErr error
 	// unfilteredHeads models a response that includes other template branches.
 	unfilteredHeads bool
 	listedHeads     []string
@@ -168,7 +171,7 @@ func (m *mockPRService) Create(_ context.Context, owner, repo string, pr *gh.Pul
 	}
 	key := owner + "/" + repo
 	m.prs[key] = append(m.prs[key], result)
-	return result, nil
+	return result, m.createLabelErr
 }
 
 func (m *mockPRService) Update(_ context.Context, _, _ string, _ int, _ *gh.PullRequestUpdate) error {
@@ -800,6 +803,31 @@ func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
 	}
 	if prSvc.updateCalls != 1 {
 		t.Errorf("SYNCPR-005: expected Update called once, got %d", prSvc.updateCalls)
+	}
+}
+
+// A PR that was created but could not be labeled must still be recorded, or the
+// next run cannot find it and tries to create it again.
+func TestSyncRecordsPRWhenLabelingFails(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	prSvc.createLabelErr = &gh.APIError{StatusCode: http.StatusForbidden, Message: "Resource not accessible"}
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.PRsCreated != 1 || result.Errors != 0 {
+		t.Fatalf("a labeling failure must not fail the sync, got %+v", result)
+	}
+	ts := syncer.state.GetTemplateState("testorg/repo-a", "claude-md")
+	if ts == nil || ts.PRNumber != 1 {
+		t.Errorf("the unlabeled PR must be recorded in state, got %+v", ts)
 	}
 }
 
