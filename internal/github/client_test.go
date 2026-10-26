@@ -596,6 +596,62 @@ func TestPRCreate(t *testing.T) {
 	}
 }
 
+// GitHub ignores a head filter without the "owner:" prefix and returns every PR.
+func TestPRListQualifiesHead(t *testing.T) {
+	tests := []struct {
+		name, head, want string
+	}{
+		{"bare branch", "steerspec-sync/claude-md/1.0.0", "o:steerspec-sync/claude-md/1.0.0"},
+		{"already qualified", "fork:feature", "fork:feature"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got string
+			mux := http.NewServeMux()
+			mux.HandleFunc("/repos/o/r/pulls", func(w http.ResponseWriter, r *http.Request) {
+				got = r.URL.Query().Get("head")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("[]")) //nolint:errcheck // test handler write
+			})
+			c := testClient(t, mux)
+			if _, err := c.PullRequests.List(context.Background(), "o", "r", &PullRequestListOptions{Head: tt.head}); err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("head query = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPRCreateLabelFailure(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/pulls", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
+			"number": 42,
+			"state":  "open",
+			"head":   map[string]string{"ref": "feature"},
+			"base":   map[string]string{"ref": "main"},
+		})
+	})
+	mux.HandleFunc("/repos/o/r/issues/42/labels", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"message":"Resource not accessible"}`)) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	pr, err := c.PullRequests.Create(context.Background(), "o", "r", &PullRequestCreate{
+		Title: "t", Head: "feature", Base: "main", Labels: []string{"steerspec-sync"},
+	})
+	if err == nil {
+		t.Fatal("expected the failed label request to be reported")
+	}
+	if pr == nil || pr.Number != 42 {
+		t.Errorf("the created PR must still be returned, got %+v", pr)
+	}
+}
+
 func TestPRUpdate(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/pulls/1", func(w http.ResponseWriter, r *http.Request) {

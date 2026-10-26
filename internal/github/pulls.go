@@ -25,7 +25,12 @@ func (s *pullRequestService) List(ctx context.Context, owner, repo string, opts 
 				params.Set("state", opts.State)
 			}
 			if opts.Head != "" {
-				params.Set("head", opts.Head)
+				// GitHub silently ignores a bare branch name and returns every PR.
+				head := opts.Head
+				if !strings.Contains(head, ":") {
+					head = owner + ":" + head
+				}
+				params.Set("head", head)
 			}
 		}
 
@@ -96,6 +101,10 @@ func (s *pullRequestService) Create(ctx context.Context, owner, repo string, pr 
 		labelsResp, err := s.client.doRequest(ctx, http.MethodPost, labelsURL, bytes.NewReader(labelsPayload))
 		if err != nil {
 			return created, err
+		}
+		// The PR lookup keys on this label, so an unlabeled PR is as good as lost.
+		if err := checkResponse(labelsResp); err != nil {
+			return created, fmt.Errorf("label PR %s/%s#%d: %w", owner, repo, created.Number, err)
 		}
 		labelsResp.Body.Close() //nolint:errcheck // label response body close is best-effort
 		created.Labels = pr.Labels
