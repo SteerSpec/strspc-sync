@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -333,6 +334,19 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	s.stateMu.Unlock()
 	previousVersion := baselineVersion(prev, tmpl.Version)
 
+	// The default branch already holds the rendered content: there is nothing to propose, whatever the state or
+	// --force say. Without this, a forced run opened empty PRs for content that was already merged (GH #94), and
+	// a closed PR was reported as "target not updated" although the file is current.
+	if bytes.Equal(rendered, existingContent) {
+		rr.Status = "skipped"
+		if !dryRun {
+			// Bring the recorded PR status up to date first (GH #56), then the version and hash.
+			s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
+			s.recordInSync(target.Repo, tmpl, contentHash)
+		}
+		return rr
+	}
+
 	// Check state - skip if hash matches and not forced
 	if !force && prev != nil && prev.Hash == contentHash {
 		rr.Status = "skipped"
@@ -498,6 +512,23 @@ func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, tem
 	sslog.L().Info("deployment state: pull request status updated",
 		"operation", "sync", "repo", fullName, "template_id", templateID, "pr", prev.PRNumber, "pr_status", status)
 	return status
+}
+
+// recordInSync records that the default branch already carries the rendered content, so the hash gate and the
+// monitor agree with the repository. A recorded PR number and status are kept: they describe a PR, not the file.
+func (s *Syncer) recordInSync(fullName string, tmpl config.TemplateConfig, contentHash string) {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	entry := state.TemplateState{Version: tmpl.Version, Hash: contentHash, Timestamp: time.Now()}
+	if cur := s.state.GetTemplateState(fullName, tmpl.ID); cur != nil {
+		if cur.Hash == contentHash && cur.Version == tmpl.Version {
+			return
+		}
+		entry.PRNumber = cur.PRNumber
+		entry.PRStatus = cur.PRStatus
+		entry.PreviousVersion = cur.PreviousVersion
+	}
+	s.state.SetTemplateState(fullName, tmpl.ID, entry)
 }
 
 func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string, error) {
