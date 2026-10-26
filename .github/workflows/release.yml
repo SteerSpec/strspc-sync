@@ -23,7 +23,8 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          if [ "v$(tr -d '[:space:]' < VERSION)" != "$TAG" ]; then
+          # Same read as the actions ($(cat VERSION)): no whitespace normalisation.
+          if [ "v$(cat VERSION)" != "$TAG" ]; then
             echo "::error::VERSION ($(cat VERSION)) does not match tag $TAG"
             exit 1
           fi
