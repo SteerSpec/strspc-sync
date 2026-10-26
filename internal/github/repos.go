@@ -171,17 +171,23 @@ func (s *repoService) GetFileContent(ctx context.Context, owner, repo, path, ref
 	return decoded, content.SHA, nil
 }
 
-// IsSymlink lists the parent directory, whose entries report symlinks without following them, and looks path up
-// in it. A missing directory or entry is not a symlink.
+// IsSymlink reads the git tree of the parent directory and checks the entry's mode (120000 is a symlink).
+// Neither Contents API response shows it: a single-file GET follows a working link and returns the target as a
+// regular file, and the directory listing reports the link itself with type "file". A missing directory or
+// entry is not a symlink; a truncated tree cannot decide, so it is an error.
 func (s *repoService) IsSymlink(ctx context.Context, owner, repo, path, ref string) (bool, error) {
-	dir := ""
+	dir, name := "", path
 	if i := strings.LastIndex(path, "/"); i >= 0 {
-		dir = path[:i]
+		dir, name = path[:i], path[i+1:]
 	}
-	u := fmt.Sprintf("%s/repos/%s/%s/contents/%s", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), dir)
-	if ref != "" {
-		u += "?ref=" + url.QueryEscape(ref)
+	if ref == "" {
+		ref = "HEAD"
 	}
+	treeish := ref
+	if dir != "" {
+		treeish += ":" + dir
+	}
+	u := fmt.Sprintf("%s/repos/%s/%s/git/trees/%s", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(treeish))
 	resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return false, err
@@ -191,19 +197,25 @@ func (s *repoService) IsSymlink(ctx context.Context, owner, repo, path, ref stri
 		return false, nil
 	}
 	if err := checkResponse(resp); err != nil {
-		return false, fmt.Errorf("list %s/%s/%s: %w", owner, repo, dir, err)
+		return false, fmt.Errorf("read tree %s/%s@%s: %w", owner, repo, treeish, err)
 	}
-	var entries []struct {
-		Path string `json:"path"`
-		Type string `json:"type"`
+	var tree struct {
+		Tree []struct {
+			Path string `json:"path"`
+			Mode string `json:"mode"`
+		} `json:"tree"`
+		Truncated bool `json:"truncated"`
 	}
-	if err := decodeBody(resp, &entries); err != nil {
+	if err := decodeBody(resp, &tree); err != nil {
 		return false, err
 	}
-	for _, e := range entries {
-		if e.Path == path {
-			return e.Type == "symlink", nil
+	for _, e := range tree.Tree {
+		if e.Path == name {
+			return e.Mode == "120000", nil
 		}
+	}
+	if tree.Truncated {
+		return false, fmt.Errorf("tree %s/%s@%s is truncated: cannot tell whether %s is a symlink", owner, repo, treeish, path)
 	}
 	return false, nil
 }

@@ -565,25 +565,41 @@ func TestRepoGetFileContentSymlink(t *testing.T) {
 
 func TestRepoIsSymlink(t *testing.T) {
 	mux := http.NewServeMux()
-	// The root listing reports the link as a symlink even though GET contents/CLAUDE.md would follow it.
-	mux.HandleFunc("/repos/o/r/contents/", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]map[string]string{ //nolint:errcheck // test handler write
-			{"path": "AGENTS.md", "type": "file"},
-			{"path": "CLAUDE.md", "type": "symlink"},
+	// Shapes copied from the real API (strspc-pr-review): the Contents API reports CLAUDE.md as a regular file
+	// both when fetched (the target's content) and in a directory listing, while the git tree carries mode 120000.
+	mux.HandleFunc("/repos/o/r/contents/CLAUDE.md", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"type": "file", "size": 5956}) //nolint:errcheck // test handler write
+	})
+	mux.HandleFunc("/repos/o/r/git/trees/main", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
+			"truncated": false,
+			"tree": []map[string]string{
+				{"path": "AGENTS.md", "mode": "100644"},
+				{"path": "CLAUDE.md", "mode": "120000"},
+			},
 		})
 	})
-	mux.HandleFunc("/repos/o/r/contents/docs", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]map[string]string{ //nolint:errcheck // test handler write
-			{"path": "docs/guide.md", "type": "file"},
-			{"path": "docs/link.md", "type": "symlink"},
+	mux.HandleFunc("/repos/o/r/git/trees/main:docs", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
+			"truncated": false,
+			"tree": []map[string]string{
+				{"path": "guide.md", "mode": "100644"},
+				{"path": "link.md", "mode": "120000"},
+			},
 		})
 	})
-	// An explicit 404: the "/contents/" pattern above is a subtree and would otherwise answer 200 here.
-	mux.HandleFunc("/repos/o/r/contents/nodir", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/git/trees/main:nodir", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprint(w, `{"message":"Not Found"}`) //nolint:errcheck // test handler write
 	})
+	mux.HandleFunc("/repos/o/r/git/trees/main:big", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"truncated": true, "tree": []map[string]string{}}) //nolint:errcheck // test handler write
+	})
 	c := testClient(t, mux)
+
+	if _, err := c.Repos.IsSymlink(context.Background(), "o", "r", "big/file.md", "main"); err == nil {
+		t.Error("a truncated tree cannot decide and must be an error")
+	}
 
 	for _, tc := range []struct {
 		path string
