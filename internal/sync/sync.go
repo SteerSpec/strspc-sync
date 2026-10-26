@@ -336,7 +336,15 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	// Check state - skip if hash matches and not forced
 	if !force && prev != nil && prev.Hash == contentHash {
 		rr.Status = "skipped"
-		s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
+		if s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev) == "closed" {
+			// The recorded PR was closed without merging, so the repo does not have this content. Retrying on
+			// every run would reopen a PR someone declined on purpose; say so and leave the retry to --force
+			// (GH #91).
+			rr.PRNumber = prev.PRNumber
+			rr.Error = fmt.Sprintf("sync PR #%d was closed without merging; run with force to open it again", prev.PRNumber)
+			sslog.L().Warn("sync PR closed without merging, target not updated",
+				"operation", "sync", "template_id", tmpl.ID, "repo", target.Repo, "pr_number", prev.PRNumber)
+		}
 		return rr
 	}
 
@@ -462,21 +470,25 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 // in sync: the PR has usually been merged by then, but the state only ever
 // recorded "open" at creation time (GH #56). Only "merged" is terminal; an
 // unmerged "closed" PR can be reopened and merged later, so it is looked up
-// again. Best-effort: a lookup failure leaves the state as it was.
-func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, templateID string, prev *state.TemplateState) {
+// again. Best-effort: a lookup failure leaves the state as it was. It returns
+// the status the state holds afterwards.
+func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, templateID string, prev *state.TemplateState) string {
 	if prev == nil || prev.PRNumber == 0 || prev.PRStatus == "merged" {
-		return
+		if prev == nil {
+			return ""
+		}
+		return prev.PRStatus
 	}
 	pr, err := s.ghClient.PullRequests.Get(ctx, owner, repo, prev.PRNumber)
 	if err != nil || pr == nil {
-		return
+		return prev.PRStatus
 	}
 	status := pr.State // "open" or "closed"
 	if pr.State == "closed" && pr.Merged {
 		status = "merged"
 	}
 	if status == prev.PRStatus {
-		return
+		return status
 	}
 	updated := *prev
 	updated.PRStatus = status
@@ -485,6 +497,7 @@ func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, tem
 	s.stateMu.Unlock()
 	sslog.L().Info("deployment state: pull request status updated",
 		"operation", "sync", "repo", fullName, "template_id", templateID, "pr", prev.PRNumber, "pr_status", status)
+	return status
 }
 
 func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string, error) {

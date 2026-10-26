@@ -1170,6 +1170,45 @@ func TestSkippedRepoRefreshesPRStatus(t *testing.T) {
 	}
 }
 
+// GH #91: a PR closed without merging leaves the repo without the content. The unchanged hash still skips, so a
+// declined PR is not reopened on every run, but the result and the log must say why the target was not updated.
+func TestSkippedRepoReportsClosedUnmergedPR(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	rendered := []byte("# Hello testorg")
+	repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = rendered
+	repoSvc.files["testorg/central/.steerspec/deployment-state.json/"] = []byte(`{
+	  "repositories": {"testorg/repo-a": {"claude-md": {"version": "1.0.0", "hash": "` + hash.HashBytes(rendered) + `", "pr_number": 7, "pr_status": "open"}}}
+	}`)
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{{Number: 7, State: "closed", Merged: false, Head: "steerspec-sync/claude-md/1.0.0"}}
+
+	syncer := New(makeTestConfig(), &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ReposSkipped != 1 || result.Errors != 0 || len(prSvc.created) != 0 {
+		t.Fatalf("a closed PR must be skipped, not retried or failed, got %+v created=%d", result, len(prSvc.created))
+	}
+	rr := result.RepoResults[0]
+	if rr.PRNumber != 7 || !strings.Contains(rr.Error, "closed without merging") || !strings.Contains(rr.Error, "force") {
+		t.Errorf("the result must name the closed PR and the way forward, got %+v", rr)
+	}
+
+	// A forced run does open it again.
+	result, err = syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
+	if err != nil {
+		t.Fatalf("unexpected error on forced run: %v", err)
+	}
+	if result.PRsCreated != 1 || len(prSvc.created) != 1 {
+		t.Errorf("force must open a new PR for the closed one, got %+v created=%d", result, len(prSvc.created))
+	}
+}
+
 // GH #56: "closed" is not terminal. A PR closed unmerged, reopened and
 // merged ends up recorded as merged across successive no-op syncs.
 func TestPRStatusFollowsCloseReopenMerge(t *testing.T) {
