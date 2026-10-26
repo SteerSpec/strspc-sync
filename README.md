@@ -65,7 +65,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: SteerSpec/strspc-sync/sync@v0.2.5
         with:
           dry-run: false
