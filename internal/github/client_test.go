@@ -563,6 +563,44 @@ func TestRepoGetFileContentSymlink(t *testing.T) {
 	}
 }
 
+func TestRepoIsSymlink(t *testing.T) {
+	mux := http.NewServeMux()
+	// The root listing reports the link as a symlink even though GET contents/CLAUDE.md would follow it.
+	mux.HandleFunc("/repos/o/r/contents/", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]map[string]string{ //nolint:errcheck // test handler write
+			{"path": "AGENTS.md", "type": "file"},
+			{"path": "CLAUDE.md", "type": "symlink"},
+		})
+	})
+	mux.HandleFunc("/repos/o/r/contents/docs", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]map[string]string{ //nolint:errcheck // test handler write
+			{"path": "docs/guide.md", "type": "file"},
+			{"path": "docs/link.md", "type": "symlink"},
+		})
+	})
+	c := testClient(t, mux)
+
+	for _, tc := range []struct {
+		path string
+		want bool
+	}{
+		{"CLAUDE.md", true},
+		{"AGENTS.md", false},
+		{"missing.md", false},
+		{"docs/link.md", true},
+		{"docs/guide.md", false},
+		{"nodir/file.md", false},
+	} {
+		got, err := c.Repos.IsSymlink(context.Background(), "o", "r", tc.path, "main")
+		if err != nil {
+			t.Fatalf("%s: %v", tc.path, err)
+		}
+		if got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.path, got, tc.want)
+		}
+	}
+}
+
 func TestRepoCreateOrUpdateFile(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/contents/file.txt", func(w http.ResponseWriter, r *http.Request) {

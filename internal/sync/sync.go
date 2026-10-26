@@ -287,17 +287,26 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	vars["repo_owner"] = owner
 	vars["repo_full_name"] = target.Repo
 
-	// Read existing file from target repo (may not exist)
-	existingContent, _, existErr := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
-	if errors.Is(existErr, gh.ErrSymlink) {
+	// A symlink must be detected before the read: the Contents API follows a working link and returns the target
+	// as a regular file, so the content alone never shows it (GH #82).
+	isLink, err := s.ghClient.Repos.IsSymlink(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
+	if err != nil {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("checking destination type: %v", err)
+		return rr
+	}
+	if isLink {
 		// Writing through the Contents API would store the rendered template as the
-		// symlink's target path, which git cannot check out (GH #82).
+		// symlink's target path, which git cannot check out.
 		sslog.L().Warn("destination is a symlink, skipping",
 			"operation", "sync", "template_id", tmpl.ID, "repo", target.Repo, "destination", tmpl.Destination)
 		rr.Status = "skipped"
 		rr.Error = fmt.Sprintf("destination %s is a symlink; point the template at the real file", tmpl.Destination)
 		return rr
 	}
+
+	// Read existing file from target repo (may not exist)
+	existingContent, _, _ := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
 
 	// Render template
 	rendered, err := template.Render(template.Strategy(tmpl.Strategy), templateContent, existingContent, vars)

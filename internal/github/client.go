@@ -30,6 +30,9 @@ type RepoService interface {
 	GetBranchSHA(ctx context.Context, owner, repo, branch string) (string, error)
 	GetFileContent(ctx context.Context, owner, repo, path, ref string) ([]byte, string, error) // content, sha, error
 	CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha, message string) error
+	// IsSymlink reports whether path is a symlink at ref. GetFileContent cannot tell: the Contents API follows
+	// a working in-repo link and returns the target's content as a regular file.
+	IsSymlink(ctx context.Context, owner, repo, path, ref string) (bool, error)
 }
 
 // PullRequestService provides access to pull-request-related GitHub API endpoints.

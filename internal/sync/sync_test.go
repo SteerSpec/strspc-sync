@@ -24,7 +24,8 @@ type mockRepoService struct {
 	files         map[string][]byte           // "owner/repo/path/ref" -> content
 	fileSHAs      map[string]string           // "owner/repo/path/ref" -> sha
 	defaultBranch string
-	// symlinks holds "owner/repo/path" entries that GetFileContent reports as symlinks.
+	// symlinks holds "owner/repo/path" entries that IsSymlink reports. GetFileContent still returns their
+	// content as a regular file, as the Contents API does for a working in-repo link.
 	symlinks     map[string]bool
 	createdFiles []string
 	branchSHAErr error
@@ -64,12 +65,15 @@ func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, _ string) (strin
 	return "abc123sha", nil
 }
 
+func (m *mockRepoService) IsSymlink(_ context.Context, owner, repo, path, _ string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.symlinks[fmt.Sprintf("%s/%s/%s", owner, repo, path)], nil
+}
+
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, ref string) ([]byte, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if m.symlinks[fmt.Sprintf("%s/%s/%s", owner, repo, path)] {
-		return nil, "", fmt.Errorf("get file: %w", gh.ErrSymlink)
-	}
 	key := fmt.Sprintf("%s/%s/%s/%s", owner, repo, path, ref)
 	data, ok := m.files[key]
 	if !ok {
@@ -875,6 +879,8 @@ func TestSyncSkipsSymlinkedDestination(t *testing.T) {
 		{Owner: "testorg", Name: "repo-b", FullName: "testorg/repo-b", DefaultBranch: "main"},
 	}
 	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	// The Contents API follows a working link, so the link's target comes back as a regular file.
+	repoSvc.files["testorg/repo-a/CLAUDE.md/"] = []byte("# AGENTS.md content")
 	repoSvc.symlinks = map[string]bool{"testorg/repo-a/CLAUDE.md": true}
 
 	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
