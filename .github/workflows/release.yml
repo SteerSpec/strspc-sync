@@ -18,6 +18,16 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      # The composite actions download the binary named by VERSION at the tag ref.
+      - name: VERSION matches tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Same read as the actions ($(cat VERSION)): no whitespace normalisation.
+          if [ "v$(cat VERSION)" != "$TAG" ]; then
+            echo "::error::VERSION ($(cat VERSION)) does not match tag $TAG"
+            exit 1
+          fi
       - name: Pre-flight tests
         run: go test -race ./...
       - name: Build smoke test
