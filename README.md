@@ -98,8 +98,8 @@ Use the composite actions directly from the Marketplace:
 #### Keeping the pin current
 
 Pin an exact tag, never a branch: the action downloads the binary named by the `VERSION` file at that tag, and a
-sync run writes pull requests to every target repository. Nothing moves an exact pin for you, so let Dependabot
-open a pull request for each new release:
+sync run opens or updates pull requests in the target repositories whose rendered content changed. Nothing moves
+an exact pin for you, so let Dependabot open a pull request for each new release:
 
 ```yaml
 # .github/dependabot.yml
