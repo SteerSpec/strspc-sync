@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // ErrSymlink is returned by GetFileContent when the path is a symlink.
@@ -168,6 +169,43 @@ func (s *repoService) GetFileContent(ctx context.Context, owner, repo, path, ref
 		return nil, "", fmt.Errorf("decode file content: %w", err)
 	}
 	return decoded, content.SHA, nil
+}
+
+// IsSymlink lists the parent directory, whose entries report symlinks without following them, and looks path up
+// in it. A missing directory or entry is not a symlink.
+func (s *repoService) IsSymlink(ctx context.Context, owner, repo, path, ref string) (bool, error) {
+	dir := ""
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		dir = path[:i]
+	}
+	u := fmt.Sprintf("%s/repos/%s/%s/contents/%s", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), dir)
+	if ref != "" {
+		u += "?ref=" + url.QueryEscape(ref)
+	}
+	resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return false, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		resp.Body.Close() //nolint:errcheck // not-found body close is best-effort
+		return false, nil
+	}
+	if err := checkResponse(resp); err != nil {
+		return false, fmt.Errorf("list %s/%s/%s: %w", owner, repo, dir, err)
+	}
+	var entries []struct {
+		Path string `json:"path"`
+		Type string `json:"type"`
+	}
+	if err := decodeBody(resp, &entries); err != nil {
+		return false, err
+	}
+	for _, e := range entries {
+		if e.Path == path {
+			return e.Type == "symlink", nil
+		}
+	}
+	return false, nil
 }
 
 func (s *repoService) CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha, message string) error {

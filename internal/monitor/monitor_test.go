@@ -19,6 +19,10 @@ type mockRepoService struct {
 	files map[string][]byte // "owner/repo/path" -> content
 }
 
+func (m *mockRepoService) IsSymlink(_ context.Context, _, _, _, _ string) (bool, error) {
+	return false, nil
+}
+
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, _ string) ([]byte, string, error) {
 	key := owner + "/" + repo + "/" + path
 	content, ok := m.files[key]

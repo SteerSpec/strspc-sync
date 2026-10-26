@@ -24,8 +24,11 @@ type mockRepoService struct {
 	files         map[string][]byte           // "owner/repo/path/ref" -> content
 	fileSHAs      map[string]string           // "owner/repo/path/ref" -> sha
 	defaultBranch string
-	// symlinks holds "owner/repo/path" entries that GetFileContent reports as symlinks.
-	symlinks     map[string]bool
+	// symlinks holds "owner/repo/path" entries that IsSymlink reports. GetFileContent still returns their
+	// content as a regular file, as the Contents API does for a working in-repo link.
+	symlinks map[string]bool
+	// getFileErr maps "owner/repo/path" to an error GetFileContent returns instead of the content.
+	getFileErr   map[string]error
 	createdFiles []string
 	branchSHAErr error
 	// createFileErr maps "owner/repo/path/branch" to an error to return.
@@ -64,11 +67,17 @@ func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, _ string) (strin
 	return "abc123sha", nil
 }
 
+func (m *mockRepoService) IsSymlink(_ context.Context, owner, repo, path, _ string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.symlinks[fmt.Sprintf("%s/%s/%s", owner, repo, path)], nil
+}
+
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, ref string) ([]byte, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if m.symlinks[fmt.Sprintf("%s/%s/%s", owner, repo, path)] {
-		return nil, "", fmt.Errorf("get file: %w", gh.ErrSymlink)
+	if err := m.getFileErr[fmt.Sprintf("%s/%s/%s", owner, repo, path)]; err != nil {
+		return nil, "", err
 	}
 	key := fmt.Sprintf("%s/%s/%s/%s", owner, repo, path, ref)
 	data, ok := m.files[key]
@@ -867,6 +876,32 @@ func TestSyncRecordsPRWhenLabelingFails(t *testing.T) {
 	}
 }
 
+func TestSyncDoesNotOverwriteWhenDestinationReadFails(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	repoSvc.getFileErr = map[string]error{
+		"testorg/repo-a/CLAUDE.md": &gh.APIError{StatusCode: http.StatusBadGateway, Message: "bad gateway"},
+	}
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Errors != 1 || result.PRsCreated != 0 {
+		t.Fatalf("a failed read must be an error, not a rewrite from the bare template, got %+v", result)
+	}
+	for _, f := range repoSvc.createdFiles {
+		if strings.Contains(f, "repo-a") {
+			t.Errorf("nothing may be written after a failed read, wrote %v", repoSvc.createdFiles)
+		}
+	}
+}
+
 func TestSyncSkipsSymlinkedDestination(t *testing.T) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()
@@ -875,6 +910,8 @@ func TestSyncSkipsSymlinkedDestination(t *testing.T) {
 		{Owner: "testorg", Name: "repo-b", FullName: "testorg/repo-b", DefaultBranch: "main"},
 	}
 	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	// The Contents API follows a working link, so the link's target comes back as a regular file.
+	repoSvc.files["testorg/repo-a/CLAUDE.md/"] = []byte("# AGENTS.md content")
 	repoSvc.symlinks = map[string]bool{"testorg/repo-a/CLAUDE.md": true}
 
 	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
