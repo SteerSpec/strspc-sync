@@ -95,6 +95,28 @@ Use the composite actions directly from the Marketplace:
 - uses: SteerSpec/strspc-sync/conflict@v0.2.6
 ```
 
+#### Keeping the pin current
+
+Pin an exact tag, never a branch: the action downloads the binary named by the `VERSION` file at that tag, and a
+sync run writes pull requests to every target repository. Nothing moves an exact pin for you, so let Dependabot
+open a pull request for each new release:
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+```
+
+Read the release notes before merging a bump. Sync, monitor and conflict workflows pinned in the same repository
+are updated together by the `groups` entry.
+
 ### CLI Binary
 
 Download from [Releases](https://github.com/SteerSpec/strspc-sync/releases):
