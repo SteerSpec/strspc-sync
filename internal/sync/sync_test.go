@@ -104,6 +104,9 @@ type mockPRService struct {
 
 	// createBranchErr, when set, is returned by CreateBranch instead of nil.
 	createBranchErr error
+	// unfilteredHeads models a response that includes other template branches.
+	unfilteredHeads bool
+	listedHeads     []string
 }
 
 func newMockPRService() *mockPRService {
@@ -128,13 +131,19 @@ func (m *mockPRService) List(_ context.Context, owner, repo string, opts *gh.Pul
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := owner + "/" + repo
+	if opts != nil && opts.Head != "" {
+		m.listedHeads = append(m.listedHeads, opts.Head)
+	}
 	var result []*gh.PullRequest
 	for _, pr := range m.prs[key] {
 		if opts != nil && opts.State != "" && pr.State != opts.State {
 			continue
 		}
-		if opts != nil && opts.Head != "" && pr.Head != opts.Head {
-			continue
+		if opts != nil && !m.unfilteredHeads {
+			// GitHub applies head filtering only to an owner:branch value.
+			if _, branch, qualified := strings.Cut(opts.Head, ":"); qualified && pr.Head != branch {
+				continue
+			}
 		}
 		result = append(result, pr)
 	}
@@ -791,6 +800,60 @@ func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
 	}
 	if prSvc.updateCalls != 1 {
 		t.Errorf("SYNCPR-005: expected Update called once, got %d", prSvc.updateCalls)
+	}
+}
+
+func TestSyncPRLookupKeepsTemplatesSeparate(t *testing.T) {
+	for _, unfiltered := range []bool{false, true} {
+		t.Run(fmt.Sprintf("unfiltered-response-%t", unfiltered), func(t *testing.T) {
+			repoSvc := newMockRepoService()
+			prSvc := newMockPRService()
+			prSvc.unfilteredHeads = unfiltered
+			repoSvc.repos["testorg"] = []*gh.Repository{
+				{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+			}
+			repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Instructions")
+			repoSvc.files["testorg/central/templates/review.md/"] = []byte("Review instructions")
+			cfg := makeTestConfig()
+			cfg.Templates = append(cfg.Templates, config.TemplateConfig{
+				ID: "agent-code-review", Version: "1.0.0", Type: "skill",
+				Source: "templates/review.md", Destination: ".claude/agents/code-review.md", Strategy: "full-replace",
+			})
+			cfg.Sync.Concurrency = 1
+			syncer := New(cfg, makeTestClient(repoSvc, prSvc), "testorg", "central")
+			result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.PRsCreated != 2 || result.PRsUpdated != 0 || len(prSvc.created) != 2 {
+				t.Fatalf("two templates must create separate PRs, got %+v", result)
+			}
+			for _, head := range prSvc.listedHeads {
+				if !strings.HasPrefix(head, "testorg:steerspec-sync/") {
+					t.Errorf("unqualified head filter: %q", head)
+				}
+			}
+			result, err = syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.PRsCreated != 0 || result.PRsUpdated != 2 || len(prSvc.created) != 2 {
+				t.Fatalf("a forced repeat must reuse each template's own PR, got %+v", result)
+			}
+			for _, tmpl := range cfg.Templates {
+				deployed := syncer.state.GetTemplateState("testorg/repo-a", tmpl.ID)
+				if deployed == nil {
+					t.Fatalf("missing state for %s", tmpl.ID)
+				}
+				pr, err := prSvc.Get(context.Background(), "testorg", "repo-a", deployed.PRNumber)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if want := "steerspec-sync/" + tmpl.ID + "/1.0.0"; pr.Head != want {
+					t.Errorf("%s recorded PR head %q, want %q", tmpl.ID, pr.Head, want)
+				}
+			}
+		})
 	}
 }
 

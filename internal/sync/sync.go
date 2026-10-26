@@ -360,7 +360,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	prLabel := s.cfg.Sync.PRLabel
 	existingPRs, _ := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{
 		State:  "open",
-		Head:   branchName,
+		Head:   owner + ":" + branchName,
 		Labels: []string{prLabel},
 	})
 
@@ -368,9 +368,14 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	prBody := s.prBody(tmpl, previousVersion, contentHash)
 
 	var pr *gh.PullRequest
-	if len(existingPRs) > 0 {
+	for _, existing := range existingPRs {
+		if existing.Head == branchName {
+			pr = existing
+			break
+		}
+	}
+	if pr != nil {
 		// Update existing PR
-		pr = existingPRs[0]
 		err = s.ghClient.PullRequests.Update(ctx, owner, repo, pr.Number, &gh.PullRequestUpdate{
 			Title: &prTitle,
 			Body:  &prBody,
