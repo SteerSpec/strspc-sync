@@ -309,6 +309,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	// Read existing file from target repo. Only a 404 means it does not exist yet: after any other failure the
 	// marker strategy would see an empty file and render the bare template over the whole destination.
 	existingContent, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
+	destExists := err == nil
 	if err != nil && !isNotFound(err) {
 		rr.Status = "error"
 		rr.Error = fmt.Sprintf("reading existing %s: %v", tmpl.Destination, err)
@@ -336,8 +337,9 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 
 	// The default branch already holds the rendered content: there is nothing to propose, whatever the state or
 	// --force say. Without this, a forced run opened empty PRs for content that was already merged (GH #94), and
-	// a closed PR was reported as "target not updated" although the file is current.
-	if bytes.Equal(rendered, existingContent) {
+	// a closed PR was reported as "target not updated" although the file is current. A missing file never counts
+	// as current, even when the template renders to nothing.
+	if destExists && bytes.Equal(rendered, existingContent) {
 		rr.Status = "skipped"
 		if !dryRun {
 			// Bring the recorded PR status up to date first (GH #56), then the version and hash.

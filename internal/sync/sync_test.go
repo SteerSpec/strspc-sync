@@ -1265,6 +1265,25 @@ func TestContentAlreadyCurrentOpensNothing(t *testing.T) {
 	}
 }
 
+// GH #94: a missing destination is not "current" just because the template renders to nothing.
+func TestMissingDestinationIsNotCurrentForEmptyTemplate(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte{}
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.PRsCreated != 1 || result.Errors != 0 {
+		t.Fatalf("a missing file must get a PR even for an empty template, got %+v", result)
+	}
+}
+
 // GH #56: "closed" is not terminal. A PR closed unmerged, reopened and
 // merged ends up recorded as merged across successive no-op syncs.
 func TestPRStatusFollowsCloseReopenMerge(t *testing.T) {
