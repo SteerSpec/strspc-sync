@@ -356,12 +356,12 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		return rr
 	}
 
-	// Find existing PR
+	// Find existing PR by its exact head branch. The label is not part of the
+	// lookup: a PR whose label request failed must still be found on a retry.
 	prLabel := s.cfg.Sync.PRLabel
 	existingPRs, _ := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{
-		State:  "open",
-		Head:   owner + ":" + branchName,
-		Labels: []string{prLabel},
+		State: "open",
+		Head:  owner + ":" + branchName,
 	})
 
 	prTitle := updateMessage(s.prTitlePrefix(), tmpl.ID, tmpl.Version)

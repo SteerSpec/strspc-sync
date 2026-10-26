@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	gosync "sync"
 	"sync/atomic"
@@ -148,9 +149,30 @@ func (m *mockPRService) List(_ context.Context, owner, repo string, opts *gh.Pul
 				continue
 			}
 		}
+		if opts != nil && !hasLabels(pr.Labels, opts.Labels) {
+			continue
+		}
 		result = append(result, pr)
 	}
 	return result, nil
+}
+
+// labelsApplied is empty when the add-labels request failed.
+func labelsApplied(labels []string, labelErr error) []string {
+	if labelErr != nil {
+		return nil
+	}
+	return labels
+}
+
+// hasLabels mirrors the real client, which filters PRs on labels after listing.
+func hasLabels(have, want []string) bool {
+	for _, w := range want {
+		if !slices.Contains(have, w) {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *mockPRService) Create(_ context.Context, owner, repo string, pr *gh.PullRequestCreate) (*gh.PullRequest, error) {
@@ -166,7 +188,7 @@ func (m *mockPRService) Create(_ context.Context, owner, repo string, pr *gh.Pul
 		State:  "open",
 		Head:   pr.Head,
 		Base:   pr.Base,
-		Labels: pr.Labels,
+		Labels: labelsApplied(pr.Labels, m.createLabelErr),
 		URL:    fmt.Sprintf("https://github.com/%s/%s/pull/%d", owner, repo, num),
 	}
 	key := owner + "/" + repo
@@ -828,6 +850,15 @@ func TestSyncRecordsPRWhenLabelingFails(t *testing.T) {
 	ts := syncer.state.GetTemplateState("testorg/repo-a", "claude-md")
 	if ts == nil || ts.PRNumber != 1 {
 		t.Errorf("the unlabeled PR must be recorded in state, got %+v", ts)
+	}
+
+	// A forced repeat must find the unlabeled PR by its head branch, not create it again.
+	result, err = syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
+	if err != nil {
+		t.Fatalf("unexpected error on forced repeat: %v", err)
+	}
+	if result.PRsCreated != 0 || result.PRsUpdated != 1 || len(prSvc.created) != 1 {
+		t.Errorf("forced repeat must reuse the unlabeled PR, got %+v, created=%d", result, len(prSvc.created))
 	}
 }
 
