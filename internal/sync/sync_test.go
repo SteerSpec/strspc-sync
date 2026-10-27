@@ -1180,7 +1180,8 @@ func TestSkippedRepoReportsClosedUnmergedPR(t *testing.T) {
 	}
 	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
 	rendered := []byte("# Hello testorg")
-	repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = rendered
+	// The state says delivered, the repository does not have it: that is what a closed, unmerged PR leaves behind.
+	repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = []byte("# stale")
 	repoSvc.files["testorg/central/.steerspec/deployment-state.json/"] = []byte(`{
 	  "repositories": {"testorg/repo-a": {"claude-md": {"version": "1.0.0", "hash": "` + hash.HashBytes(rendered) + `", "pr_number": 7, "pr_status": "open"}}}
 	}`)
@@ -1206,6 +1207,80 @@ func TestSkippedRepoReportsClosedUnmergedPR(t *testing.T) {
 	}
 	if result.PRsCreated != 1 || len(prSvc.created) != 1 {
 		t.Errorf("force must open a new PR for the closed one, got %+v created=%d", result, len(prSvc.created))
+	}
+}
+
+// GH #94: when the default branch already holds the rendered content nothing is proposed, with or without --force,
+// and a closed PR is not reported as "target not updated" because the file is current.
+func TestContentAlreadyCurrentOpensNothing(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		force bool
+		pr    *gh.PullRequest
+	}{
+		{name: "force, no recorded PR", force: true},
+		{name: "force, merged PR", force: true, pr: &gh.PullRequest{Number: 7, State: "closed", Merged: true}},
+		{name: "closed PR, no force", pr: &gh.PullRequest{Number: 7, State: "closed"}},
+		{name: "closed PR, force", force: true, pr: &gh.PullRequest{Number: 7, State: "closed"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repoSvc := newMockRepoService()
+			prSvc := newMockPRService()
+			repoSvc.repos["testorg"] = []*gh.Repository{
+				{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+			}
+			repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+			rendered := []byte("# Hello testorg")
+			repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = rendered
+			stateJSON := `{"repositories": {}}`
+			if tc.pr != nil {
+				tc.pr.Head = "steerspec-sync/claude-md/1.0.0"
+				prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{tc.pr}
+				stateJSON = `{"repositories": {"testorg/repo-a": {"claude-md": {"version": "1.0.0", "hash": "` +
+					hash.HashBytes(rendered) + `", "pr_number": 7, "pr_status": "open"}}}}`
+			}
+			repoSvc.files["testorg/central/.steerspec/deployment-state.json/"] = []byte(stateJSON)
+
+			syncer := New(makeTestConfig(), &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central")
+			result, err := syncer.Run(context.Background(), Options{Trigger: "manual", Force: tc.force})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.PRsCreated != 0 || result.PRsUpdated != 0 || result.Errors != 0 || len(prSvc.created) != 0 {
+				t.Fatalf("a current repo must open nothing, got %+v created=%d", result, len(prSvc.created))
+			}
+			if rr := result.RepoResults[0]; rr.Status != "skipped" || rr.Error != "" {
+				t.Errorf("expected a plain skip, got %+v", rr)
+			}
+			for _, f := range repoSvc.createdFiles {
+				if strings.Contains(f, "repo-a") {
+					t.Errorf("nothing may be written to the target, wrote %v", repoSvc.createdFiles)
+				}
+			}
+			ts := syncer.state.GetTemplateState("testorg/repo-a", "claude-md")
+			if ts == nil || ts.Hash != hash.HashBytes(rendered) || ts.Version != "1.0.0" {
+				t.Errorf("state must record the current version and hash, got %+v", ts)
+			}
+		})
+	}
+}
+
+// GH #94: a missing destination is not "current" just because the template renders to nothing.
+func TestMissingDestinationIsNotCurrentForEmptyTemplate(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte{}
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.PRsCreated != 1 || result.Errors != 0 {
+		t.Fatalf("a missing file must get a PR even for an empty template, got %+v", result)
 	}
 }
 
