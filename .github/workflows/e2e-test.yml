@@ -1,0 +1,110 @@
+name: E2E (testbed-multi-org)
+
+# Manual-only: this suite WRITES to a real GitHub org (testbed-multi-org). It opens and closes PRs, creates and
+# deletes steerspec-sync/e2e-<run_id>-* branches, commits to default branches through the Contents API (drift
+# injection, state file) and opens/closes drift and conflict issues. Never run it on push, PR or schedule.
+#
+# Repos touched (all in testbed-multi-org): strspc-e2e-central (templates, config, state), targets
+# strspc-e2e-public, strspc-e2e-private, strspc-e2e-src, strspc-e2e-symlink and strspc-e2e-develop.
+#
+# STEERSPEC_APP_ID / STEERSPEC_PRIVATE_KEY are the credentials of the SteerSpec GitHub App with write access to those
+# repos. They must be scoped to this repository only and are passed through env, never echoed. The checked-out ref's
+# tests run with those secrets, so the job targets the `e2e-testbed` environment: configure it with required
+# reviewers (and restrict dispatch to people allowed to approve), so a ref is reviewed before the secrets are released.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: git ref of strspc-sync to build and test
+        type: string
+        default: main
+      keep:
+        description: skip cleanup for debugging (leaves PRs, branches and issues in the testbed)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One run at a time against the shared testbed; queue rather than cancel so a running test can finish its cleanup.
+concurrency:
+  group: e2e-testbed
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    # Tests 25m + cleanup up to 10m + checkout, setup and build.
+    timeout-minutes: 45
+    # The checked-out ref's tests run with the App key. The environment's required reviewers are the trust gate: the
+    # job (and so the secrets) starts only after a reviewer has looked at the ref being run.
+    environment: e2e-testbed
+    # The App credentials are set only on the test and cleanup steps below, not here, so checkout, setup-go and the
+    # build of the dispatched ref never see them.
+    env:
+      E2E_ORG: testbed-multi-org
+      E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      # Read by the harness so in-test cleanup also leaves the run in place for debugging.
+      E2E_KEEP: ${{ inputs.keep }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build strspc
+        run: |
+          set -euo pipefail
+          # The runner context is unavailable in job-level env, so export the path for the later steps here.
+          echo "STRSPC_BIN=$RUNNER_TEMP/strspc" >> "$GITHUB_ENV"
+          go build -o "$RUNNER_TEMP/strspc" ./cmd/strspc
+          "$RUNNER_TEMP/strspc" version
+
+      - name: Run e2e tests
+        id: e2e
+        env:
+          STEERSPEC_APP_ID: ${{ secrets.STEERSPEC_APP_ID }}
+          STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          # An unset secret or one outside this repo's scope expands to an empty string, which would make the harness
+          # skip every test and let the run pass without touching GitHub.
+          : "${STEERSPEC_APP_ID:?STEERSPEC_APP_ID is empty: check the secret and its repository scope}"
+          : "${STEERSPEC_PRIVATE_KEY:?STEERSPEC_PRIVATE_KEY is empty: check the secret and its repository scope}"
+          go test -tags e2e -count=1 -timeout 25m -v ./tests/e2e/...
+
+      # Safety net for runs that were cancelled, timed out or panicked before t.Cleanup ran. Prefix-scoped to this
+      # run id, so it never touches other runs or the recorded manual-run repos.
+      - name: Cleanup testbed
+        if: always() && !inputs.keep
+        timeout-minutes: 10
+        env:
+          STEERSPEC_APP_ID: ${{ secrets.STEERSPEC_APP_ID }}
+          STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
+          # TestCleanupRun skips unless this is set, so it never runs inside the scenario suite above.
+          E2E_CLEANUP_ONLY: 'true'
+        run: |
+          set -euo pipefail
+          go test -tags e2e -count=1 -run '^TestCleanupRun$' ./tests/e2e/...
+
+      - name: Job summary
+        if: always()
+        env:
+          REF: ${{ inputs.ref }}
+          KEEP: ${{ inputs.keep }}
+          RESULT: ${{ steps.e2e.outcome }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### E2E (testbed-multi-org)"
+            echo
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| ref | \`${REF}\` |"
+            echo "| run id | ${E2E_RUN_ID} |"
+            echo "| result | ${RESULT} |"
+            echo "| cleanup skipped | ${KEEP} |"
+          } >> "$GITHUB_STEP_SUMMARY"

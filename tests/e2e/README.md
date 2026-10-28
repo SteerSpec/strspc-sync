@@ -1,4 +1,107 @@
-# End-to-end runs
+# End-to-end tests
+
+Two parts: the automated suite (below) and the recorded manual runs that preceded it.
+
+## Automated suite
+
+Go tests behind the `e2e` build tag in `tests/e2e/`. They exec a `strspc` binary built from a
+chosen ref and assert through the real GitHub client against the `testbed-multi-org`
+organization. `go test ./...` never runs them (no tag).
+
+### How to run
+
+Dispatch the `e2e-test.yml` workflow (`workflow_dispatch` only) with a `ref` input: a branch,
+tag or SHA of this repo. The workflow builds `strspc` from that ref, runs
+`go test -tags e2e ./tests/e2e/... -count=1`, and always runs a cleanup step. Runs are
+serialized by the `e2e-testbed` concurrency group (`cancel-in-progress: false`). Run it before
+tagging a release.
+
+Required secrets, org-level, with `strspc-sync` in their repository scope:
+
+- `STEERSPEC_APP_ID`
+- `STEERSPEC_PRIVATE_KEY`
+
+The GitHub App installation token is used for sync itself and for injecting drift through the
+Contents API (App commits are signed by GitHub, so they pass the Signed Commit ruleset).
+
+### Testbed repos
+
+| Repo | Visibility | Role |
+|---|---|---|
+| `strspc-e2e-central` | internal | Templates, config and deployment state. Sync PRs never target it. |
+| `strspc-e2e-public` | public | Target; gets the central source for `sync-visibility`. |
+| `strspc-e2e-private` | private | Target; gets the `strspc-e2e-src` source for `sync-visibility`. |
+| `strspc-e2e-src` | private | Second source repo for the `owner/repo:path` form. Not a target. |
+| `strspc-e2e-symlink` | private | Target whose `CLAUDE.md` is a symlink, seeded once by a signed commit (#82). |
+| `strspc-e2e-develop` | private | Target whose default branch is `develop`. |
+
+### Fixtures
+
+`tests/e2e/fixtures/` holds the files seeded into the testbed:
+
+| File | Seed into |
+|---|---|
+| `steerspec-sync.yml` | `strspc-e2e-central` (the harness copies it per run) |
+| `templates/basic.mustache` | `strspc-e2e-central:templates/basic.mustache` |
+| `templates/visibility.public.mustache` | `strspc-e2e-central:templates/visibility.public.mustache` |
+| `src-repo/templates/visibility.private.mustache` | `strspc-e2e-src:templates/visibility.private.mustache` |
+
+The fixture config uses short stable template ids: `sync-basic` (destination `CLAUDE.md`,
+mustache, every target) and `sync-visibility` (destination `.steerspec-e2e/visibility.md`,
+source fallback plus `sources:` for `public` and `private`). When the harness copies the config
+it rewrites every `id:` to `e2e-<run_id>-<id>`, so the PR branches are
+`steerspec-sync/e2e-<run_id>-sync-basic/1.0.0` and so on. Tests must use the rewritten ids.
+
+Variables the templates read: global `org_name`, `e2e_marker`; per template `template_name`.
+Rendered content is distinguishable: `BASIC-SOURCE` (basic), `PUBLIC-SOURCE` (central
+visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
+
+### One-time setup (Wave 0, repo owner)
+
+1. Create the repos in the table above with the stated visibility, each with an initial commit
+   on its default branch.
+2. Set the default branch of `strspc-e2e-develop` to `develop`.
+3. In `strspc-e2e-symlink`, commit `CLAUDE.md` as a symlink (git mode `120000`, any target such
+   as `AGENTS.md`, which must also exist) with a signed `git commit` and push it. The Contents
+   API cannot create symlinks.
+4. Seed the fixture files from the table above into `strspc-e2e-central` and `strspc-e2e-src`.
+5. Install the SteerSpec App on all testbed repos, and add it as a bypass actor of the ruleset
+   on `strspc-e2e-central` `main`, so sync can commit its deployment state.
+6. Add `strspc-sync` to the repository scope of the `STEERSPEC_APP_ID` and
+   `STEERSPEC_PRIVATE_KEY` org secrets.
+7. Create the `e2e-testbed` environment in `strspc-sync` (Settings, Environments) with required
+   reviewers. The workflow runs the dispatched ref's tests with the App key, so the reviewer
+   approving the run is the trust boundary; do not remove the protection rule.
+
+### Isolation and cleanup
+
+- Each run rewrites template ids to `e2e-<run_id>-*` and `harness.New` resets the state file, so
+  runs and the earlier recorded runs on `strspc-central` / `strspc-test-repo-*` cannot collide.
+- Files a scenario changes through `WriteFile`, `PutFile` or `DeleteFile` are snapshotted first
+  and restored by cleanup. A process killed mid-run cannot restore them (the baseline lives in
+  memory), so each scenario starts by `ResetFile`-ing every file it depends on.
+- Cleanup runs in `t.Cleanup` and in an `if: always()` workflow step (`TestCleanupRun`, enabled
+  only by `E2E_CLEANUP_ONLY=true`): restore changed files, reset the deployment state file to
+  empty (the central repo is dedicated to the suite, so empty is its baseline, and this also works
+  in the cleanup-only process), close PRs, delete `steerspec-sync/e2e-<run_id>-*` branches, close
+  open issues that mention the run's template ids or carry the `steerspec-drift` /
+  `steerspec-conflict` label (conflict issues are titled by type and path, so they carry no run
+  marker; runs are serialized, so any such open issue is a leftover). After a green run the testbed
+  has no open PRs or issues and no `e2e-*` branches.
+
+### Scenarios
+
+- Sync: a forced sync opens one PR per target with branch `steerspec-sync/<id>/<version>`,
+  expected file content and PR body; deployment state is committed; a rerun opens nothing (#94);
+  a closed-unmerged PR is reported (#91); a no-op rerun writes no state commit (#100).
+- Monitor: drift injected through the App Contents API gives one issue; a rerun adds none
+  (fingerprint); reverting the drift closes it.
+- Conflict: tier 1 and tier 2 conflict issues open and auto-close.
+- Edge cases: the symlinked `CLAUDE.md` is skipped with a reason (#82); `develop` default
+  branch is honored; per-visibility sources (#80): public targets get the central source,
+  private targets get `strspc-e2e-src`, and only the private PR links it.
+
+## Recorded manual runs
 
 Recorded runs of the released action against the `testbed-multi-org` organization.
 The central repo is `testbed-multi-org/strspc-central` (`auth.method: github-app`,

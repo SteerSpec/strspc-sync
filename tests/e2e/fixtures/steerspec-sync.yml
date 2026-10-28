@@ -1,0 +1,47 @@
+# E2E testbed config for testbed-multi-org. The harness copies this file, rewrites
+# every template `id:` to e2e-<run_id>-<id>, and resets the state file before a run.
+version: "1.0.0"
+
+central-repo: testbed-multi-org/strspc-e2e-central
+
+auth:
+  method: github-app
+
+variables:
+  org_name: testbed-multi-org
+  e2e_marker: strspc-e2e
+
+templates:
+  # One source for every target.
+  - id: sync-basic
+    version: "1.0.0"
+    type: claude-md
+    strategy: mustache
+    source: templates/basic.mustache
+    destination: CLAUDE.md
+    variables:
+      template_name: sync-basic
+
+  # Source depends on the target's visibility (#80). Public targets get the central
+  # fallback via sources.public, private targets get the second source repo.
+  - id: sync-visibility
+    version: "1.0.0"
+    type: custom
+    strategy: mustache
+    source: templates/visibility.public.mustache
+    sources:
+      public: templates/visibility.public.mustache
+      private: testbed-multi-org/strspc-e2e-src:templates/visibility.private.mustache
+    destination: .steerspec-e2e/visibility.md
+    variables:
+      template_name: sync-visibility
+
+targets:
+  include:
+    - testbed-multi-org/strspc-e2e-public
+    - testbed-multi-org/strspc-e2e-private
+    - testbed-multi-org/strspc-e2e-symlink
+    - testbed-multi-org/strspc-e2e-develop
+
+sync:
+  concurrency: 2
