@@ -73,7 +73,8 @@ func TestSyncSkipsSymlinkedClaudeMd(t *testing.T) {
 		t.Errorf("PRsCreated=%d PRsUpdated=%d, want 0/0", res.Sync.PRsCreated, res.Sync.PRsUpdated)
 	}
 
-	if prs := env.PRsWithPrefixState(t, repo, "all", "steerspec-sync/"); len(prs) != 0 {
+	// Only this test's own prefix: PRs from other runs or a kept run (keep=true) are not this sync's doing.
+	if prs := env.PRsWithPrefixState(t, repo, "all", env.BranchPrefix()); len(prs) != 0 {
 		t.Errorf("%d sync PRs in %s, want none: %+v", len(prs), repo, prs)
 	}
 	if branchExists(t, env, repo, branchFor(env)) {
