@@ -22,6 +22,9 @@ func RunConfig(path, runID, org string) ([]byte, error) {
 		return nil, fmt.Errorf("loading fixture config: %w", err)
 	}
 	cfg.CentralRepo = strings.ReplaceAll(cfg.CentralRepo, DefaultOrg+"/", org+"/")
+	if cfg.Variables["org_name"] == DefaultOrg {
+		cfg.Variables["org_name"] = org // the templates render {{org_name}}
+	}
 	for i := range cfg.Targets.Include {
 		cfg.Targets.Include[i] = strings.ReplaceAll(cfg.Targets.Include[i], DefaultOrg+"/", org+"/")
 	}

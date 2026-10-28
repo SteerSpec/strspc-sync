@@ -28,6 +28,9 @@ func TestRunConfigRewritesFixture(t *testing.T) {
 	if cfg.CentralRepo != "other-org/strspc-e2e-central" {
 		t.Errorf("central repo = %q", cfg.CentralRepo)
 	}
+	if cfg.Variables["org_name"] != "other-org" {
+		t.Errorf("org_name = %q, want other-org", cfg.Variables["org_name"])
+	}
 	for _, inc := range cfg.Targets.Include {
 		if !strings.HasPrefix(inc, "other-org/") {
 			t.Errorf("include %q not rewritten", inc)
