@@ -72,6 +72,9 @@ type Syncer struct {
 	stateMu      gosync.Mutex
 	state        *state.DeploymentState
 	stateSHA     string // SHA of the state file for updates
+	// stateLoaded fingerprints the state as read from the central repo. It is
+	// empty when no state was read, so a first run always writes (GH #100).
+	stateLoaded string
 }
 
 // repoListerAdapter adapts gh.RepoService to registry.RepoLister.
@@ -168,6 +171,9 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 		sslog.L().Warn("could not load deployment state, starting fresh",
 			"operation", "sync", "err", err)
 		s.state = state.NewDeploymentState()
+		s.stateLoaded = ""
+	} else if fp, ferr := s.state.Fingerprint(); ferr == nil {
+		s.stateLoaded = fp
 	}
 
 	// Filter templates
@@ -578,6 +584,14 @@ func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string,
 }
 
 func (s *Syncer) saveState(ctx context.Context) error {
+	// Save restamps updated_at, so an unchanged state would still differ from
+	// the stored file and add a commit to the central repo on every run.
+	if s.stateLoaded != "" {
+		if fp, err := s.state.Fingerprint(); err == nil && fp == s.stateLoaded {
+			sslog.L().Debug("deployment state unchanged, not committing", "operation", "sync")
+			return nil
+		}
+	}
 	data, err := s.state.Save()
 	if err != nil {
 		return fmt.Errorf("serializing state: %w", err)

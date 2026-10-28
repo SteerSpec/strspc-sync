@@ -45,6 +45,17 @@ func Load(data []byte) (*DeploymentState, error) {
 	return &ds, nil
 }
 
+// Fingerprint identifies the recorded deployments. It ignores UpdatedAt, which
+// Save restamps on every call, so equal fingerprints mean nothing was recorded
+// in between.
+func (ds *DeploymentState) Fingerprint() (string, error) {
+	data, err := json.Marshal(ds.Repositories)
+	if err != nil {
+		return "", fmt.Errorf("fingerprinting state: %w", err)
+	}
+	return hash.HashBytes(data), nil
+}
+
 func (ds *DeploymentState) Save() ([]byte, error) {
 	ds.UpdatedAt = time.Now()
 	ds.Hash = ds.computeHash()
