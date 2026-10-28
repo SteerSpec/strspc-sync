@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -64,9 +65,34 @@ type Env struct {
 func New(t *testing.T) *Env {
 	t.Helper()
 	e := newEnv(t)
+	// Each test gets its own template-id prefix (e2e-<run>-<test>-), so closed PRs and branches left by one scenario
+	// never show up in another's listings. It still starts with the run prefix, which TestCleanupRun sweeps.
+	e.RunID += "-" + testSlug(t.Name())
+	var err error
+	if e.ConfigPath, err = e.writeRunConfig(t.TempDir()); err != nil {
+		t.Fatalf("harness.New: %v", err)
+	}
 	t.Cleanup(func() { e.Cleanup(t) })
 	e.ResetState(t)
 	return e
+}
+
+// testSlug turns a test name into a short, branch-safe suffix: "TestSyncForcedOpensPRs" becomes "syncforcedopensprs".
+func testSlug(name string) string {
+	name = strings.TrimPrefix(name, "Test")
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('-')
+		}
+	}
+	s := b.String()
+	if len(s) > 40 {
+		s = s[:40]
+	}
+	return strings.Trim(s, "-")
 }
 
 // CleanupRun removes everything the run left behind without registering anything else. A workflow step runs it as
@@ -85,10 +111,6 @@ func newEnv(t *testing.T) *Env {
 		t.Skip("STEERSPEC_APP_ID / STEERSPEC_PRIVATE_KEY not set; skipping e2e")
 	}
 	e, err := buildEnv(t.Context(), appID, key)
-	if err != nil {
-		t.Fatalf("harness.New: %v", err)
-	}
-	e.ConfigPath, err = e.writeRunConfig(t.TempDir())
 	if err != nil {
 		t.Fatalf("harness.New: %v", err)
 	}

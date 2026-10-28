@@ -75,7 +75,9 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
 
 ### Isolation and cleanup
 
-- Each run rewrites template ids to `e2e-<run_id>-*` and `harness.New` resets the state file, so
+- Each test rewrites template ids to `e2e-<run_id>-<test>-*` (so a PR one scenario closes never
+  shows up in another's listings, while `TestCleanupRun` still sweeps the whole `e2e-<run_id>-`
+  prefix) and `harness.New` resets the state file, so
   runs and the earlier recorded runs on `strspc-central` / `strspc-test-repo-*` cannot collide.
 - Files a scenario changes through `WriteFile`, `PutFile` or `DeleteFile` are snapshotted first
   and restored by cleanup. A process killed mid-run cannot restore them (the baseline lives in
