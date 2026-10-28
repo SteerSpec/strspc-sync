@@ -81,9 +81,13 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
   and restored by cleanup. A process killed mid-run cannot restore them (the baseline lives in
   memory), so each scenario starts by `ResetFile`-ing every file it depends on.
 - Cleanup runs in `t.Cleanup` and in an `if: always()` workflow step (`TestCleanupRun`, enabled
-  only by `E2E_CLEANUP_ONLY=true`): restore changed files, close PRs, delete
-  `steerspec-sync/e2e-<run_id>-*` branches, close drift and conflict issues. After a green run
-  the testbed has no open PRs or issues and no `e2e-*` branches.
+  only by `E2E_CLEANUP_ONLY=true`): restore changed files, reset the deployment state file to
+  empty (the central repo is dedicated to the suite, so empty is its baseline, and this also works
+  in the cleanup-only process), close PRs, delete `steerspec-sync/e2e-<run_id>-*` branches, close
+  open issues that mention the run's template ids or carry the `steerspec-drift` /
+  `steerspec-conflict` label (conflict issues are titled by type and path, so they carry no run
+  marker; runs are serialized, so any such open issue is a leftover). After a green run the testbed
+  has no open PRs or issues and no `e2e-*` branches.
 
 ### Scenarios
 

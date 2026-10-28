@@ -10,9 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	gh "github.com/SteerSpec/strspc-sync/internal/github"
 )
 
 const cleanupTimeout = 5 * time.Minute
@@ -39,6 +42,11 @@ func (e *Env) Cleanup(t *testing.T) {
 func CleanupAll(ctx context.Context, e *Env) error {
 	var errs []error
 	if err := e.restoreBaselines(ctx); err != nil {
+		errs = append(errs, err)
+	}
+	// strspc-e2e-central is dedicated to the suite, so its baseline state is empty; resetting also works in the
+	// cleanup-only process, which has no in-memory snapshot.
+	if err := e.resetFile(ctx, RepoCentral, StatePath, []byte(EmptyState)); err != nil {
 		errs = append(errs, err)
 	}
 	for _, repo := range append([]string{RepoCentral}, TargetRepos...) {
@@ -79,7 +87,7 @@ func (e *Env) cleanupRepo(ctx context.Context, repo string) error {
 	}
 	marker := templateID(e.RunID, "")
 	for _, is := range issues {
-		if !strings.Contains(is.Title, marker) && !strings.Contains(is.Body, marker) {
+		if !ownedByRun(is, marker) {
 			continue
 		}
 		if err := e.Client.Issues.Close(ctx, e.Org, repo, is.Number); err != nil {
@@ -87,6 +95,25 @@ func (e *Env) cleanupRepo(ctx context.Context, repo string) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// runIssueLabels are the labels strspc gives drift and conflict issues. Conflict issues are titled by conflict type and
+// path, not by template id, so they carry no run marker; in the dedicated, serialized testbed any open issue with one
+// of these labels is a leftover of a test run.
+var runIssueLabels = []string{"steerspec-drift", "steerspec-conflict"}
+
+// ownedByRun reports whether cleanup should close is: it mentions the run's template prefix, or carries a drift or
+// conflict label.
+func ownedByRun(is *gh.Issue, marker string) bool {
+	if strings.Contains(is.Title, marker) || strings.Contains(is.Body, marker) {
+		return true
+	}
+	for _, l := range is.Labels {
+		if slices.Contains(runIssueLabels, l) {
+			return true
+		}
+	}
+	return false
 }
 
 // branchesWithPrefix lists branch names in repo starting with prefix.
