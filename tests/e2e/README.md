@@ -22,7 +22,10 @@ Required secrets, org-level, with `strspc-sync` in their repository scope:
 - `STEERSPEC_PRIVATE_KEY`
 
 The GitHub App installation token is used for sync itself and for injecting drift through the
-Contents API (App commits are signed by GitHub, so they pass the Signed Commit ruleset).
+Contents API (App commits are signed by GitHub, so they pass the Signed Commit ruleset). The
+exception is the Contents API `DELETE`: its App commits are not signed and the ruleset rejects
+them with a 409, so the harness deletes files with the GraphQL `createCommitOnBranch` mutation,
+whose commits are signed. A new testbed should be smoke-tested for a write and a delete.
 
 ### Testbed repos
 

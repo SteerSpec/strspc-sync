@@ -174,22 +174,62 @@ func (e *Env) DeleteFile(t *testing.T, repo, path string) {
 	}
 }
 
+// createCommitOnBranch is used for deletions because the App's Contents API DELETE commit is not signed and the
+// enterprise Signed Commit ruleset rejects it, while PUT commits and this mutation's commits are signed by GitHub.
+const createCommitOnBranch = `mutation($input: CreateCommitOnBranchInput!) {
+  createCommitOnBranch(input: $input) { commit { oid } }
+}`
+
 func (e *Env) deleteFile(ctx context.Context, repo, path string) error {
-	_, sha, err := e.GetFile(ctx, repo, path, "")
+	_, _, err := e.GetFile(ctx, repo, path, "")
 	if IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	status, body, err := e.api(ctx, http.MethodDelete,
-		"/repos/"+url.PathEscape(e.Org)+"/"+url.PathEscape(repo)+"/contents/"+escapePath(path),
-		map[string]string{"message": "test(e2e): delete " + path + " [" + e.RunID + "]", "sha": sha})
+	branch, err := e.Client.Repos.GetDefaultBranch(ctx, e.Org, repo)
+	if err != nil {
+		return fmt.Errorf("default branch of %s: %w", repo, err)
+	}
+	head, err := e.Client.Repos.GetBranchSHA(ctx, e.Org, repo, branch)
+	if err != nil {
+		return fmt.Errorf("head of %s/%s: %w", repo, branch, err)
+	}
+	status, body, err := e.api(ctx, http.MethodPost, "/graphql", map[string]any{
+		"query": createCommitOnBranch,
+		"variables": map[string]any{"input": map[string]any{
+			"branch":          map[string]string{"repositoryNameWithOwner": e.Org + "/" + repo, "branchName": branch},
+			"message":         map[string]string{"headline": "test(e2e): delete " + path + " [" + e.RunID + "]"},
+			"expectedHeadOid": head,
+			"fileChanges":     map[string]any{"deletions": []map[string]string{{"path": path}}},
+		}},
+	})
 	if err != nil {
 		return err
 	}
 	if status != http.StatusOK {
 		return fmt.Errorf("deleting %s/%s: status %d: %s", repo, path, status, body)
+	}
+	return graphqlError(fmt.Sprintf("deleting %s/%s", repo, path), body)
+}
+
+// graphqlError turns a 200 response that carries GraphQL errors into an error; op names the operation.
+func graphqlError(op string, body []byte) error {
+	var resp struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("%s: decoding GraphQL response: %w", op, err)
+	}
+	if len(resp.Errors) > 0 {
+		msgs := make([]string, len(resp.Errors))
+		for i, e := range resp.Errors {
+			msgs[i] = e.Message
+		}
+		return fmt.Errorf("%s: %s", op, strings.Join(msgs, "; "))
 	}
 	return nil
 }
