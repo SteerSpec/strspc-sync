@@ -4,7 +4,7 @@
 # Rule sources — where to fetch rules from
 rules:
   # Core rules from the SteerSpec specification
-  - source: github://SteerSpec/strspc-rules@v1.8.0/rules/core
+  - source: github://SteerSpec/strspc-rules@v1.9.0/rules/core
     scope: global
 
   # This repository's own rules (dev.steerspec.sync realm). They govern the
