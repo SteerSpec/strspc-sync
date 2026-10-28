@@ -25,9 +25,11 @@ func poll(timeout, interval time.Duration, fn func() bool) bool {
 		if fn() {
 			return true
 		}
-		if !time.Now().Add(interval).Before(deadline) {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
 			return false
 		}
-		time.Sleep(interval)
+		// Shorten the last sleep so fn is probed once more right at the deadline.
+		time.Sleep(min(interval, remaining))
 	}
 }

@@ -145,9 +145,35 @@ func (e *Env) deleteBranch(ctx context.Context, repo, branch string) error {
 	if err != nil {
 		return fmt.Errorf("deleting branch %s: %w", branch, err)
 	}
-	// 422 means the ref is already gone.
-	if status != http.StatusNoContent && status != http.StatusUnprocessableEntity && status != http.StatusNotFound {
-		return fmt.Errorf("deleting branch %s: status %d: %s", branch, status, body)
+	switch status {
+	case http.StatusNoContent, http.StatusNotFound:
+		return nil
+	case http.StatusUnprocessableEntity:
+		// 422 also covers validation failures such as a protected branch, so only treat it as success once the ref
+		// is confirmed gone.
+		gone, err := e.branchGone(ctx, repo, branch)
+		if err != nil {
+			return fmt.Errorf("deleting branch %s: status 422: %s; checking the ref: %w", branch, body, err)
+		}
+		if gone {
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("deleting branch %s: status %d: %s", branch, status, body)
+}
+
+// branchGone reports whether refs/heads/<branch> no longer exists in repo.
+func (e *Env) branchGone(ctx context.Context, repo, branch string) (bool, error) {
+	path := "/repos/" + url.PathEscape(e.Org) + "/" + url.PathEscape(repo) + "/git/ref/heads/" + escapePath(branch)
+	status, body, err := e.api(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return false, err
+	}
+	switch status {
+	case http.StatusNotFound:
+		return true, nil
+	case http.StatusOK:
+		return false, nil
+	}
+	return false, fmt.Errorf("status %d: %s", status, body)
 }

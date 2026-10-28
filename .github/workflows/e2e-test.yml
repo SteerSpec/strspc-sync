@@ -70,6 +70,10 @@ jobs:
           STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
         run: |
           set -euo pipefail
+          # An unset secret or one outside this repo's scope expands to an empty string, which would make the harness
+          # skip every test and let the run pass without touching GitHub.
+          : "${STEERSPEC_APP_ID:?STEERSPEC_APP_ID is empty: check the secret and its repository scope}"
+          : "${STEERSPEC_PRIVATE_KEY:?STEERSPEC_PRIVATE_KEY is empty: check the secret and its repository scope}"
           go test -tags e2e -count=1 -timeout 25m -v ./tests/e2e/...
 
       # Safety net for runs that were cancelled, timed out or panicked before t.Cleanup ran. Prefix-scoped to this
