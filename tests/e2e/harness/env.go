@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,6 +48,9 @@ type Env struct {
 	ConfigPath string // E2E_CONFIG, default <repo root>/tests/e2e/fixtures/steerspec-sync.yml
 	Client     *gh.Client
 
+	mu        sync.Mutex
+	baselines map[string]baseline // files changed by this run, restored by Cleanup
+
 	appID      string
 	privateKey string
 	baseURL    string
@@ -55,11 +59,13 @@ type Env struct {
 }
 
 // New builds the Env for t. It skips the test when STEERSPEC_APP_ID or STEERSPEC_PRIVATE_KEY is unset, fails it when
-// the App token cannot be minted, and registers Cleanup to run when t finishes.
+// the App token cannot be minted, registers Cleanup to run when t finishes, and resets the deployment state so the
+// scenario starts clean. CleanupRun does not reset anything.
 func New(t *testing.T) *Env {
 	t.Helper()
 	e := newEnv(t)
 	t.Cleanup(func() { e.Cleanup(t) })
+	e.ResetState(t)
 	return e
 }
 

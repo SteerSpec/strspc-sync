@@ -69,14 +69,21 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
    on `strspc-e2e-central` `main`, so sync can commit its deployment state.
 6. Add `strspc-sync` to the repository scope of the `STEERSPEC_APP_ID` and
    `STEERSPEC_PRIVATE_KEY` org secrets.
+7. Create the `e2e-testbed` environment in `strspc-sync` (Settings, Environments) with required
+   reviewers. The workflow runs the dispatched ref's tests with the App key, so the reviewer
+   approving the run is the trust boundary; do not remove the protection rule.
 
 ### Isolation and cleanup
 
-- Each run rewrites template ids to `e2e-<run_id>-*` and resets the state file first, so runs
-  and the earlier recorded runs on `strspc-central` / `strspc-test-repo-*` cannot collide.
-- Cleanup runs in `t.Cleanup` and in an `if: always()` workflow step: close PRs, delete
-  `steerspec-sync/e2e-<run_id>-*` branches, close drift and conflict issues, reset managed
-  files. After a green run the testbed has no open PRs or issues and no `e2e-*` branches.
+- Each run rewrites template ids to `e2e-<run_id>-*` and `harness.New` resets the state file, so
+  runs and the earlier recorded runs on `strspc-central` / `strspc-test-repo-*` cannot collide.
+- Files a scenario changes through `WriteFile`, `PutFile` or `DeleteFile` are snapshotted first
+  and restored by cleanup. A process killed mid-run cannot restore them (the baseline lives in
+  memory), so each scenario starts by `ResetFile`-ing every file it depends on.
+- Cleanup runs in `t.Cleanup` and in an `if: always()` workflow step (`TestCleanupRun`, enabled
+  only by `E2E_CLEANUP_ONLY=true`): restore changed files, close PRs, delete
+  `steerspec-sync/e2e-<run_id>-*` branches, close drift and conflict issues. After a green run
+  the testbed has no open PRs or issues and no `e2e-*` branches.
 
 ### Scenarios
 

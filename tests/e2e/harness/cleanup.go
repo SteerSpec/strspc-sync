@@ -32,11 +32,15 @@ func (e *Env) Cleanup(t *testing.T) {
 	}
 }
 
-// CleanupAll closes the open pull requests whose head branch starts with steerspec-sync/e2e-<RunID>-, deletes those
+// CleanupAll first restores every file this Env changed to its pre-run content (or removes it if it did not exist),
+// then closes the open pull requests whose head branch starts with steerspec-sync/e2e-<RunID>-, deletes those
 // branches, and closes the open issues mentioning the run's template prefix (e2e-<RunID>-) in the title or body,
 // across the central repo and all target repos. It keeps going after a failure and returns the joined errors.
 func CleanupAll(ctx context.Context, e *Env) error {
 	var errs []error
+	if err := e.restoreBaselines(ctx); err != nil {
+		errs = append(errs, err)
+	}
 	for _, repo := range append([]string{RepoCentral}, TargetRepos...) {
 		if err := e.cleanupRepo(ctx, repo); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", repo, err))

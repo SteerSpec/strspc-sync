@@ -113,6 +113,9 @@ func (e *Env) FileExists(t *testing.T, repo, path string) bool {
 
 // PutFile creates or updates path on the default branch, looking up the current sha when the file exists.
 func (e *Env) PutFile(ctx context.Context, repo, path string, content []byte, message string) error {
+	if err := e.snapshot(ctx, repo, path); err != nil {
+		return err
+	}
 	_, sha, err := e.GetFile(ctx, repo, path, "")
 	if err != nil && !IsNotFound(err) {
 		return err
@@ -163,20 +166,79 @@ func (e *Env) DeleteFile(t *testing.T, repo, path string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), opTimeout)
 	defer cancel()
+	if err := e.snapshot(ctx, repo, path); err != nil {
+		t.Fatalf("DeleteFile: %v", err)
+	}
+	if err := e.deleteFile(ctx, repo, path); err != nil {
+		t.Fatalf("DeleteFile: %v", err)
+	}
+}
+
+func (e *Env) deleteFile(ctx context.Context, repo, path string) error {
 	_, sha, err := e.GetFile(ctx, repo, path, "")
 	if IsNotFound(err) {
-		return
+		return nil
 	}
 	if err != nil {
-		t.Fatalf("DeleteFile: %v", err)
+		return err
 	}
 	status, body, err := e.api(ctx, http.MethodDelete,
 		"/repos/"+url.PathEscape(e.Org)+"/"+url.PathEscape(repo)+"/contents/"+escapePath(path),
 		map[string]string{"message": "test(e2e): delete " + path + " [" + e.RunID + "]", "sha": sha})
 	if err != nil {
-		t.Fatalf("DeleteFile: %v", err)
+		return err
 	}
 	if status != http.StatusOK {
-		t.Fatalf("DeleteFile %s/%s: status %d: %s", repo, path, status, body)
+		return fmt.Errorf("deleting %s/%s: status %d: %s", repo, path, status, body)
 	}
+	return nil
+}
+
+// baseline is how a file looked before this run first changed it.
+type baseline struct {
+	existed bool
+	content []byte
+}
+
+// snapshot records repo/path as it is now, once, so Cleanup can put it back. Files changed by WriteFile, PutFile or
+// DeleteFile are restored when the same Env cleans up; a process killed mid-run cannot restore them, so scenarios
+// start by ResetFile-ing every file they depend on.
+func (e *Env) snapshot(ctx context.Context, repo, path string) error {
+	key := repo + "/" + path
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if _, ok := e.baselines[key]; ok {
+		return nil
+	}
+	content, _, err := e.GetFile(ctx, repo, path, "")
+	if err != nil && !IsNotFound(err) {
+		return err
+	}
+	if e.baselines == nil {
+		e.baselines = make(map[string]baseline)
+	}
+	e.baselines[key] = baseline{existed: err == nil, content: content}
+	return nil
+}
+
+// restoreBaselines puts every snapshotted file back and forgets it. It keeps going after a failure.
+func (e *Env) restoreBaselines(ctx context.Context) error {
+	e.mu.Lock()
+	snaps := e.baselines
+	e.baselines = nil
+	e.mu.Unlock()
+	var errs []error
+	for key, b := range snaps {
+		repo, path, _ := strings.Cut(key, "/")
+		var err error
+		if b.existed {
+			err = e.resetFile(ctx, repo, path, b.content)
+		} else {
+			err = e.deleteFile(ctx, repo, path)
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("restoring %s: %w", key, err))
+		}
+	}
+	return errors.Join(errs...)
 }
