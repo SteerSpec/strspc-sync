@@ -35,6 +35,16 @@ variables:
 # Every `source` is a path in this repo; every `destination` is the path Claude
 # Code reads in the target repo (CLAUDE.md, .claude/agents/<name>.md,
 # .claude/skills/<name>/SKILL.md, .claude/settings.json).
+#
+# A template may also pick its source by target visibility, so text meant for
+# private repos need not sit in a public central repo. `source` stays the
+# fallback. A value is a path here or `owner/repo:path` in another repo, which
+# the token or App installation must be able to read:
+#
+#   source: templates/CLAUDE.md.mustache
+#   sources:
+#     internal: templates/CLAUDE.internal.mustache
+#     private: acme-corp/steerspec-private:templates/CLAUDE.private.mustache
 templates:
   # The marker strategy replaces the STEERSPEC:BEGIN/END sections it finds in
   # the template, leaving the rest of the target file untouched. Which sections

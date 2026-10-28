@@ -61,6 +61,7 @@ type Repository struct {
 	DefaultBranch string
 	Topics        []string
 	Archived      bool
+	Visibility    string // "public", "internal" or "private"
 }
 
 type PullRequest struct {

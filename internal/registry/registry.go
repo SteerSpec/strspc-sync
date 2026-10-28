@@ -18,6 +18,7 @@ type ResolvedRepo struct {
 	FullName      string // "owner/repo"
 	DefaultBranch string
 	Topics        []string
+	Visibility    string // "public", "internal" or "private"
 }
 
 // RepoLister is the interface needed from the GitHub client.
@@ -30,6 +31,7 @@ type RepoLister interface {
 type ResolvedTarget struct {
 	Repo             string
 	DefaultBranch    string
+	Visibility       string
 	Variables        map[string]string
 	ExcludeTemplates []string
 	IncludeTemplates []string
@@ -147,6 +149,7 @@ func (r *Registry) Resolve(ctx context.Context, targets config.TargetsConfig, gl
 		rt := ResolvedTarget{
 			Repo:          repo.FullName,
 			DefaultBranch: repo.DefaultBranch,
+			Visibility:    repo.Visibility,
 			Variables:     vars,
 			Enabled:       true,
 		}
