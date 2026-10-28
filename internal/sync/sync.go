@@ -637,7 +637,6 @@ func serverURL() string {
 // history there and the diff link points at the source as rendered; the diff
 // of the rendered result is the PR itself.
 func (s *Syncer) prBody(tmpl config.TemplateConfig, src templateSource, previousVersion, contentHash string) string {
-	central := fmt.Sprintf("%s/%s/%s", serverURL(), s.centralOwner, s.centralRepo)
 	previous := "none (first deployment)"
 	if previousVersion != "" {
 		previous = fmt.Sprintf("%#q", previousVersion)
@@ -648,7 +647,7 @@ func (s *Syncer) prBody(tmpl config.TemplateConfig, src templateSource, previous
 	var b strings.Builder
 	b.WriteString("## SteerSpec Sync\n\n")
 	fmt.Fprintf(&b, "Updates %#q from template %#q in [%s/%s](%s).\n\n",
-		tmpl.Destination, tmpl.ID, s.centralOwner, s.centralRepo, central)
+		tmpl.Destination, tmpl.ID, src.owner, src.repo, sourceRepo)
 	b.WriteString("| | |\n|---|---|\n")
 	fmt.Fprintf(&b, "| Previous version | %s |\n", previous)
 	fmt.Fprintf(&b, "| New version | %#q |\n", tmpl.Version)

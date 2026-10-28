@@ -53,6 +53,7 @@ targets:
 		{name: "source and sources", extra: "    source: t/s\n    sources:\n      public: t/pub"},
 		{name: "neither", extra: "", wantErr: "needs source or sources"},
 		{name: "bad visibility", extra: "    source: t/s\n    sources:\n      secret: t/x", wantErr: "must be one of"},
+		{name: "bad fallback ref", extra: "    source: bad:x", wantErr: "owner/repo:path"},
 		{name: "bad repo ref", extra: "    source: t/s\n    sources:\n      private: bad:x", wantErr: "owner/repo:path"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

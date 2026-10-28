@@ -241,6 +241,11 @@ func Validate(cfg *SyncConfig) error {
 		if tmpl.Source == "" && len(tmpl.Sources) == 0 {
 			return fmt.Errorf("templates[%d] needs source or sources", i)
 		}
+		if tmpl.Source != "" {
+			if _, _, err := ParseSource(tmpl.Source); err != nil {
+				return fmt.Errorf("templates[%d].source: %w", i, err)
+			}
+		}
 		for vis, src := range tmpl.Sources {
 			if !validVisibilities[vis] {
 				return fmt.Errorf("templates[%d].sources key %q must be one of: public, internal, private", i, vis)
