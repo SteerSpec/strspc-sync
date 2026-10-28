@@ -82,6 +82,10 @@ func newEnv(t *testing.T) *Env {
 	if err != nil {
 		t.Fatalf("harness.New: %v", err)
 	}
+	e.ConfigPath, err = e.writeRunConfig(t.TempDir())
+	if err != nil {
+		t.Fatalf("harness.New: %v", err)
+	}
 	return e
 }
 

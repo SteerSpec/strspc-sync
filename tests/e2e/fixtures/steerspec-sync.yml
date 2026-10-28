@@ -38,10 +38,10 @@ templates:
 
 targets:
   include:
-    - strspc-e2e-public
-    - strspc-e2e-private
-    - strspc-e2e-symlink
-    - strspc-e2e-develop
+    - testbed-multi-org/strspc-e2e-public
+    - testbed-multi-org/strspc-e2e-private
+    - testbed-multi-org/strspc-e2e-symlink
+    - testbed-multi-org/strspc-e2e-develop
 
 sync:
   concurrency: 2

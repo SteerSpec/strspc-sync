@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,10 @@ const cleanupTimeout = 5 * time.Minute
 // if anything could not be cleaned, and uses its own context so it still works after t's context is cancelled.
 func (e *Env) Cleanup(t *testing.T) {
 	t.Helper()
+	if os.Getenv("E2E_KEEP") == "true" {
+		t.Logf("E2E_KEEP=true: leaving run %s in place", e.RunID)
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), cleanupTimeout)
 	defer cancel()
 	if err := CleanupAll(ctx, e); err != nil {

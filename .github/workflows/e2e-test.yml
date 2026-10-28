@@ -40,6 +40,8 @@ jobs:
       STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
       E2E_ORG: testbed-multi-org
       E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      # Read by the harness so in-test cleanup also leaves the run in place for debugging.
+      E2E_KEEP: ${{ inputs.keep }}
     steps:
       - uses: actions/checkout@v7
         with:
