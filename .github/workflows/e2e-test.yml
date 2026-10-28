@@ -40,9 +40,9 @@ jobs:
     # The checked-out ref's tests run with the App key. The environment's required reviewers are the trust gate: the
     # job (and so the secrets) starts only after a reviewer has looked at the ref being run.
     environment: e2e-testbed
+    # The App credentials are set only on the test and cleanup steps below, not here, so checkout, setup-go and the
+    # build of the dispatched ref never see them.
     env:
-      STEERSPEC_APP_ID: ${{ secrets.STEERSPEC_APP_ID }}
-      STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
       E2E_ORG: testbed-multi-org
       E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
       # Read by the harness so in-test cleanup also leaves the run in place for debugging.
@@ -65,6 +65,9 @@ jobs:
 
       - name: Run e2e tests
         id: e2e
+        env:
+          STEERSPEC_APP_ID: ${{ secrets.STEERSPEC_APP_ID }}
+          STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
         run: |
           set -euo pipefail
           go test -tags e2e -count=1 -timeout 25m -v ./tests/e2e/...
@@ -75,6 +78,8 @@ jobs:
         if: always() && !inputs.keep
         timeout-minutes: 10
         env:
+          STEERSPEC_APP_ID: ${{ secrets.STEERSPEC_APP_ID }}
+          STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
           # TestCleanupRun skips unless this is set, so it never runs inside the scenario suite above.
           E2E_CLEANUP_ONLY: 'true'
         run: |
