@@ -106,6 +106,17 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
   branch is honored; per-visibility sources (#80): public targets get the central source,
   private targets get `strspc-e2e-src`, and only the private PR links it.
 
+### Recorded automated runs
+
+| Run | Ref | Result |
+|---|---|---|
+| [40766051379](https://github.com/SteerSpec/strspc-sync/actions/runs/40766051379) | `main` | First live run: failed. The App's Contents API `DELETE` is unsigned and the enterprise signature rule rejected cleanup, so leftover files made four sync scenarios skip. Fixed by deleting through GraphQL (#108). |
+| [40769125396](https://github.com/SteerSpec/strspc-sync/actions/runs/40769125396) | `fix/e2e-signed-delete` | All 9 scenarios green, testbed clean afterwards. |
+| [40773218378](https://github.com/SteerSpec/strspc-sync/actions/runs/40773218378) | throwaway branch with the in-sync skip (#94) disabled | Mutation check: `TestSyncAlreadyCurrentOpensNothing` went red (a PR was opened for current content), the other 9 stayed green. |
+
+The mutation check is the proof that the suite can fail: after changing sync behavior, break the
+guard under test on a throwaway branch and dispatch against it.
+
 ## Recorded manual runs
 
 Recorded runs of the released action against the `testbed-multi-org` organization.
