@@ -261,6 +261,8 @@ type apiRepo struct {
 	DefaultBranch string                 `json:"default_branch"`
 	Topics        []string               `json:"topics"`
 	Archived      bool                   `json:"archived"`
+	Private       bool                   `json:"private"`
+	Visibility    string                 `json:"visibility"`
 }
 
 func (r *apiRepo) toDomain() *Repository {
@@ -271,7 +273,20 @@ func (r *apiRepo) toDomain() *Repository {
 		DefaultBranch: r.DefaultBranch,
 		Topics:        r.Topics,
 		Archived:      r.Archived,
+		Visibility:    r.visibility(),
 	}
+}
+
+// visibility returns "public", "internal" or "private". The API's visibility
+// field wins; the private flag covers responses that omit it.
+func (r *apiRepo) visibility() string {
+	if r.Visibility != "" {
+		return r.Visibility
+	}
+	if r.Private {
+		return "private"
+	}
+	return "public"
 }
 
 func decodeBody(resp *http.Response, v any) error {

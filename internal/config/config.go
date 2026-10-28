@@ -30,10 +30,14 @@ type AuthConfig struct {
 }
 
 type TemplateConfig struct {
-	ID          string            `yaml:"id"`
-	Version     string            `yaml:"version"`
-	Type        string            `yaml:"type"`
-	Source      string            `yaml:"source"`
+	ID      string `yaml:"id"`
+	Version string `yaml:"version"`
+	Type    string `yaml:"type"`
+	Source  string `yaml:"source"`
+	// Sources picks a source by target visibility (public, internal, private).
+	// A value is a path in the central repo or "owner/repo:path" in another
+	// repo; Source is the fallback for visibilities not listed.
+	Sources     map[string]string `yaml:"sources,omitempty"`
 	Destination string            `yaml:"destination"`
 	Strategy    string            `yaml:"strategy"`
 	Variables   map[string]string `yaml:"variables,omitempty"`
@@ -97,8 +101,25 @@ var (
 	validTemplateTypes = map[string]bool{"claude-md": true, "skill": true, "agent": true, "config": true, "custom": true}
 	validStrategies    = map[string]bool{"mustache": true, "marker": true, "full-replace": true}
 	validConflictTiers = map[int]bool{1: true, 2: true, 3: true}
+	validVisibilities  = map[string]bool{"public": true, "internal": true, "private": true}
 	semverRE           = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+	sourceRepoRE       = regexp.MustCompile(`^([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+):(.+)$`)
 )
+
+// ParseSource splits a template source into its repository ("owner/repo") and
+// path. A bare path has an empty repository and means the central repo.
+func ParseSource(src string) (repo, path string, err error) {
+	if src == "" {
+		return "", "", fmt.Errorf("source must not be empty")
+	}
+	if m := sourceRepoRE.FindStringSubmatch(src); m != nil {
+		return m[1], m[2], nil
+	}
+	if strings.Contains(src, ":") {
+		return "", "", fmt.Errorf("source %q must be a path or owner/repo:path", src)
+	}
+	return "", src, nil
+}
 
 func Load(path string) (*SyncConfig, error) {
 	data, err := os.ReadFile(path)
@@ -215,6 +236,18 @@ func Validate(cfg *SyncConfig) error {
 		}
 		if !semverRE.MatchString(tmpl.Version) {
 			return fmt.Errorf("templates[%d].version %q must be a semver (e.g. \"1.0.0\")", i, tmpl.Version)
+		}
+
+		if tmpl.Source == "" && len(tmpl.Sources) == 0 {
+			return fmt.Errorf("templates[%d] needs source or sources", i)
+		}
+		for vis, src := range tmpl.Sources {
+			if !validVisibilities[vis] {
+				return fmt.Errorf("templates[%d].sources key %q must be one of: public, internal, private", i, vis)
+			}
+			if _, _, err := ParseSource(src); err != nil {
+				return fmt.Errorf("templates[%d].sources.%s: %w", i, vis, err)
+			}
 		}
 
 		if !validTemplateTypes[tmpl.Type] {

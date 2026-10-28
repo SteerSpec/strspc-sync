@@ -1651,7 +1651,7 @@ func TestPRBody_EscapesSourcePath(t *testing.T) {
 		Destination: "CLAUDE.md",
 		Version:     "1.0.0",
 	}
-	body := s.prBody(tmpl, "", "blake3:abc")
+	body := s.prBody(tmpl, templateSource{owner: s.centralOwner, repo: s.centralRepo, path: tmpl.Source}, "", "blake3:abc")
 	for _, want := range []string{
 		"https://github.com/testorg/central/commits/HEAD/templates/Claude%20Guide%231.md%3Fv2",
 		"https://github.com/testorg/central/blob/HEAD/templates/Claude%20Guide%231.md%3Fv2",
