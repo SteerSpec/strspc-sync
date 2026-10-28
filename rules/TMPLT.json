@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.1.0",
-    "timestamp": "2026-10-19T19:40:07Z",
-    "hash": "blake3:22ef700b175eb068cab401b5d5051d714141b16080b2ec484ddf22f864d1ecc7"
+    "version": "0.1.1",
+    "timestamp": "2026-10-28T10:44:12Z",
+    "hash": "blake3:b118878c871411c4e232a21063aed790d6cd46ff4d7a88ccf579b503bcf16f68"
   },
   "rules": [
     {
@@ -40,9 +40,9 @@
     },
     {
       "id": "TMPLT-004",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "HAS a source path relative to the central repository.",
+      "body": "HAS a source path relative to the central repository, or an owner/repo:path reference to another repository, and MAY declare a source per target visibility (public, internal, private) with the plain source as the fallback; a template MUST have at least one.",
       "added_by": "@pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
