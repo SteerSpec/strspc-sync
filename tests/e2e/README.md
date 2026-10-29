@@ -30,7 +30,7 @@ whose commits are signed. A new testbed should be smoke-tested for a write and a
 ### Testbed repos
 
 | Repo | Visibility | Role |
-|---|---|---|
+| --- | --- | --- |
 | `strspc-e2e-central` | internal | Templates, config and deployment state. Sync PRs never target it. |
 | `strspc-e2e-public` | public | Target; gets the central source for `sync-visibility`. |
 | `strspc-e2e-private` | private | Target; gets the `strspc-e2e-src` source for `sync-visibility`. |
@@ -43,7 +43,7 @@ whose commits are signed. A new testbed should be smoke-tested for a write and a
 `tests/e2e/fixtures/` holds the files seeded into the testbed:
 
 | File | Seed into |
-|---|---|
+| --- | --- |
 | `steerspec-sync.yml` | `strspc-e2e-central` (the harness copies it per run) |
 | `templates/basic.mustache` | `strspc-e2e-central:templates/basic.mustache` |
 | `templates/visibility.public.mustache` | `strspc-e2e-central:templates/visibility.public.mustache` |
@@ -109,7 +109,7 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
 ### Recorded automated runs
 
 | Run | Ref | Result |
-|---|---|---|
+| --- | --- | --- |
 | [40766051379](https://github.com/SteerSpec/strspc-sync/actions/runs/40766051379) | `main` | First live run: failed. The App's Contents API `DELETE` is unsigned and the enterprise signature rule rejected cleanup, so leftover files made four sync scenarios skip. Fixed by deleting through GraphQL (#108). |
 | [40769125396](https://github.com/SteerSpec/strspc-sync/actions/runs/40769125396) | `fix/e2e-signed-delete` | All 10 scenarios green, testbed clean afterwards. |
 | [40773218378](https://github.com/SteerSpec/strspc-sync/actions/runs/40773218378) | throwaway branch with the in-sync skip (#94) disabled | Mutation check: `TestSyncAlreadyCurrentOpensNothing` went red (a PR was opened for current content), the other 9 stayed green. |
@@ -131,7 +131,7 @@ pinned to `SteerSpec/strspc-sync/<cmd>@v0.2.1` with `app-id` / `private-key`
 from org secrets.
 
 | Step | Run | Result |
-|---|---|---|
+| --- | --- | --- |
 | Forced sync (`force: true`) with the three sync PRs from 2026-08-21 still open | [39408576963](https://github.com/testbed-multi-org/strspc-central/actions/runs/39408576963) | `prs_updated: 3`, `errors: 0`. PR titles became `chore(steerspec-sync): update claude-md to 1.0.0`, bodies carry previous/new version and content hash. |
 | Re-sync, no force | [39408821143](https://github.com/testbed-multi-org/strspc-central/actions/runs/39408821143) | `repos_skipped: 3`, `errors: 0` |
 | Monitor with the sync PRs still open | [39418427868](https://github.com/testbed-multi-org/strspc-central/actions/runs/39418427868) | `repos_drifted: 3`, `issues_created: 3` in the central repo; repo-3 reported as `(file not found)` because it had no `CLAUDE.md` yet |
