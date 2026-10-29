@@ -54,7 +54,7 @@ Pre-commit framework runs 6 hooks — install with `pip install pre-commit` then
 `pre-commit install`. Hooks are also integrated into beads' `core.hooksPath`.
 
 | Hook | Config |
-|------|--------|
+| --- | --- |
 | actionlint | (default) |
 | golangci-lint v2 | `.golangci.yml` |
 | shellcheck | (default) |

@@ -44,7 +44,7 @@ CI enforces a **70% total coverage threshold**, so new code needs tests to land.
 `pre-commit run --all-files` runs the same six hooks CI does:
 
 | Hook | Config |
-|------|--------|
+| --- | --- |
 | actionlint | (default) |
 | golangci-lint v2 | [`.golangci.yml`](.golangci.yml) |
 | shellcheck | (default) |
