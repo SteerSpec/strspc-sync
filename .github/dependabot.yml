@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Dependabot's default "Bump ..." titles fail the org's conventional-commit checks.
+    commit-message:
+      prefix: "chore(deps)"
     groups:
       actions:
         patterns: ["*"]
