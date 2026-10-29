@@ -112,7 +112,7 @@ jobs:
         with:
           config_file: .yamllint.yml
       - name: markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@v16
+        uses: DavidAnson/markdownlint-cli2-action@v25
         with:
           config: .markdownlint.yml
           globs: |
