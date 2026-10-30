@@ -26,7 +26,7 @@ repos:
     hooks:
       - id: markdownlint
         args: [--config, .markdownlint.yml]
-        exclude: ^(\.beads/|AGENTS\.md)
+        exclude: ^(\.beads/|AGENTS\.md|CHANGELOG\.md)
 
   - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
     rev: 3.2.1
