@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.1.1",
-    "timestamp": "2026-10-24T08:53:25Z",
-    "hash": "blake3:429b75e6bb3fb9bb87ee2602c4949621fdd38c4703a09b122d1d63719a2ff861"
+    "version": "0.1.2",
+    "timestamp": "2026-10-30T10:48:36Z",
+    "hash": "blake3:b529fd44320a6454ab558d9ef495fc340bc5e33005ed359862674f625a05e695"
   },
   "rules": [
     {
@@ -58,9 +58,9 @@
     },
     {
       "id": "SYNCOP-006",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "Produces one or more SyncPullRequests for out-of-date repositories.",
+      "body": "MUST produce one or more SyncPullRequests for out-of-date repositories.",
       "added_by": "@pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
