@@ -23,7 +23,8 @@
           "minLength": 1
         },
         "version": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
         }
       },
       "additionalProperties": false
@@ -35,7 +36,10 @@
         "required": ["realm_id", "version"],
         "properties": {
           "realm_id": { "type": "string" },
-          "version": { "type": "string" },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+          },
           "source": {
             "type": "string",
             "description": "Fetch location for this dependency (e.g. github://owner/repo@version/path)"
@@ -60,8 +64,39 @@
       "description": "Subdirectory names of child Realms (RLM-010). Null or absent if none."
     },
     "rule_identifier_format": {
+      "description": "Overrides of the RLIFRMT defaults (RLMMNFST-004). Every field is optional and falls back to its default. For a top-level Realm, null keeps all defaults; for a sub-realm, null means the parent's format applies (RLM-015). Affects rendering only (RLIFRMT-008).",
       "oneOf": [
-        { "type": "object" },
+        {
+          "type": "object",
+          "properties": {
+            "brackets": {
+              "enum": ["(,)", "{,}", "[,]"],
+              "default": "[,]",
+              "description": "Opening and closing character pair (RLIFRMT-002)."
+            },
+            "euid_position": {
+              "enum": ["opening", "closing"],
+              "default": "opening",
+              "description": "Position of the Entity Unique Identifier (RLIFRMT-003); the Rule Set Unique Number takes the opposing position (RLIFRMT-004)."
+            },
+            "id_splitter": {
+              "enum": ["-", "_"],
+              "default": "-",
+              "description": "Separator between the Entity Unique Identifier and the Rule Set Unique Number (RLIFRMT-005)."
+            },
+            "revision_splitter": {
+              "enum": [".", "#"],
+              "default": ".",
+              "description": "Separator before the Rule Revision (RLIFRMT-006)."
+            },
+            "state_splitter": {
+              "enum": ["/", "\\", "|"],
+              "default": "/",
+              "description": "Separator before the Rule State (RLIFRMT-007)."
+            }
+          },
+          "additionalProperties": false
+        },
         { "type": "null" }
       ]
     }

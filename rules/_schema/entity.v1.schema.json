@@ -37,6 +37,9 @@
         },
         "parent": {
           "type": "string"
+        },
+        "inherits": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -120,6 +123,17 @@
               {
                 "type": "string",
                 "pattern": "^[A-Z0-9]+-\\d{3}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "overrides": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^([a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*:)?[A-Z0-9]+-\\d{3}$"
               },
               {
                 "type": "null"
