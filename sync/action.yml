@@ -101,18 +101,25 @@ runs:
         STEERSPEC_APP_ID: ${{ inputs.app-id }}
         STEERSPEC_PRIVATE_KEY: ${{ inputs.private-key }}
         STEERSPEC_INSTALLATION_ID: ${{ inputs.installation-id }}
+        # Inputs reach the script as environment variables, never interpolated
+        # into it, so a value cannot inject shell syntax.
+        STRSPC_INPUT_CONFIG_PATH: ${{ inputs.config-path }}
+        STRSPC_INPUT_DRY_RUN: ${{ inputs.dry-run }}
+        STRSPC_INPUT_TARGET_FILTER: ${{ inputs.target-filter }}
+        STRSPC_INPUT_TEMPLATE_FILTER: ${{ inputs.template-filter }}
+        STRSPC_INPUT_FORCE: ${{ inputs.force }}
       run: |
-        ARGS="sync --config ${{ inputs.config-path }}"
-        if [ "${{ inputs.dry-run }}" = "true" ]; then
-          ARGS="${ARGS} --dry-run"
+        args=(sync --config "$STRSPC_INPUT_CONFIG_PATH")
+        if [ "$STRSPC_INPUT_DRY_RUN" = "true" ]; then
+          args+=(--dry-run)
         fi
-        if [ -n "${{ inputs.target-filter }}" ]; then
-          ARGS="${ARGS} --target-filter ${{ inputs.target-filter }}"
+        if [ -n "$STRSPC_INPUT_TARGET_FILTER" ]; then
+          args+=(--target-filter "$STRSPC_INPUT_TARGET_FILTER")
         fi
-        if [ -n "${{ inputs.template-filter }}" ]; then
-          ARGS="${ARGS} --template-filter ${{ inputs.template-filter }}"
+        if [ -n "$STRSPC_INPUT_TEMPLATE_FILTER" ]; then
+          args+=(--template-filter "$STRSPC_INPUT_TEMPLATE_FILTER")
         fi
-        if [ "${{ inputs.force }}" = "true" ]; then
-          ARGS="${ARGS} --force"
+        if [ "$STRSPC_INPUT_FORCE" = "true" ]; then
+          args+=(--force)
         fi
-        strspc ${ARGS}
+        strspc "${args[@]}"

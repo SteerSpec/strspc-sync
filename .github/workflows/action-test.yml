@@ -27,6 +27,9 @@ jobs:
       - name: Action inputs declare and use token
         run: tests/action-inputs_test.sh
 
+      - name: Action inputs cannot inject shell
+        run: tests/action-injection_test.sh
+
       - name: Test help
         run: strspc help
 
