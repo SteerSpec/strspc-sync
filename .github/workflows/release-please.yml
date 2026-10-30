@@ -1,0 +1,37 @@
+name: Release Please
+
+# Keeps a release PR open that bumps VERSION and the changelog from the
+# conventional commits on main. Merging it creates the vX.Y.Z tag and GitHub
+# release, and the tag push runs release.yml (VERSION check, tests, GoReleaser).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint a GitHub App token
+        # steerspec-sync App: its PRs trigger CI and auto-approve (unlike GITHUB_TOKEN),
+        # its API commits are GitHub-signed (required_signatures) and its author
+        # steerspec-sync[bot] is not the approving bot, so auto-approve can act.
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
+        with:
+          app-id: ${{ secrets.STEERSPEC_APP_ID }}
+          private-key: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: googleapis/release-please-action@v4
+        with:
+          # Not GITHUB_TOKEN: its tag pushes would not trigger release.yml and its
+          # PRs get no CI. Not a PAT either: PAT commits are unsigned.
+          token: ${{ steps.app.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

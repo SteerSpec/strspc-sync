@@ -52,6 +52,21 @@ CI enforces a **70% total coverage threshold**, so new code needs tests to land.
 | markdownlint | [`.markdownlint.yml`](.markdownlint.yml) |
 | editorconfig-checker | [`.editorconfig-checker.json`](.editorconfig-checker.json) |
 
+## Releases
+
+Releases are cut by [release-please](https://github.com/googleapis/release-please) from the
+conventional commits on `main`; nobody tags by hand.
+
+1. A `release-please` workflow keeps a release PR open that bumps [`VERSION`](VERSION) and the
+   changelog. `fix:` gives a patch release, `feat:` a minor one (we are pre-1.0).
+2. Merge that PR. release-please creates the `vX.Y.Z` tag and the GitHub release.
+3. The tag runs [`release.yml`](.github/workflows/release.yml): it checks `VERSION` matches the
+   tag, runs the tests, and publishes the archives with GoReleaser.
+4. Consumer repos pin the tag, so Dependabot opens a bump PR in each one.
+
+The composite actions download the binary named by `VERSION` at the tag, so never edit `VERSION`
+outside the release PR.
+
 ## Code conventions
 
 - **Formatting**: gofumpt with extra rules (enforced through golangci-lint)
