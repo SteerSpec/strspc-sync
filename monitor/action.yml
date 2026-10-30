@@ -89,9 +89,13 @@ runs:
         STEERSPEC_APP_ID: ${{ inputs.app-id }}
         STEERSPEC_PRIVATE_KEY: ${{ inputs.private-key }}
         STEERSPEC_INSTALLATION_ID: ${{ inputs.installation-id }}
+        # Inputs reach the script as environment variables, never interpolated
+        # into it, so a value cannot inject shell syntax.
+        STRSPC_INPUT_CONFIG_PATH: ${{ inputs.config-path }}
+        STRSPC_INPUT_TARGET_FILTER: ${{ inputs.target-filter }}
       run: |
-        ARGS="monitor --config ${{ inputs.config-path }}"
-        if [ -n "${{ inputs.target-filter }}" ]; then
-          ARGS="${ARGS} --target-filter ${{ inputs.target-filter }}"
+        args=(monitor --config "$STRSPC_INPUT_CONFIG_PATH")
+        if [ -n "$STRSPC_INPUT_TARGET_FILTER" ]; then
+          args+=(--target-filter "$STRSPC_INPUT_TARGET_FILTER")
         fi
-        strspc ${ARGS}
+        strspc "${args[@]}"
