@@ -6,9 +6,9 @@
     "description": "A GitHub Action that detects conflicts and inconsistencies across target repositories."
   },
   "rule_set": {
-    "version": "0.1.0",
-    "timestamp": "2026-10-19T19:40:07Z",
-    "hash": "blake3:aaf80bcc108ee5b71725d946dafe65aa0f15f965bee66d50046f8130bb8c1de5"
+    "version": "0.1.2",
+    "timestamp": "2026-11-01T13:58:03Z",
+    "hash": "blake3:0db067795ad4c7d7667601cd021119df57ba23124fb11c82358642e94e23961c"
   },
   "rules": [
     {
@@ -94,9 +94,9 @@
     },
     {
       "id": "CNFLACT-010",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "HAS an input `tiers` (string, optional) to override the configured detection tiers (e.g., \"1,2,3\").",
+      "body": "HAS an input `tiers` (string, optional) to override the configured detection tiers.",
       "added_by": "@pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -147,5 +147,15 @@
       "supersedes": null
     }
   ],
-  "notes": []
+  "notes": [
+    {
+      "id": "CNFLACT-010/01",
+      "rule_ref": "CNFLACT-010",
+      "type": "example",
+      "content": "`1,2,3`",
+      "added_by": "@pleberre",
+      "added_at": "2026-11-01",
+      "revision": 0
+    }
+  ]
 }
