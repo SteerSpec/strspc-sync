@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.1.1",
-    "timestamp": "2026-10-28T10:44:12Z",
-    "hash": "blake3:b118878c871411c4e232a21063aed790d6cd46ff4d7a88ccf579b503bcf16f68"
+    "version": "0.1.3",
+    "timestamp": "2026-11-01T13:58:03Z",
+    "hash": "blake3:07ab906aecfd53aca9e313ae581fbe9629300ca93b432fadcf7343603f999830"
   },
   "rules": [
     {
@@ -22,9 +22,9 @@
     },
     {
       "id": "TMPLT-002",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "HAS a unique template identifier (e.g., \"claude-md\", \"agent-code-review\").",
+      "body": "HAS a unique template identifier.",
       "added_by": "@pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -156,6 +156,15 @@
       "content": "Mustache is best for fully templated files. Marker is best for CLAUDE.md files where repos may have local sections between managed markers. Full-replace is best for agents and skills that should be identical everywhere.",
       "added_by": "@pleberre",
       "added_at": "2026-03-07",
+      "revision": 0
+    },
+    {
+      "id": "TMPLT-002/01",
+      "rule_ref": "TMPLT-002",
+      "type": "example",
+      "content": "`claude-md` or `agent-code-review`",
+      "added_by": "@pleberre",
+      "added_at": "2026-11-01",
       "revision": 0
     }
   ]
