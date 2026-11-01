@@ -3,7 +3,7 @@ name: PR Auto-Approve (Copilot)
 # This IS the live workflow for this repo -- not a template to copy anywhere.
 #
 # Generated from templates/pr-auto-approve.yml in SteerSpec/strspc-pr-review
-# (v1.9.0) with only the per-repo values changed: secrets.BOT_TOKEN and the
+# (v1.10.0) with only the per-repo values changed: secrets.BOT_TOKEN and the
 # workflow_run list. Settings come from STRSPC_PR_AUTO_APPROVE_* variables, so
 # policy changes need no edit here; re-sync with the pr-caller-sync skill.
 #
