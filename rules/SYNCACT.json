@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.1.0",
-    "timestamp": "2026-10-19T19:40:07Z",
-    "hash": "blake3:addbe5b7dfd15ba16d398a2751802e3da6fe69f499f7084da20ed624181b0e39"
+    "version": "0.1.2",
+    "timestamp": "2026-11-01T13:58:03Z",
+    "hash": "blake3:0b0114ad9223fd68d773f5d5d1ff4af6d51c6a6ae4516074ef22f69c7e4cdb1d"
   },
   "rules": [
     {
@@ -202,9 +202,9 @@
     },
     {
       "id": "SYNCACT-022",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "The reference implementation SHOULD be published as a reusable GitHub Action (e.g., `steerspec/sync-action@v1`).",
+      "body": "The reference implementation SHOULD be published as a reusable GitHub Action.",
       "added_by": "@pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -218,6 +218,15 @@
       "content": "Per-repo error isolation prevents a single misconfigured or inaccessible repo from blocking updates to all other repos.",
       "added_by": "@pleberre",
       "added_at": "2026-03-07",
+      "revision": 0
+    },
+    {
+      "id": "SYNCACT-022/01",
+      "rule_ref": "SYNCACT-022",
+      "type": "example",
+      "content": "`steerspec/sync-action@v1`",
+      "added_by": "@pleberre",
+      "added_at": "2026-11-01",
       "revision": 0
     }
   ]
