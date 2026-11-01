@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/SteerSpec/strspc-sync/compare/v0.4.0...v0.4.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **rules:** move inline examples into example notes ([7b79877](https://github.com/SteerSpec/strspc-sync/commit/7b79877b7c19051b1581f5c66fff4c3b82eaec06))
+* **rules:** move inline examples into example notes ([56f4891](https://github.com/SteerSpec/strspc-sync/commit/56f4891c0a4b4393d371d7b2b1b3b424b9e02144))
+
 ## [0.4.0](https://github.com/SteerSpec/strspc-sync/compare/v0.3.0...v0.4.0) (2026-10-30)
 
 
