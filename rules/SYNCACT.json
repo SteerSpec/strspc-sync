@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.1.2",
-    "timestamp": "2026-11-01T13:58:03Z",
-    "hash": "blake3:0b0114ad9223fd68d773f5d5d1ff4af6d51c6a6ae4516074ef22f69c7e4cdb1d"
+    "version": "0.1.3",
+    "timestamp": "2026-11-05T07:49:16Z",
+    "hash": "blake3:d5d65727e23e75443cf8e9a440d0f1a910b868048987dd40a371667eb1cdf2c6"
   },
   "rules": [
     {
@@ -16,7 +16,7 @@
       "revision": 0,
       "state": "D",
       "body": "IS a GitHub Action that synchronizes templates from the central repository to target repositories.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -25,7 +25,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST be triggered on push to the central repository when template or manifest files change.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -34,7 +34,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST support manual dispatch via `workflow_dispatch`.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -43,7 +43,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST read the SyncManifest to determine templates and targets.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -52,7 +52,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST resolve target repositories via the GitHub API using the ComponentRegistry.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -61,7 +61,7 @@
       "revision": 0,
       "state": "D",
       "body": "For each target repository, MUST check the DeploymentState to determine if an update is needed.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -70,7 +70,7 @@
       "revision": 0,
       "state": "D",
       "body": "For each out-of-date target, MUST render the template using the configured strategy and create or update a SyncPullRequest.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -79,7 +79,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST NOT fail the entire workflow when a single target repository fails; errors MUST be isolated per repository.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -88,7 +88,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST handle GitHub API rate limiting with exponential backoff.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -97,7 +97,7 @@
       "revision": 0,
       "state": "D",
       "body": "SHOULD use concurrency groups to prevent parallel sync operations from conflicting.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -106,7 +106,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an input `dry-run` (boolean, default: false) which when true prevents any PRs from being created or updated.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -115,7 +115,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an input `target-filter` (string, optional) to limit sync to repositories matching a glob pattern.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -124,7 +124,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an input `template-filter` (string, optional) to limit sync to specific template identifiers.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -133,7 +133,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an input `force` (boolean, default: false) which when true forces sync even if DeploymentState shows current version.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -142,7 +142,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an input `config-path` (string, default: \"steerspec-sync.yml\") to specify an alternate config file path.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -151,7 +151,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an output `prs-created` (integer) counting the number of new PRs created.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -160,7 +160,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an output `prs-updated` (integer) counting the number of existing PRs updated.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -169,7 +169,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an output `repos-skipped` (integer) counting repositories that were already up to date.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -178,7 +178,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an output `errors` (integer) counting repositories that encountered errors.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -187,7 +187,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS an output `summary` (JSON string) containing a detailed summary of the sync operation including per-repo results.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -196,7 +196,7 @@
       "revision": 0,
       "state": "D",
       "body": "A reference implementation IS RECOMMENDED in Go as a composite GitHub Action.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -205,7 +205,7 @@
       "revision": 1,
       "state": "D",
       "body": "The reference implementation SHOULD be published as a reusable GitHub Action.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     }
@@ -216,7 +216,7 @@
       "rule_ref": "SYNCACT-008",
       "type": "rationale",
       "content": "Per-repo error isolation prevents a single misconfigured or inaccessible repo from blocking updates to all other repos.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "revision": 0
     },
@@ -225,7 +225,7 @@
       "rule_ref": "SYNCACT-022",
       "type": "example",
       "content": "`steerspec/sync-action@v1`",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-11-01",
       "revision": 0
     }

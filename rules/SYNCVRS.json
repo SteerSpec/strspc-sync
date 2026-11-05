@@ -6,9 +6,9 @@
     "description": "Versioning strategy for synchronized templates."
   },
   "rule_set": {
-    "version": "0.1.0",
-    "timestamp": "2026-10-19T19:40:07Z",
-    "hash": "blake3:5025d0f0bd895b648e51fcdbf0c5778cd11ed39716e305516f1cac65b1b7e8ca"
+    "version": "0.1.1",
+    "timestamp": "2026-11-05T07:49:16Z",
+    "hash": "blake3:f460ba29e5d39bf9041cdea0a77ac146aba2588df177509203d69e4b95e8e04d"
   },
   "rules": [
     {
@@ -16,7 +16,7 @@
       "revision": 0,
       "state": "D",
       "body": "All template versions MUST use semantic versioning (MAJOR.MINOR.PATCH).",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -25,7 +25,7 @@
       "revision": 0,
       "state": "D",
       "body": "A MAJOR version bump IS REQUIRED for breaking changes: rendering strategy change, required variable addition or removal, or destination path change.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -34,7 +34,7 @@
       "revision": 0,
       "state": "D",
       "body": "A MINOR version bump IS REQUIRED for new optional content or new optional variables.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -43,7 +43,7 @@
       "revision": 0,
       "state": "D",
       "body": "A PATCH version bump IS REQUIRED for content corrections, typo fixes, or formatting changes.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -52,7 +52,7 @@
       "revision": 0,
       "state": "D",
       "body": "Version bumps MUST be determined by the template author and MUST NOT be auto-inferred.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -61,7 +61,7 @@
       "revision": 0,
       "state": "D",
       "body": "Each template version MUST be tracked via a git tag in the format `tmpl/<template-id>/v<version>`.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -70,7 +70,7 @@
       "revision": 0,
       "state": "D",
       "body": "The specification version MUST be tracked in a `VERSION` file at the repository root.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -79,7 +79,7 @@
       "revision": 0,
       "state": "D",
       "body": "Per-template version metadata MUST be stored in `.steerspec/versions.json` in the central repository.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -88,7 +88,7 @@
       "revision": 0,
       "state": "D",
       "body": "Each entry in `versions.json` MUST contain: version string, Blake3 hash, UTC timestamp, and author.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -97,7 +97,7 @@
       "revision": 0,
       "state": "D",
       "body": "Version entries in `versions.json` MUST be append-only; previous entries MUST NOT be modified or deleted.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     }
@@ -108,7 +108,7 @@
       "rule_ref": "SYNCVRS-002",
       "type": "rationale",
       "content": "Breaking changes force target repos to potentially update their local sections or variable definitions, warranting a major bump.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "revision": 0
     },
@@ -117,7 +117,7 @@
       "rule_ref": "SYNCVRS-005",
       "type": "rationale",
       "content": "Auto-inferring version bumps from diffs is fragile and cannot reliably distinguish between content corrections (patch) and meaningful additions (minor).",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "revision": 0
     }

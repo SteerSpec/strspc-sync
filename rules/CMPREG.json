@@ -6,9 +6,9 @@
     "description": "The registry of target repositories for synchronization."
   },
   "rule_set": {
-    "version": "0.1.0",
-    "timestamp": "2026-10-19T19:40:07Z",
-    "hash": "blake3:4bd2297296ec736c2921fe21e5e7936bd39d7e7a86eee307d1e124e1b54bb467"
+    "version": "0.1.1",
+    "timestamp": "2026-11-05T07:49:16Z",
+    "hash": "blake3:8e362f52e5caf561286ce159bd2d90642960c4061d3c70a138d9be9aef5db719"
   },
   "rules": [
     {
@@ -16,7 +16,7 @@
       "revision": 0,
       "state": "D",
       "body": "IS the registry of target repositories for synchronization.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -25,7 +25,7 @@
       "revision": 0,
       "state": "D",
       "body": "IS defined within the SyncManifest or via a `$include` directive.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -34,7 +34,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS one or more ComponentTargets.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -43,7 +43,7 @@
       "revision": 0,
       "state": "D",
       "body": "MAY use glob patterns for repository name matching.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -52,7 +52,7 @@
       "revision": 0,
       "state": "D",
       "body": "MAY use GitHub topics for dynamic repository resolution.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     }
@@ -67,9 +67,9 @@
         "parent": "CMPREG"
       },
       "rule_set": {
-        "version": "0.1.0",
-        "timestamp": "2026-10-19T19:40:07Z",
-        "hash": "blake3:3d4cb9728e9307d0f2d10f9fb60f1fb2f668e1b6d2728cb53ca6599c121af2e6"
+        "version": "0.1.1",
+        "timestamp": "2026-11-05T07:49:16Z",
+        "hash": "blake3:b4a8d74670d2cccaa57e68225f6e912a7a77496ab58b041e7ccd1eddfe842b7f"
       },
       "rules": [
         {
@@ -77,7 +77,7 @@
           "revision": 0,
           "state": "D",
           "body": "HAS a repository identifier in `owner/repo` format.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -86,7 +86,7 @@
           "revision": 0,
           "state": "D",
           "body": "HAS a default branch name.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -95,7 +95,7 @@
           "revision": 0,
           "state": "D",
           "body": "MAY include specific templates by identifier.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -104,7 +104,7 @@
           "revision": 0,
           "state": "D",
           "body": "MAY exclude specific templates by identifier.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -113,7 +113,7 @@
           "revision": 0,
           "state": "D",
           "body": "MAY define variable overrides for template rendering.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -122,7 +122,7 @@
           "revision": 0,
           "state": "D",
           "body": "HAS an `enabled` boolean flag (default: true).",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         }
