@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.1.3",
-    "timestamp": "2026-11-01T13:58:03Z",
-    "hash": "blake3:07ab906aecfd53aca9e313ae581fbe9629300ca93b432fadcf7343603f999830"
+    "version": "0.1.4",
+    "timestamp": "2026-11-05T07:49:16Z",
+    "hash": "blake3:2be8d6deb03bc876a70a98f86ef434172708bd29d7bea1f58aa17e6f5ac42bb8"
   },
   "rules": [
     {
@@ -16,7 +16,7 @@
       "revision": 0,
       "state": "D",
       "body": "IS a managed file synchronized to target repositories.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -25,7 +25,7 @@
       "revision": 1,
       "state": "D",
       "body": "HAS a unique template identifier.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -34,7 +34,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS a type which MUST be one of: \"claude-md\", \"skill\", \"agent\", \"config\", \"custom\".",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -43,7 +43,7 @@
       "revision": 1,
       "state": "D",
       "body": "HAS a source path relative to the central repository, or an owner/repo:path reference to another repository, and MAY declare a source per target visibility (public, internal, private) with the plain source as the fallback; a template MUST have at least one.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -52,7 +52,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS a destination path relative to the target repository (supports `.claude/` tree paths).",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -61,7 +61,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST support a rendering strategy which MUST be one of: \"mustache\", \"marker\", \"full-replace\".",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -70,7 +70,7 @@
       "revision": 0,
       "state": "D",
       "body": "When using the marker strategy, managed sections MUST be delimited by `<!-- STEERSPEC:BEGIN:section_name -->` and `<!-- STEERSPEC:END:section_name -->`.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -79,7 +79,7 @@
       "revision": 0,
       "state": "D",
       "body": "MAY define template-specific variables.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     }
@@ -94,9 +94,9 @@
         "parent": "TMPLT"
       },
       "rule_set": {
-        "version": "0.1.0",
-        "timestamp": "2026-10-19T19:40:07Z",
-        "hash": "blake3:d01e0c7f4a7ca52dcbec789c2751a737bbf3e96c4984778de67d87572670d187"
+        "version": "0.1.1",
+        "timestamp": "2026-11-05T07:49:16Z",
+        "hash": "blake3:6d4904ca5380caad148a1897fd3a3d66a3e72352cb1ec11e1e518d2400a1a26b"
       },
       "rules": [
         {
@@ -104,7 +104,7 @@
           "revision": 0,
           "state": "D",
           "body": "HAS a version in semver format (MAJOR.MINOR.PATCH).",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -113,7 +113,7 @@
           "revision": 0,
           "state": "D",
           "body": "HAS a Blake3 hash of the template content.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -122,7 +122,7 @@
           "revision": 0,
           "state": "D",
           "body": "HAS a UTC timestamp.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -131,7 +131,7 @@
           "revision": 0,
           "state": "D",
           "body": "MUST be immutable once created.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         },
@@ -140,7 +140,7 @@
           "revision": 0,
           "state": "D",
           "body": "IS tracked via git tags in the format `tmpl/<template-id>/v<version>`.",
-          "added_by": "@pleberre",
+          "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         }
@@ -154,7 +154,7 @@
       "rule_ref": "TMPLT-006",
       "type": "rationale",
       "content": "Mustache is best for fully templated files. Marker is best for CLAUDE.md files where repos may have local sections between managed markers. Full-replace is best for agents and skills that should be identical everywhere.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "revision": 0
     },
@@ -163,7 +163,7 @@
       "rule_ref": "TMPLT-002",
       "type": "example",
       "content": "`claude-md` or `agent-code-review`",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-11-01",
       "revision": 0
     }

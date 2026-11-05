@@ -6,9 +6,9 @@
     "description": "The central configuration for synchronizing AI configuration files across a GitHub organization."
   },
   "rule_set": {
-    "version": "0.1.0",
-    "timestamp": "2026-10-19T19:40:07Z",
-    "hash": "blake3:7448dba0356f8b2dee6da03c80853e73b90cce7ade412f9e54f8f37798c0d5d9"
+    "version": "0.1.1",
+    "timestamp": "2026-11-05T07:49:16Z",
+    "hash": "blake3:090e3e70f0820cbe93d3ca89ee70426a4d835627cb1c7b58898a5d852254a38d"
   },
   "rules": [
     {
@@ -16,7 +16,7 @@
       "revision": 0,
       "state": "D",
       "body": "IS the central configuration for synchronizing AI configuration files across a GitHub organization.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -25,7 +25,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST be stored in a dedicated central repository (source of truth).",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -34,7 +34,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST define at least one Template.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -43,7 +43,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST define a ComponentRegistry.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -52,7 +52,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS a manifest version in semver format.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -61,7 +61,7 @@
       "revision": 0,
       "state": "D",
       "body": "MUST be expressed as YAML named `steerspec-sync.yml` at the repository root.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -70,7 +70,7 @@
       "revision": 0,
       "state": "D",
       "body": "MAY define global template variables.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
@@ -79,7 +79,7 @@
       "revision": 0,
       "state": "D",
       "body": "HAS a Blake3 hash for integrity verification.",
-      "added_by": "@pleberre",
+      "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     }
