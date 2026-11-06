@@ -7,7 +7,6 @@ repository in a GitHub organization, by pull request.
 <!-- markdownlint-disable MD013 -->
 [![CI](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/SteerSpec/strspc-sync?color=161B22&labelColor=161B22)](https://github.com/SteerSpec/strspc-sync/releases)
-[![Go](https://img.shields.io/badge/Go-1.26+-161B22?labelColor=161B22&logo=go&logoColor=E6EDF3)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-161B22?labelColor=161B22)](LICENSE)
 [![Marketplace](https://img.shields.io/badge/Marketplace-SteerSpec%20Sync-161B22?labelColor=161B22&logo=github&logoColor=E6EDF3)](https://github.com/marketplace/actions/steerspec-sync)
 <!-- markdownlint-enable MD013 -->
@@ -16,7 +15,7 @@ Pre-1.0; the latest release is [v0.4.1](https://github.com/SteerSpec/strspc-sync
 Sync never force-pushes a git ref and never merges for you (the `--force` flag only skips the
 unchanged-content check): every change lands as a reviewable pull request in the
 target repo. The behaviour is specified by the `dev.steerspec.sync` realm, linked under
-[Specification](#specification).
+[Specification](docs/specification.md).
 
 ## Installation
 
@@ -36,27 +35,8 @@ Use the composite actions directly from the Marketplace:
 - uses: SteerSpec/strspc-sync/conflict@v0.4.1
 ```
 
-#### Keeping the pin current
-
-Pin an exact tag, never a branch: the action downloads the binary named by the `VERSION` file at that tag, and a
-sync run opens or updates pull requests in the target repositories whose rendered content changed. Nothing moves
-an exact pin for you, so let Dependabot open a pull request for each new release:
-
-```yaml
-# .github/dependabot.yml
-version: 2
-updates:
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-    groups:
-      actions:
-        patterns: ["*"]
-```
-
-Read the release notes before merging a bump. Sync, monitor and conflict workflows pinned in the same repository
-are updated together by the `groups` entry.
+Pin an exact tag, never a branch. See [Keeping the pin current](docs/keeping-the-pin-current.md) for a Dependabot
+setup that opens a pull request for each new release.
 
 ### CLI Binary
 
@@ -112,146 +92,42 @@ every target repo. For `auth.method: github-app`, pass `app-id` and `private-key
 | If you want to | Go to |
 | --- | --- |
 | Run it from a workflow | [Installation](#github-action), [example workflows](docs/quickstart/workflows/) |
-| Set up your first central repo | [Quick Start](#quick-start) and [docs/quickstart/](docs/quickstart/) |
-| Run the CLI locally | [CLI Binary](#cli-binary) and [Commands](#commands) |
-| Look up a configuration key | [Configuration](#configuration) and [`SYNCCFG`](rules/SYNCCFG.json) |
-| Read the specification | [Specification](#specification) |
+| Set up your first central repo | [Quick Start](#quick-start), [docs/quickstart/](docs/quickstart/) |
+| Understand what a run does | [How it works](docs/how-it-works.md) |
+| Run the CLI locally | [CLI Binary](#cli-binary), [Commands](docs/commands.md) |
+| Look up a configuration key | [Configuration](docs/configuration.md) |
+| Keep the action pin current | [Keeping the pin current](docs/keeping-the-pin-current.md) |
+| Read the specification | [Specification](docs/specification.md) |
 | Build, test or contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Report a vulnerability | [Security](#security) |
 
-## How it works
+## Governance
 
-Templates live in one central repo. On every run, `strspc` renders each template for each target
-repository, hashes the result with BLAKE3, and compares it against the recorded deployment state.
-Only genuine changes become pull requests — an unchanged render is skipped and opens no pull request.
+Open source software by Consulare.
 
-```mermaid
-flowchart LR
-    C["Central repo<br/><i>templates + steerspec-sync.yml</i>"]
-    R["Render<br/><i>mustache · marker · full-replace</i>"]
-    D{"Content<br/>changed?"}
-    X["Skip"]
-    P["Pull request<br/><i>one per template, per repo</i>"]
-    T["Target repos<br/><i>CLAUDE.md · agents · skills · settings</i>"]
-    S["Deployment state<br/><i>BLAKE3 hashes</i>"]
-
-    C --> R --> D
-    D -->|no| X
-    D -->|yes| P --> T
-    P --> S
-    S -.->|compared on next run| D
-```
-
-Each pull request in a target repo is titled `chore(steerspec-sync): update <template-id> to <version>` (the type
-and scope are configurable) so commitlint and semantic-PR checks let it through. Two companion commands watch what
-happens afterwards — `monitor` reports files that have drifted away from their template, and `conflict` flags
-contradictions across the fleet.
-
-## Commands
-
-### sync
-
-Render templates and open PRs in target repositories.
-
-```bash
-strspc sync --config steerspec-sync.yml
-strspc sync --config steerspec-sync.yml --dry-run
-strspc sync --config steerspec-sync.yml --target-filter "my-org/api-*"
-strspc sync --config steerspec-sync.yml --template-filter claude-md --force
-```
-
-**Action usage:**
-
-```yaml
-- uses: SteerSpec/strspc-sync/sync@v0.4.1
-  with:
-    dry-run: true
-    target-filter: 'my-org/api-*'
-```
-
-**Outputs:** `prs-created`, `prs-updated`, `repos-skipped`, `errors`, `summary`
-
-### monitor
-
-Check target repositories for configuration drift and create issues.
-
-```bash
-strspc monitor --config steerspec-sync.yml
-```
-
-**Action usage:**
-
-```yaml
-- uses: SteerSpec/strspc-sync/monitor@v0.4.1
-```
-
-**Outputs:** `repos-in-sync`, `repos-drifted`, `issues-created`, `issues-closed`, `summary`
-
-### conflict
-
-Detect conflicts across AI configuration files in target repositories.
-
-```bash
-strspc conflict --config steerspec-sync.yml
-strspc conflict --config steerspec-sync.yml --tiers 1,2
-```
-
-**Action usage:**
-
-```yaml
-- uses: SteerSpec/strspc-sync/conflict@v0.4.1
-  with:
-    tiers: '1,2'
-```
-
-**Outputs:** `conflicts-found`, `critical-count`, `warning-count`, `info-count`, `summary`
-
-## Configuration
-
-All configuration lives in `steerspec-sync.yml`.
-See [docs/quickstart/steerspec-sync.yml](docs/quickstart/steerspec-sync.yml) for an example
-and the `SYNCCFG` entity in [`rules/`](rules/SYNCCFG.json) for the specification of every key.
-
-## Specification
-
-The SteerSpec Sync specification is the `dev.steerspec.sync` realm in
-[`rules/` at v0.4.1](https://github.com/SteerSpec/strspc-sync/tree/v0.4.1/rules):
-166 rules across 11 entities and 5 sub-entities (configuration, manifest, templates, sync, monitor and conflict
-actions, deployment state, component registry, versioning), depending on
-[`dev.steerspec.core`](https://github.com/SteerSpec/strspc-rules). Rules are authored with the
-[`strspc` CLI](https://github.com/SteerSpec/strspc-CLI) (`strspc rule add`, `strspc rule promote`)
-and validated in CI (`strspc realm validate`, `strspc lint`, `strspc diff`); every pull request is
-also checked against them by `strspc check` (structural checks; the AI evaluation runs only where the org
-supplies an `ANTHROPIC_API_KEY`).
-
-## License
-
-Apache 2.0 -- see [LICENSE](LICENSE).
+Licensed under Apache 2.0 ([LICENSE](LICENSE)). Every change, including the maintainers', lands by pull request; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
 
 To report a security issue privately, email <security@steerspec.dev> and do not open a public issue. See
 [SECURITY.md](SECURITY.md) for what to include and the response timeline.
 
-## Contributing
+## Community
 
 Bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the build,
-test, and lint workflow.
+test, and lint workflow. Pull requests are reviewed by GitHub Copilot, and an automated approval from a bot is
+expected; see the
+[strspc-pr-review v1.10.2 README](https://github.com/SteerSpec/strspc-pr-review/blob/v1.10.2/README.md).
 
-Pull requests to `main` are reviewed automatically by GitHub Copilot. When that review
-comes back clean, [`pr-auto-approve`](https://github.com/SteerSpec/strspc-pr-review)
-posts the approving review as `cnslr-bt`, which satisfies the required-approval rule — so
-an approval from a bot you have never met is expected, not a misconfiguration.
-
-It approves once checks pass and Copilot's latest review is clean for the current commit, or after the
-configured number of review rounds (see the
-[strspc-pr-review v1.10.2 README](https://github.com/SteerSpec/strspc-pr-review/blob/v1.10.2/README.md)).
-A push after Copilot reviewed dismisses the approval, and `CHANGES_REQUESTED` always blocks.
-
-## Related projects
+### Related projects
 
 Part of the [SteerSpec](https://steerspec.dev) ecosystem:
 
 - [strspc-rules](https://github.com/SteerSpec/strspc-rules) — canonical rule format specification
 - [strspc-manager](https://github.com/SteerSpec/strspc-manager) — core enforcement engine
 - [strspc-CLI](https://github.com/SteerSpec/strspc-CLI) — render, validate, and manage rule files
+
+## License
+
+Apache 2.0 -- see [LICENSE](LICENSE).
