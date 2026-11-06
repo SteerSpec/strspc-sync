@@ -13,7 +13,8 @@ repository in a GitHub organization, by pull request.
 <!-- markdownlint-enable MD013 -->
 
 Pre-1.0; the latest release is [v0.4.1](https://github.com/SteerSpec/strspc-sync/releases/tag/v0.4.1).
-Sync never force-pushes a git ref and never merges for you (the `--force` flag only skips the unchanged-content check): every change lands as a reviewable pull request in the
+Sync never force-pushes a git ref and never merges for you (the `--force` flag only skips the
+unchanged-content check): every change lands as a reviewable pull request in the
 target repo. The behaviour is specified by the `dev.steerspec.sync` realm, linked under
 [Specification](#specification).
 
@@ -243,7 +244,8 @@ posts the approving review as `cnslr-bt`, which satisfies the required-approval 
 an approval from a bot you have never met is expected, not a misconfiguration.
 
 It approves once checks pass and Copilot's latest review is clean for the current commit, or after the
-configured number of review rounds (see the [strspc-pr-review v1.10.2 README](https://github.com/SteerSpec/strspc-pr-review/blob/v1.10.2/README.md)).
+configured number of review rounds (see the
+[strspc-pr-review v1.10.2 README](https://github.com/SteerSpec/strspc-pr-review/blob/v1.10.2/README.md)).
 A push after Copilot reviewed dismisses the approval, and `CHANGES_REQUESTED` always blocks.
 
 ## Related projects
