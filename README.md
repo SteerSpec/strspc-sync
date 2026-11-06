@@ -1,50 +1,63 @@
+<img src="https://steerspec.dev/assets/logo-transparent.svg" alt="SteerSpec logo" width="96" height="96">
+
 # SteerSpec Sync
 
-> Define your AI configuration once. Ship it everywhere, by pull request.
+SteerSpec Sync is a Go CLI and GitHub Action for platform and engineering teams that distribute AI configuration
+files (`CLAUDE.md`, `.claude/agents/`, `.claude/skills/`, `.claude/settings.json`) from one central repo to every
+repository in a GitHub organization, by pull request.
 
 <!-- markdownlint-disable MD013 -->
 [![CI](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/SteerSpec/strspc-sync)](https://github.com/SteerSpec/strspc-sync/releases)
-[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Marketplace](https://img.shields.io/badge/Marketplace-SteerSpec%20Sync-blue?logo=github)](https://github.com/marketplace/actions/steerspec-sync)
+[![Release](https://img.shields.io/github/v/release/SteerSpec/strspc-sync?color=161B22&labelColor=161B22)](https://github.com/SteerSpec/strspc-sync/releases)
+[![License](https://img.shields.io/badge/License-Apache%202.0-161B22?labelColor=161B22)](LICENSE)
+[![Marketplace](https://img.shields.io/badge/Marketplace-SteerSpec%20Sync-161B22?labelColor=161B22&logo=github&logoColor=E6EDF3)](https://github.com/marketplace/actions/steerspec-sync)
 <!-- markdownlint-enable MD013 -->
 
-Synchronize AI configuration files (`CLAUDE.md`, `.claude/agents/`, `.claude/skills/`,
-`.claude/settings.json`) across your GitHub organization. Define templates once in a central
-repo, then distribute them via pull requests.
+Pre-1.0; see [Releases](https://github.com/SteerSpec/strspc-sync/releases) for the current version.
+Sync never force-pushes a git ref and never merges for you (the `--force` flag only bypasses the
+recorded deployment-state hash check; unchanged content never opens a pull request): every change
+lands as a reviewable pull request in the target repo. The behaviour is specified by the
+`dev.steerspec.sync` realm, linked under
+[Specification](docs/specification.md).
 
----
+## Installation
 
-## How it works
+### GitHub Action
 
-Templates live in one central repo. On every run, `strspc` renders each template for each target
-repository, hashes the result with BLAKE3, and compares it against the recorded deployment state.
-Only genuine changes become pull requests — an unchanged render is skipped, so re-running is cheap
-and quiet.
+Use the composite actions directly from the Marketplace:
 
-```mermaid
-flowchart LR
-    C["Central repo<br/><i>templates + steerspec-sync.yml</i>"]
-    R["Render<br/><i>mustache · marker · full-replace</i>"]
-    D{"Content<br/>changed?"}
-    X["Skip"]
-    P["Pull request<br/><i>one per template, per repo</i>"]
-    T["Target repos<br/><i>CLAUDE.md · agents · skills · settings</i>"]
-    S["Deployment state<br/><i>BLAKE3 hashes</i>"]
+```yaml
+# Full action (specify command)
+- uses: SteerSpec/strspc-sync@v0.4.1
+  with:
+    command: sync
 
-    C --> R --> D
-    D -->|no| X
-    D -->|yes| P --> T
-    P --> S
-    S -.->|compared on next run| D
+# Convenience sub-actions
+- uses: SteerSpec/strspc-sync/sync@v0.4.1
+- uses: SteerSpec/strspc-sync/monitor@v0.4.1
+- uses: SteerSpec/strspc-sync/conflict@v0.4.1
 ```
 
-Nothing is force-pushed and nothing is merged for you: every change lands as a reviewable PR in the
-target repo, titled `chore(steerspec-sync): update <template-id> to <version>` (the type and
-scope are configurable) so commitlint and semantic-PR checks let it through. Two companion
-commands watch what happens afterwards — `monitor` reports files that have drifted away from their
-template, and `conflict` flags contradictions across the fleet.
+Pin an exact tag, never a branch. See [Keeping the pin current](docs/keeping-the-pin-current.md) for a Dependabot
+setup that opens a pull request for each new release.
+
+### CLI Binary
+
+Download an archive and its `checksums.txt` from
+[Releases](https://github.com/SteerSpec/strspc-sync/releases/tag/v0.4.1). Linux ships as `.tar.gz` and macOS as
+`.zip`, for `amd64` and `arm64`. Compare the archive's SHA-256 with the entry in `checksums.txt`:
+
+```bash
+# Linux (amd64; use linux_arm64 on arm64)
+curl -fsSLO https://github.com/SteerSpec/strspc-sync/releases/download/v0.4.1/strspc_0.4.1_linux_amd64.tar.gz
+tar xzf strspc_0.4.1_linux_amd64.tar.gz strspc
+
+# macOS (Apple silicon; use darwin_amd64 on Intel)
+curl -fsSLO https://github.com/SteerSpec/strspc-sync/releases/download/v0.4.1/strspc_0.4.1_darwin_arm64.zip
+unzip strspc_0.4.1_darwin_arm64.zip strspc
+
+sudo mv strspc /usr/local/bin/
+```
 
 ## Quick Start
 
@@ -66,163 +79,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: SteerSpec/strspc-sync/sync@v0.3.0
+      - uses: SteerSpec/strspc-sync/sync@v0.4.1
         with:
           dry-run: false
           token: ${{ secrets.STEERSPEC_TOKEN }}
 ```
 
-The `token` input defaults to the workflow's own `GITHUB_TOKEN`, which is scoped to the
-repository running the workflow and cannot open pull requests anywhere else — so pass a
-PAT (or a GitHub App installation token) with `contents` and `pull_requests` write access on
-every target repo. For `auth.method: github-app`, pass `app-id` and `private-key` instead.
+The default `GITHUB_TOKEN` cannot open pull requests in other repositories; see
+[Authentication](docs/configuration.md#authentication) for the token and GitHub App options.
 
-## Installation
+## Where to go
 
-### GitHub Action
+| If you want to | Go to |
+| --- | --- |
+| Run it from a workflow | [Installation](#github-action), [example workflows](docs/quickstart/workflows/) |
+| Set up your first central repo | [Quick Start](#quick-start), [docs/quickstart/](docs/quickstart/) |
+| Understand what a run does | [How it works](docs/how-it-works.md) |
+| Run the CLI locally | [CLI Binary](#cli-binary), [Commands](docs/commands.md) |
+| Look up a configuration key or set up authentication | [Configuration](docs/configuration.md) |
+| Keep the action pin current | [Keeping the pin current](docs/keeping-the-pin-current.md) |
+| Read the specification | [Specification](docs/specification.md) |
+| Build, test or contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Report a vulnerability | [Security](#security) |
 
-Use the composite actions directly from the Marketplace:
+## Governance
 
-```yaml
-# Full action (specify command)
-- uses: SteerSpec/strspc-sync@v0.3.0
-  with:
-    command: sync
+Open source software by Consulare.
 
-# Convenience sub-actions
-- uses: SteerSpec/strspc-sync/sync@v0.3.0
-- uses: SteerSpec/strspc-sync/monitor@v0.3.0
-- uses: SteerSpec/strspc-sync/conflict@v0.3.0
-```
+The copyright holder is named in [NOTICE](NOTICE).
 
-#### Keeping the pin current
+Every change, including the maintainers', lands by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Pin an exact tag, never a branch: the action downloads the binary named by the `VERSION` file at that tag, and a
-sync run opens or updates pull requests in the target repositories whose rendered content changed. Nothing moves
-an exact pin for you, so let Dependabot open a pull request for each new release:
+## Security
 
-```yaml
-# .github/dependabot.yml
-version: 2
-updates:
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-    groups:
-      actions:
-        patterns: ["*"]
-```
+To report a security issue privately, email <security@steerspec.dev> and do not open a public issue. See
+[SECURITY.md](SECURITY.md) for what to include and the response timeline.
 
-Read the release notes before merging a bump. Sync, monitor and conflict workflows pinned in the same repository
-are updated together by the `groups` entry.
-
-### CLI Binary
-
-Download from [Releases](https://github.com/SteerSpec/strspc-sync/releases):
-
-```bash
-# macOS / Linux
-curl -fsSL https://github.com/SteerSpec/strspc-sync/releases/latest/download/strspc_<version>_<os>_<arch>.tar.gz | tar xz
-sudo mv strspc /usr/local/bin/
-```
-
-## Commands
-
-### sync
-
-Render templates and open PRs in target repositories.
-
-```bash
-strspc sync --config steerspec-sync.yml
-strspc sync --config steerspec-sync.yml --dry-run
-strspc sync --config steerspec-sync.yml --target-filter "my-org/api-*"
-strspc sync --config steerspec-sync.yml --template-filter claude-md --force
-```
-
-**Action usage:**
-
-```yaml
-- uses: SteerSpec/strspc-sync/sync@v0.3.0
-  with:
-    dry-run: true
-    target-filter: 'my-org/api-*'
-```
-
-**Outputs:** `prs-created`, `prs-updated`, `repos-skipped`, `errors`, `summary`
-
-### monitor
-
-Check target repositories for configuration drift and create issues.
-
-```bash
-strspc monitor --config steerspec-sync.yml
-```
-
-**Action usage:**
-
-```yaml
-- uses: SteerSpec/strspc-sync/monitor@v0.3.0
-```
-
-**Outputs:** `repos-in-sync`, `repos-drifted`, `issues-created`, `issues-closed`, `summary`
-
-### conflict
-
-Detect conflicts across AI configuration files in target repositories.
-
-```bash
-strspc conflict --config steerspec-sync.yml
-strspc conflict --config steerspec-sync.yml --tiers 1,2
-```
-
-**Action usage:**
-
-```yaml
-- uses: SteerSpec/strspc-sync/conflict@v0.3.0
-  with:
-    tiers: '1,2'
-```
-
-**Outputs:** `conflicts-found`, `critical-count`, `warning-count`, `info-count`, `summary`
-
-## Configuration
-
-All configuration lives in `steerspec-sync.yml`.
-See [docs/quickstart/steerspec-sync.yml](docs/quickstart/steerspec-sync.yml) for an example
-and the `SYNCCFG` entity in [`rules/`](rules/SYNCCFG.json) for the specification of every key.
-
-## Contributing
+## Community
 
 Bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the build,
-test, and lint workflow. To report a security issue privately, see [SECURITY.md](SECURITY.md).
+test, and lint workflow. Pull requests are reviewed by GitHub Copilot, and an automated approval from a bot is
+expected; see the
+[strspc-pr-review v1.10.2 README](https://github.com/SteerSpec/strspc-pr-review/blob/v1.10.2/README.md).
 
-Pull requests to `main` are reviewed automatically by GitHub Copilot. When that review
-comes back clean, [`pr-auto-approve`](https://github.com/SteerSpec/strspc-pr-review)
-posts the approving review as `cnslr-bt`, which satisfies the required-approval rule — so
-an approval from a bot you have never met is expected, not a misconfiguration.
-
-It approves only when every check has passed and Copilot's latest review is clean for the
-current commit. A push after Copilot reviewed dismisses the approval until Copilot
-re-reviews, and `CHANGES_REQUESTED` always blocks.
-
-## Related projects
+### Related projects
 
 Part of the [SteerSpec](https://steerspec.dev) ecosystem:
 
 - [strspc-rules](https://github.com/SteerSpec/strspc-rules) — canonical rule format specification
 - [strspc-manager](https://github.com/SteerSpec/strspc-manager) — core enforcement engine
 - [strspc-CLI](https://github.com/SteerSpec/strspc-CLI) — render, validate, and manage rule files
-
-## Specification
-
-The SteerSpec Sync specification is the `dev.steerspec.sync` realm in [`rules/`](rules/):
-166 rules across 11 entities (configuration, manifest, templates, sync, monitor and conflict
-actions, deployment state, component registry, versioning), depending on
-[`dev.steerspec.core`](https://github.com/SteerSpec/strspc-rules). Rules are authored with the
-[`strspc` CLI](https://github.com/SteerSpec/strspc-CLI) (`strspc rule add`, `strspc rule promote`)
-and validated in CI (`strspc realm validate`, `strspc lint`, `strspc diff`); every pull request is
-also evaluated against them by `strspc check`.
 
 ## License
 
