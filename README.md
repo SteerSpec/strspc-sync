@@ -11,7 +11,7 @@ repository in a GitHub organization, by pull request.
 [![Marketplace](https://img.shields.io/badge/Marketplace-SteerSpec%20Sync-161B22?labelColor=161B22&logo=github&logoColor=E6EDF3)](https://github.com/marketplace/actions/steerspec-sync)
 <!-- markdownlint-enable MD013 -->
 
-Pre-1.0; the latest release is [v0.4.1](https://github.com/SteerSpec/strspc-sync/releases/tag/v0.4.1).
+Pre-1.0; see [Releases](https://github.com/SteerSpec/strspc-sync/releases) for the current version.
 Sync never force-pushes a git ref and never merges for you (the `--force` flag only skips the
 unchanged-content check): every change lands as a reviewable pull request in the
 target repo. The behaviour is specified by the `dev.steerspec.sync` realm, linked under
@@ -42,7 +42,7 @@ setup that opens a pull request for each new release.
 
 Download an archive and its `checksums.txt` from
 [Releases](https://github.com/SteerSpec/strspc-sync/releases/tag/v0.4.1). Linux ships as `.tar.gz` and macOS as
-`.zip`, for `amd64` and `arm64`:
+`.zip`, for `amd64` and `arm64`. Compare the archive's SHA-256 with the entry in `checksums.txt`:
 
 ```bash
 # Linux (amd64; use linux_arm64 on arm64)
@@ -82,10 +82,8 @@ jobs:
           token: ${{ secrets.STEERSPEC_TOKEN }}
 ```
 
-The `token` input defaults to the workflow's own `GITHUB_TOKEN`, which is scoped to the
-repository running the workflow and cannot open pull requests anywhere else — so pass a
-PAT (or a GitHub App installation token) with `contents` and `pull_requests` write access on
-every target repo. For `auth.method: github-app`, pass `app-id` and `private-key` instead.
+The default `GITHUB_TOKEN` cannot open pull requests in other repositories; see
+[Authentication](docs/configuration.md#authentication) for the token and GitHub App options.
 
 ## Where to go
 
@@ -95,7 +93,7 @@ every target repo. For `auth.method: github-app`, pass `app-id` and `private-key
 | Set up your first central repo | [Quick Start](#quick-start), [docs/quickstart/](docs/quickstart/) |
 | Understand what a run does | [How it works](docs/how-it-works.md) |
 | Run the CLI locally | [CLI Binary](#cli-binary), [Commands](docs/commands.md) |
-| Look up a configuration key | [Configuration](docs/configuration.md) |
+| Look up a configuration key or set up authentication | [Configuration](docs/configuration.md) |
 | Keep the action pin current | [Keeping the pin current](docs/keeping-the-pin-current.md) |
 | Read the specification | [Specification](docs/specification.md) |
 | Build, test or contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |

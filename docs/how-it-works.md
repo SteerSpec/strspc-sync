@@ -2,7 +2,8 @@
 
 Templates live in one central repo. On every run, `strspc` renders each template for each target
 repository, hashes the result with BLAKE3, and compares it against the recorded deployment state.
-Only genuine changes become pull requests — an unchanged render is skipped and opens no pull request.
+A pull request opens only when the BLAKE3 hash of the rendered content differs from the recorded state; an unchanged
+render is skipped.
 
 ```mermaid
 flowchart LR
