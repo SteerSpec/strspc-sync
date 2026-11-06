@@ -14,8 +14,8 @@ repository in a GitHub organization, by pull request.
 <!-- markdownlint-enable MD013 -->
 
 Pre-1.0; see [Releases](https://github.com/SteerSpec/strspc-sync/releases) for the current version.
-Sync never force-pushes a git ref and never merges for you (the `--force` flag only skips the
-unchanged-content check): every change lands as a reviewable pull request in the
+Sync never force-pushes a git ref and never merges for you (the `--force` flag only bypasses the
+recorded deployment-state hash check; unchanged content never opens a pull request): every change lands as a reviewable pull request in the
 target repo. The behaviour is specified by the `dev.steerspec.sync` realm, linked under
 [Specification](docs/specification.md).
 

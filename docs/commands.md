@@ -55,4 +55,4 @@ strspc conflict --config steerspec-sync.yml --tiers 1,2
     tiers: '1,2'
 ```
 
-**Outputs:** `conflicts-found`, `critical-count`, `warning-count`, `info-count`, `summary`
+**Outputs:** `conflicts-found`, `critical-count`, `warning-count`, `info-count`
