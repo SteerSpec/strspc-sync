@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.4.2](https://github.com/SteerSpec/strspc-sync/compare/v0.4.1...v0.4.2) (2026-11-06)
+
+
+### Documentation
+
+* address review (copyright appendix, action pins, force wording, conflict outputs) ([aee28a1](https://github.com/SteerSpec/strspc-sync/commit/aee28a1735a2857a81c867f476e5fb2175f3226f))
+* name Consulare in NOTICE, link it from Governance, add tagged source links ([1cde013](https://github.com/SteerSpec/strspc-sync/commit/1cde0135c4a2bb29c5e727cd8320297970a9647a))
+* qualify when a sync pull request opens ([05545f3](https://github.com/SteerSpec/strspc-sync/commit/05545f307de3e8329d07348d88f51b79c843a1b6))
+* **readme:** add logo, state the licence once ([09336cf](https://github.com/SteerSpec/strspc-sync/commit/09336cfc29e394ebe9623fe20aaadfb5d083bfc5))
+* **readme:** align with README and BRAND rules, refresh pins to v0.4.1 ([0b0433a](https://github.com/SteerSpec/strspc-sync/commit/0b0433ad3ad1eb91a6ea4d42e29a7ae870aa4e7e))
+* **readme:** drop version prose, move auth detail to docs, sharpen wording ([c99b2c1](https://github.com/SteerSpec/strspc-sync/commit/c99b2c1f37927156311f44df4b7120d93b9f0839))
+* **readme:** move reference content to docs/ and align with README rules ([b1dd1b4](https://github.com/SteerSpec/strspc-sync/commit/b1dd1b4a58b3f8041c51386415c4efb5eacb68c6))
+* **readme:** move reference content to docs/, add governance, drop Go badge ([5d4d13d](https://github.com/SteerSpec/strspc-sync/commit/5d4d13d0bfad16b0c9afe9a25653246678133f7a))
+* **readme:** order security before community, drop unmeasured claim, palette logo colour ([d901f3f](https://github.com/SteerSpec/strspc-sync/commit/d901f3fc75d57c4e2c33282a454e24d6d7dd135f))
+* **readme:** qualify approval, check and force-push claims ([2c09f2b](https://github.com/SteerSpec/strspc-sync/commit/2c09f2b28fcbc8652065a13416ffd182dce35f51))
+* **readme:** rewrap long lines ([10a423a](https://github.com/SteerSpec/strspc-sync/commit/10a423abd6051a71f24c5d04570a6dff9deff7ce))
+* show the transparent logo ([4609e46](https://github.com/SteerSpec/strspc-sync/commit/4609e4645563fa8a4186a10e5fc829b646b69e81))
+* tighten sync-flow wording, link CI workflow at v0.4.1 ([19e03d2](https://github.com/SteerSpec/strspc-sync/commit/19e03d2f46e29f27d038aa586499761286c657a0))
+* wrap long line ([abd5708](https://github.com/SteerSpec/strspc-sync/commit/abd570822ea19c429330a19b51eb0428c0ba3a29))
+* wrap long lines, drop the platform claim, list the conflict summary output ([9cab316](https://github.com/SteerSpec/strspc-sync/commit/9cab316225aaa19c94d9fe8892d55b9e0ecc3fa4))
+
 ## [0.4.1](https://github.com/SteerSpec/strspc-sync/compare/v0.4.0...v0.4.1) (2026-11-01)
 
 
