@@ -105,6 +105,8 @@ The default `GITHUB_TOKEN` cannot open pull requests in other repositories; see
 
 Open source software by Consulare.
 
+The copyright holder is named in [NOTICE](NOTICE).
+
 Every change, including the maintainers', lands by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security

@@ -5,6 +5,13 @@ repository, hashes the result with BLAKE3, and compares it against the recorded 
 Unless `--force` is set, a pull request opens only when the BLAKE3 hash of the rendered content differs from the
 recorded state and the target's file differs from the render; an unchanged render is skipped.
 
+Source at v0.4.1: [BLAKE3 hashing][hash]; the [sync flow][sync], which only creates branches and pull requests (no
+ref force-update, no merge call); and the [binary download from the `VERSION` file][action].
+
+[hash]: https://github.com/SteerSpec/strspc-sync/blob/v0.4.1/internal/hash/blake3.go
+[sync]: https://github.com/SteerSpec/strspc-sync/blob/v0.4.1/internal/sync/sync.go
+[action]: https://github.com/SteerSpec/strspc-sync/blob/v0.4.1/action.yml
+
 ```mermaid
 flowchart LR
     C["Central repo<br/><i>templates + steerspec-sync.yml</i>"]
