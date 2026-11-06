@@ -1,3 +1,5 @@
+<img src="https://steerspec.dev/assets/logo.svg" alt="SteerSpec logo" width="96" height="96">
+
 # SteerSpec Sync
 
 SteerSpec Sync is a Go CLI and GitHub Action for platform and engineering teams that distribute AI configuration
@@ -103,8 +105,7 @@ The default `GITHUB_TOKEN` cannot open pull requests in other repositories; see
 
 Open source software by Consulare.
 
-Licensed under Apache 2.0 ([LICENSE](LICENSE)). Every change, including the maintainers', lands by pull request; see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Every change, including the maintainers', lands by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
 
