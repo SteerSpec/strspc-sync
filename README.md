@@ -7,9 +7,9 @@ repository in a GitHub organization, by pull request.
 <!-- markdownlint-disable MD013 -->
 [![CI](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/SteerSpec/strspc-sync?color=161B22&labelColor=161B22)](https://github.com/SteerSpec/strspc-sync/releases)
-[![Go](https://img.shields.io/badge/Go-1.26+-161B22?labelColor=161B22&logo=go&logoColor=white)](https://go.dev)
+[![Go](https://img.shields.io/badge/Go-1.26+-161B22?labelColor=161B22&logo=go&logoColor=E6EDF3)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-161B22?labelColor=161B22)](LICENSE)
-[![Marketplace](https://img.shields.io/badge/Marketplace-SteerSpec%20Sync-161B22?labelColor=161B22&logo=github)](https://github.com/marketplace/actions/steerspec-sync)
+[![Marketplace](https://img.shields.io/badge/Marketplace-SteerSpec%20Sync-161B22?labelColor=161B22&logo=github&logoColor=E6EDF3)](https://github.com/marketplace/actions/steerspec-sync)
 <!-- markdownlint-enable MD013 -->
 
 Pre-1.0; the latest release is [v0.4.1](https://github.com/SteerSpec/strspc-sync/releases/tag/v0.4.1).
@@ -122,8 +122,7 @@ every target repo. For `auth.method: github-app`, pass `app-id` and `private-key
 
 Templates live in one central repo. On every run, `strspc` renders each template for each target
 repository, hashes the result with BLAKE3, and compares it against the recorded deployment state.
-Only genuine changes become pull requests — an unchanged render is skipped, so re-running is cheap
-and quiet.
+Only genuine changes become pull requests — an unchanged render is skipped and opens no pull request.
 
 ```mermaid
 flowchart LR
@@ -223,6 +222,15 @@ actions, deployment state, component registry, versioning), depending on
 and validated in CI (`strspc realm validate`, `strspc lint`, `strspc diff`); every pull request is
 also evaluated against them by `strspc check`.
 
+## License
+
+Apache 2.0 -- see [LICENSE](LICENSE).
+
+## Security
+
+To report a security issue privately, email <security@steerspec.dev> and do not open a public issue. See
+[SECURITY.md](SECURITY.md) for what to include and the response timeline.
+
 ## Contributing
 
 Bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the build,
@@ -236,15 +244,6 @@ an approval from a bot you have never met is expected, not a misconfiguration.
 It approves only when every check has passed and Copilot's latest review is clean for the
 current commit. A push after Copilot reviewed dismisses the approval until Copilot
 re-reviews, and `CHANGES_REQUESTED` always blocks.
-
-## License
-
-Apache 2.0 -- see [LICENSE](LICENSE).
-
-## Security
-
-To report a security issue privately, email <security@steerspec.dev> and do not open a public issue. See
-[SECURITY.md](SECURITY.md) for what to include and the response timeline.
 
 ## Related projects
 
