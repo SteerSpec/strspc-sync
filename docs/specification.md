@@ -8,4 +8,5 @@ sync, monitor and conflict actions, deployment state, component registry and ver
 [`strspc` CLI](https://github.com/SteerSpec/strspc-CLI) (`strspc rule add`, `strspc rule promote`)
 and validated in CI (`strspc realm validate`, `strspc lint`, `strspc diff`); every pull request is
 also checked against them by `strspc check` (structural checks; the AI evaluation runs only where the org
-supplies an `ANTHROPIC_API_KEY`).
+supplies an `ANTHROPIC_API_KEY`). See the
+[CI workflow at v0.4.1](https://github.com/SteerSpec/strspc-sync/blob/v0.4.1/.github/workflows/ci.yml).
