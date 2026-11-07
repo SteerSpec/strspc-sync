@@ -9,7 +9,10 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/state"
 )
 
-var crossRefPattern = regexp.MustCompile(`(?:\.claude/)?((?:agents|skills)/[^\s)]+\.md)`)
+// crossRefPattern finds references to agent and skill files in CLAUDE.md. The path must start a word (beginning of
+// line, whitespace, or an opening bracket, quote or backtick), so "docs/skills/x.md" or a URL is not read as
+// "skills/x.md". The capture keeps an optional "./" or ".claude/" prefix so the path is resolved as written.
+var crossRefPattern = regexp.MustCompile("(?m)(?:^|[\\s(\\[<\"'`])((?:\\./)?(?:\\.claude/)?(?:agents|skills)/[^\\s)\\]>\"'`]+\\.md)")
 
 func (s *Scanner) runTier1(ctx context.Context, deployState *state.DeploymentState, targets []string) ([]ConflictEntry, error) {
 	var entries []ConflictEntry
@@ -107,30 +110,56 @@ func (s *Scanner) checkCrossReferences(ctx context.Context, owner, repo, target 
 		return nil, nil // no CLAUDE.md, nothing to check; a failed read marks the repo incomplete
 	}
 
-	refs := crossRefPattern.FindAllStringSubmatch(string(content), -1)
-	for _, match := range refs {
-		refPath := ".claude/" + match[1]
-		if strings.HasPrefix(match[1], ".claude/") {
-			refPath = match[1]
+	seen := make(map[string]bool)
+	for _, match := range crossRefPattern.FindAllStringSubmatch(string(content), -1) {
+		ref := strings.TrimPrefix(match[1], "./")
+		if seen[ref] {
+			continue
+		}
+		seen[ref] = true
+		// A glob ("skills/*/SKILL.md") names a set of files, not a path. Checking it would need a directory
+		// listing, so it is not reported.
+		if strings.ContainsAny(ref, "*?[") {
+			continue
 		}
 
-		_, found, err := s.readFile(ctx, owner, repo, refPath)
-		if err != nil {
+		exists, ok := s.referenceExists(ctx, owner, repo, ref)
+		if !ok {
 			continue // transient; the repo is marked incomplete
 		}
-		if !found {
+		if !exists {
 			entries = append(entries, ConflictEntry{
 				Severity:            SeverityCritical,
 				Type:                TypeCrossReferenceBroken,
 				Repo:                target,
-				FilePath:            refPath,
-				Description:         fmt.Sprintf("CLAUDE.md references %q but the file does not exist", refPath),
+				FilePath:            ref,
+				Description:         fmt.Sprintf("CLAUDE.md references %q but the file does not exist", ref),
 				SuggestedResolution: "Create the missing file or remove the reference from CLAUDE.md.",
 			})
 		}
 	}
 
 	return entries, nil
+}
+
+// referenceExists resolves a CLAUDE.md reference as written, from the repository root. A reference without the
+// ".claude/" prefix may also mean the file under .claude/, the usual home of agents and skills, so it is found
+// if either path exists. ok is false when a read failed for a reason other than 404.
+func (s *Scanner) referenceExists(ctx context.Context, owner, repo, ref string) (exists, ok bool) {
+	candidates := []string{ref}
+	if !strings.HasPrefix(ref, ".claude/") {
+		candidates = append(candidates, ".claude/"+ref)
+	}
+	for _, path := range candidates {
+		_, found, err := s.readFile(ctx, owner, repo, path)
+		if err != nil {
+			return false, false
+		}
+		if found {
+			return true, true
+		}
+	}
+	return false, true
 }
 
 func (s *Scanner) checkUnmanagedFiles(deployState *state.DeploymentState, target string) []ConflictEntry {
