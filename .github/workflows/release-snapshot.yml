@@ -5,7 +5,7 @@ name: Release snapshot
 # linux and darwin, amd64 and arm64 archives locally and publishes nothing (GH #102).
 #
 # Only PRs that touch what the release build depends on run it: the build inputs, the release config and
-# workflows, and action.yml, which downloads the archives by name.
+# workflows, and the four composite actions, which download the archives by name.
 
 on:
   pull_request:
@@ -15,6 +15,9 @@ on:
       - '.github/workflows/release.yml'
       - '.github/workflows/release-snapshot.yml'
       - 'action.yml'
+      - 'sync/action.yml'
+      - 'monitor/action.yml'
+      - 'conflict/action.yml'
       - 'go.mod'
       - 'go.sum'
       - 'cmd/**'
