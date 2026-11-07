@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.1.1",
-    "timestamp": "2026-11-05T07:49:16Z",
-    "hash": "blake3:97eb464812597328dd7071124209b98cea0323dc3e8d48322ea4096225bf8f35"
+    "version": "0.1.2",
+    "timestamp": "2026-11-07T19:07:34Z",
+    "hash": "blake3:6d48e5d91b9f2b0f1c0831a1ffd808043742eef85f46bfbe648214771d1dc0ad"
   },
   "rules": [
     {
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.1.1",
-        "timestamp": "2026-11-05T07:49:16Z",
-        "hash": "blake3:f890096553704dede2804557d065191806fc471adff1283db9471c90577e17d6"
+        "version": "0.1.2",
+        "timestamp": "2026-11-07T19:07:34Z",
+        "hash": "blake3:ae07cb942d8b243288d78ca71f60f0b99faa51d4af7ea9c7719e74f702dd9ec7"
       },
       "rules": [
         {
@@ -254,9 +254,9 @@
         },
         {
           "id": "CNFLDTS-005",
-          "revision": 0,
+          "revision": 1,
           "state": "D",
-          "body": "Tier 3 MUST be explicitly opted into via configuration and MUST NOT be enabled by default.",
+          "body": "Tier 3 MUST NOT run unless the configuration explicitly opts into it.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null

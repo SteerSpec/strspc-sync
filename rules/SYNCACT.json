@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.1.3",
-    "timestamp": "2026-11-05T07:49:16Z",
-    "hash": "blake3:d5d65727e23e75443cf8e9a440d0f1a910b868048987dd40a371667eb1cdf2c6"
+    "version": "0.1.5",
+    "timestamp": "2026-11-07T19:07:34Z",
+    "hash": "blake3:4732cd968cefa07c1d896275cf4bf2c2c88296489eadfab4287530fab8931198"
   },
   "rules": [
     {
@@ -76,9 +76,9 @@
     },
     {
       "id": "SYNCACT-008",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "MUST NOT fail the entire workflow when a single target repository fails; errors MUST be isolated per repository.",
+      "body": "MUST NOT fail the entire workflow when a single target repository fails.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -207,6 +207,15 @@
       "body": "The reference implementation SHOULD be published as a reusable GitHub Action.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCACT-023",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST isolate errors per target repository, continuing with the other targets when one fails.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-07",
       "supersedes": null
     }
   ],
