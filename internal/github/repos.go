@@ -1,7 +1,6 @@
 package github
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -220,36 +219,48 @@ func (s *repoService) IsSymlink(ctx context.Context, owner, repo, path, ref stri
 	return false, nil
 }
 
+// CreateOrUpdateFile commits content to path on branch, or on the default branch when branch is empty. path is a
+// repository path, not a URL segment. When sha is non-empty it is the blob the caller read, and the write fails
+// if the file at the branch head has changed since, as the Contents API did with a stale sha.
+//
+// The commit goes through GraphQL createCommitOnBranch rather than the Contents API: GitHub signs it whatever the
+// token type, so it passes Signed Commit rulesets (GH #126). The file is written with mode 100644.
 func (s *repoService) CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha, message string) error {
-	u := fmt.Sprintf("%s/repos/%s/%s/contents/%s", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), path)
+	wrap := func(err error) error { return fmt.Errorf("create/update file %s/%s/%s: %w", owner, repo, path, err) }
 
-	body := map[string]string{
-		"message": message,
-		"content": base64.StdEncoding.EncodeToString(content),
+	// The mutation has no default branch, and the deployment state passes none (GH #43).
+	if branch == "" {
+		b, err := s.GetDefaultBranch(ctx, owner, repo)
+		if err != nil {
+			return wrap(err)
+		}
+		branch = b
 	}
-	// Only send "branch" when we actually have one. GitHub does not fall back to
-	// the repository default when the key is present but empty — it answers
-	// 404 "Branch  not found", which is how deployment state silently went
-	// unwritten for months (GH #43). Omitting the key selects the default branch.
-	if branch != "" {
-		body["branch"] = branch
+	head, err := s.GetBranchSHA(ctx, owner, repo, branch)
+	if err != nil {
+		return wrap(err)
 	}
 	if sha != "" {
-		body["sha"] = sha
+		// Read at the head the commit is based on: a change after this check moves the head, and the mutation's
+		// expectedHeadOid then refuses the commit.
+		_, current, err := s.GetFileContent(ctx, owner, repo, escapeRepoPath(path), head)
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			current, err = "", nil
+		}
+		if err != nil {
+			return wrap(err)
+		}
+		if current != sha {
+			if current == "" {
+				current = "none"
+			}
+			return wrap(fmt.Errorf("%w (blob %s, expected %s)", errFileChanged, current, sha))
+		}
 	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return err
+	if err := s.commitFile(ctx, owner, repo, path, branch, head, content, message); err != nil {
+		return wrap(err)
 	}
-
-	resp, err := s.client.doRequest(ctx, http.MethodPut, u, bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	if err := checkResponse(resp); err != nil {
-		return fmt.Errorf("create/update file %s/%s/%s: %w", owner, repo, path, err)
-	}
-	resp.Body.Close() //nolint:errcheck // success response body close is best-effort
 	return nil
 }
 

@@ -433,8 +433,14 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		return rr
 	}
 
-	// Get the file SHA on the branch (for updates)
-	_, fileSHA, _ := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, branchName)
+	// Get the file SHA on the branch (for updates). Only a 404 means the file is absent: an empty sha makes the
+	// write an unconditional overwrite, so a read that failed for another reason must stop here.
+	_, fileSHA, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, branchName)
+	if err != nil && !isNotFound(err) {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("reading %s on %s: %v", tmpl.Destination, branchName, err)
+		return rr
+	}
 
 	// Create or update file on branch
 	commitMsg := updateMessage(s.commitPrefix(), tmpl.ID, tmpl.Version)

@@ -27,7 +27,8 @@ type mockRepoService struct {
 	// symlinks holds "owner/repo/path" entries that IsSymlink reports. GetFileContent still returns their
 	// content as a regular file, as the Contents API does for a working in-repo link.
 	symlinks map[string]bool
-	// getFileErr maps "owner/repo/path" to an error GetFileContent returns instead of the content.
+	// getFileErr maps "owner/repo/path" (any ref) or "owner/repo/path@ref" to an error GetFileContent returns
+	// instead of the content.
 	getFileErr   map[string]error
 	createdFiles []string
 	branchSHAErr error
@@ -77,6 +78,9 @@ func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, r
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if err := m.getFileErr[fmt.Sprintf("%s/%s/%s", owner, repo, path)]; err != nil {
+		return nil, "", err
+	}
+	if err := m.getFileErr[fmt.Sprintf("%s/%s/%s@%s", owner, repo, path, ref)]; err != nil {
 		return nil, "", err
 	}
 	key := fmt.Sprintf("%s/%s/%s/%s", owner, repo, path, ref)
@@ -899,6 +903,50 @@ func TestSyncDoesNotOverwriteWhenDestinationReadFails(t *testing.T) {
 		if strings.Contains(f, "repo-a") {
 			t.Errorf("nothing may be written after a failed read, wrote %v", repoSvc.createdFiles)
 		}
+	}
+}
+
+// The sha read on the sync branch feeds CreateOrUpdateFile, where an empty sha is an unconditional overwrite. A
+// failed read must not pass for a missing file (PR #149 review).
+func TestSyncDoesNotOverwriteWhenBranchReadFails(t *testing.T) {
+	branch := "steerspec-sync/claude-md/1.0.0"
+	tests := []struct {
+		name      string
+		err       error
+		wantWrite bool
+	}{
+		{"server error stops the write", &gh.APIError{StatusCode: http.StatusInternalServerError, Message: "boom"}, false},
+		{"forbidden stops the write", &gh.APIError{StatusCode: http.StatusForbidden, Message: "no"}, false},
+		{"missing file is written", &gh.APIError{StatusCode: http.StatusNotFound, Message: "Not Found"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoSvc := newMockRepoService()
+			prSvc := newMockPRService()
+			repoSvc.repos["testorg"] = []*gh.Repository{
+				{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+			}
+			repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+			repoSvc.getFileErr = map[string]error{"testorg/repo-a/CLAUDE.md@" + branch: tt.err}
+
+			syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+			result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			wrote := false
+			for _, f := range repoSvc.createdFiles {
+				if strings.HasPrefix(f, "testorg/repo-a/") {
+					wrote = true
+				}
+			}
+			if wrote != tt.wantWrite {
+				t.Fatalf("wrote = %v, want %v (result %+v, files %v)", wrote, tt.wantWrite, result, repoSvc.createdFiles)
+			}
+			if !tt.wantWrite && result.Errors != 1 {
+				t.Errorf("Errors = %d, want 1", result.Errors)
+			}
+		})
 	}
 }
 

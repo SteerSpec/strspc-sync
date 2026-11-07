@@ -10,22 +10,30 @@ organization. `go test ./...` never runs them (no tag).
 
 ### How to run
 
-Dispatch the `e2e-test.yml` workflow (`workflow_dispatch` only) with a `ref` input: a branch,
-tag or SHA of this repo. The workflow builds `strspc` from that ref, runs
+The `e2e-test.yml` workflow runs automatically on every `develop` → `main` promotion PR
+(head `develop` in this repo), against the PR head SHA. The repo ruleset `required-e2e` makes
+its `e2e` check required on `main`, so nothing ships untested. Other PRs into `main`, such as
+release-please's, skip the job, and a skipped job passes the check. Each run still waits for an
+`e2e-testbed` reviewer to approve it.
+
+For ad-hoc runs, dispatch the workflow with a `ref` input: a branch, tag or SHA of this repo.
+
+Either way the workflow builds `strspc` from that ref, runs
 `go test -tags e2e ./tests/e2e/... -count=1`, and always runs a cleanup step. Runs are
-serialized by the `e2e-testbed` concurrency group (`cancel-in-progress: false`). Run it before
-tagging a release.
+serialized by the `e2e-testbed` concurrency group (`cancel-in-progress: false`).
 
 Required secrets, org-level, with `strspc-sync` in their repository scope:
 
 - `STEERSPEC_APP_ID`
 - `STEERSPEC_PRIVATE_KEY`
 
-The GitHub App installation token is used for sync itself and for injecting drift through the
-Contents API (App commits are signed by GitHub, so they pass the Signed Commit ruleset). The
-exception is the Contents API `DELETE`: its App commits are not signed and the ruleset rejects
-them with a 409, so the harness deletes files with the GraphQL `createCommitOnBranch` mutation,
-whose commits are signed. A new testbed should be smoke-tested for a write and a delete.
+The GitHub App installation token is used for sync itself and for injecting drift. Writes (sync
+and the harness) go through `CreateOrUpdateFile`, which commits with the GraphQL
+`createCommitOnBranch` mutation (#126), and the harness deletes files with the same mutation:
+GitHub signs those commits, so they pass the Signed Commit ruleset. The Contents API `DELETE` is
+not used because its App commits are unsigned and the ruleset rejects them with a 409 (#108).
+The forced-sync scenario checks that every sync PR commit is verified. A new testbed should be
+smoke-tested for a write and a delete.
 
 ### Testbed repos
 
@@ -75,6 +83,9 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
 7. Create the `e2e-testbed` environment in `strspc-sync` (Settings, Environments) with required
    reviewers. The workflow runs the dispatched ref's tests with the App key, so the reviewer
    approving the run is the trust boundary; do not remove the protection rule.
+8. Give `strspc-e2e-develop`, and no other repo in the org, the topic `strspc-e2e-topic`
+   (`TestSyncTargetSelection` selects it by topic and fails with this step's reference if it is
+   missing).
 
 ### Isolation and cleanup
 
@@ -97,14 +108,25 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
 ### Scenarios
 
 - Sync: a forced sync opens one PR per target with branch `steerspec-sync/<id>/<version>`,
-  expected file content and PR body; deployment state is committed; a rerun opens nothing (#94);
+  expected file content and PR body and only verified (signed) commits (#126);
+  deployment state is committed; a rerun opens nothing (#94);
   a closed-unmerged PR is reported (#91); a no-op rerun writes no state commit (#100).
-- Monitor: drift injected through the App Contents API gives one issue; a rerun adds none
+- Monitor: drift injected with an App commit gives one issue; a rerun adds none
   (fingerprint); reverting the drift closes it.
 - Conflict: tier 1 and tier 2 conflict issues open and auto-close.
 - Edge cases: the symlinked `CLAUDE.md` is skipped with a reason (#82); `develop` default
   branch is honored; per-visibility sources (#80): public targets get the central source,
   private targets get `strspc-e2e-src`, and only the private PR links it.
+- Lifecycle (#156): a template edit at the same version updates the open PR on its branch; a
+  version bump opens a PR on the new branch, reports the previous version and closes the stale
+  PR (`close-stale-prs`); a merged sync PR is recorded as `merged`, and neither a plain nor a
+  forced rerun opens anything.
+- Strategies (#156): `marker` replaces only the managed section and keeps the repo's content
+  byte for byte, appending a section the file lacks; `full-replace` overwrites the file with
+  `{{var}}` substitution.
+- Target selection (#156), from the config alone: include glob plus explicit include, topic,
+  exclude glob, and overrides (an override variable, `exclude_templates`, `include_templates`)
+  yield exactly the expected (repo, template) pairs.
 
 ### Recorded automated runs
 

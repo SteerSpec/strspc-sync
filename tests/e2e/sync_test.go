@@ -41,6 +41,9 @@ func TestSyncForcedOpensPRs(t *testing.T) {
 		if strings.TrimSpace(pr.Title) == "" || strings.TrimSpace(pr.Body) == "" {
 			t.Errorf("%s: empty PR title %q or body", repo, pr.Title)
 		}
+		if bad := env.UnverifiedPRCommits(t, repo, pr.Number); len(bad) > 0 {
+			t.Errorf("%s: PR #%d has unsigned commits (GH #126): %v", repo, pr.Number, bad)
+		}
 		containsAll(t, repo+" PR title", pr.Title, tmplID, syncVersion)
 		containsAll(t, repo+" PR body", pr.Body,
 			"| Previous version | none (first deployment) |", "| New version | `"+syncVersion+"` |")

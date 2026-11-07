@@ -30,6 +30,7 @@ func testClient(t *testing.T, handler http.Handler) *Client {
 		t.Fatal(err)
 	}
 	c.baseURL = srv.URL
+	c.graphqlURL = ""                               // Actions sets GITHUB_GRAPHQL_URL; derive it from the test server instead
 	c.rateLimiter.baseDelay = 10 * time.Millisecond // speed up tests
 	return c
 }
@@ -619,24 +620,6 @@ func TestRepoIsSymlink(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("%s: got %v, want %v", tc.path, got, tc.want)
 		}
-	}
-}
-
-func TestRepoCreateOrUpdateFile(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/repos/o/r/contents/file.txt", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPut {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"content":{"sha":"newsha"}}`) //nolint:errcheck // test handler write
-	})
-
-	c := testClient(t, mux)
-	err := c.Repos.CreateOrUpdateFile(context.Background(), "o", "r", "file.txt", "main", []byte("data"), "oldsha", "update file")
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -1274,45 +1257,5 @@ func TestRepoListByTopicRejectsEmptyOrg(t *testing.T) {
 	}
 	if called {
 		t.Error("an unscoped search was issued despite the empty org")
-	}
-}
-
-// GitHub answers 404 "Branch  not found" when "branch" is present but empty,
-// rather than defaulting to the repository's default branch. Sending it anyway
-// is how deployment state went unwritten for months (GH #43).
-func TestCreateOrUpdateFileOmitsEmptyBranch(t *testing.T) {
-	tests := []struct {
-		name       string
-		branch     string
-		wantBranch bool
-	}{
-		{"empty branch is omitted", "", false},
-		{"real branch is sent", "steerspec-sync/claude-md/1.0.0", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var body map[string]any
-			mux := http.NewServeMux()
-			mux.HandleFunc("/repos/o/r/contents/f.txt", func(w http.ResponseWriter, r *http.Request) {
-				json.NewDecoder(r.Body).Decode(&body) //nolint:errcheck // test handler read
-				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, `{}`) //nolint:errcheck // test handler write
-			})
-
-			c := testClient(t, mux)
-			err := c.Repos.CreateOrUpdateFile(context.Background(), "o", "r", "f.txt", tt.branch, []byte("x"), "", "msg")
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			got, present := body["branch"]
-			if present != tt.wantBranch {
-				t.Fatalf("branch key present = %v, want %v (body: %v)", present, tt.wantBranch, body)
-			}
-			if tt.wantBranch && got != tt.branch {
-				t.Errorf("branch = %v, want %q", got, tt.branch)
-			}
-		})
 	}
 }

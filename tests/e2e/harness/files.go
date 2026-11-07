@@ -120,7 +120,8 @@ func (e *Env) PutFile(ctx context.Context, repo, path string, content []byte, me
 	if err != nil && !IsNotFound(err) {
 		return err
 	}
-	if err := e.Client.Repos.CreateOrUpdateFile(ctx, e.Org, repo, escapePath(path), "", content, sha, message); err != nil {
+	// CreateOrUpdateFile takes a repository path (it commits through GraphQL), so the path is not escaped.
+	if err := e.Client.Repos.CreateOrUpdateFile(ctx, e.Org, repo, path, "", content, sha, message); err != nil {
 		return fmt.Errorf("writing %s/%s: %w", repo, path, err)
 	}
 	return nil
@@ -133,6 +134,17 @@ func (e *Env) WriteFile(t *testing.T, repo, path string, content []byte) {
 	defer cancel()
 	if err := e.PutFile(ctx, repo, path, content, "test(e2e): write "+path+" ["+e.RunID+"]"); err != nil {
 		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
+// Track records how path on repo's default branch looks now, so Cleanup restores it (or deletes it if it did not
+// exist). Use it before a change the harness does not make itself, such as merging a sync PR.
+func (e *Env) Track(t *testing.T, repo, path string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), opTimeout)
+	defer cancel()
+	if err := e.snapshot(ctx, repo, path); err != nil {
+		t.Fatalf("Track: %v", err)
 	}
 }
 
@@ -154,7 +166,7 @@ func (e *Env) resetFile(ctx context.Context, repo, path string, content []byte) 
 	if err == nil && bytes.Equal(cur, content) {
 		return nil
 	}
-	if err := e.Client.Repos.CreateOrUpdateFile(ctx, e.Org, repo, escapePath(path), "", content, sha,
+	if err := e.Client.Repos.CreateOrUpdateFile(ctx, e.Org, repo, path, "", content, sha,
 		"test(e2e): reset "+path+" ["+e.RunID+"]"); err != nil {
 		return fmt.Errorf("resetting %s/%s: %w", repo, path, err)
 	}

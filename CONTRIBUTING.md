@@ -55,7 +55,8 @@ CI enforces a **70% total coverage threshold**, so new code needs tests to land.
 ## Releases
 
 Releases are cut by [release-please](https://github.com/googleapis/release-please) from the
-conventional commits on `main`; nobody tags by hand.
+conventional commits on `main`; nobody tags by hand. Day-to-day work merges into `develop`, which
+is promoted to `main` through a `develop` → `main` pull request.
 
 1. A `release-please` workflow keeps a release PR open that bumps [`VERSION`](VERSION) and the
    changelog. `fix:` gives a patch release, `feat:` a minor one (we are pre-1.0).
@@ -85,7 +86,7 @@ Work in this repo is tracked in GitHub Issues, so please **open an issue before 
 
 Then:
 
-1. Branch off `main`
+1. Branch off `develop` (the default branch) and open the pull request against it
 2. Keep commits focused; reference the issue number in the body
 3. Make sure `go test -race ./...` and `pre-commit run --all-files` pass
 4. Open a pull request describing what changed and why

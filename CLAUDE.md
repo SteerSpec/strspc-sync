@@ -62,7 +62,7 @@ Pre-commit framework runs 6 hooks — install with `pip install pre-commit` then
 | markdownlint | `.markdownlint.yml` |
 | editorconfig-checker | `.editorconfig-checker.json` |
 
-CI runs `go vet`, `go test -race`, and golangci-lint on push/PR to main.
+CI runs `go vet`, `go test -race`, and golangci-lint on push/PR to `develop` and `main`.
 
 ## Code Conventions
 
@@ -102,15 +102,21 @@ docs/quickstart/     Example config + templates
 files, one per entity (`SYNCCFG.json`, `SYNCACT.json`, ...). Edit them only through the CLI so
 versions and hashes stay consistent: `strspc rule add <EUID> --body ... --added-by @you`,
 `strspc rule promote <RULE>`, `strspc note add`. Validate with `strspc realm validate rules
---recursive --strict`, `strspc lint rules --strict` and `strspc diff rules --base origin/main`.
+--recursive --strict`, `strspc lint rules --strict` and `strspc diff rules --base origin/develop`.
 `.strspc/config.yaml` resolves these rules plus `dev.steerspec.core` for `strspc check`.
 
 ## CI/CD
 
 - **ci.yml**: `go vet` + `go test -race` + golangci-lint + lint-extra (actionlint, shellcheck,
-  yamllint, markdownlint) on push/PR to main; 70% coverage threshold enforced natively via
+  yamllint, markdownlint) on push/PR to `develop` and `main`; 70% coverage threshold enforced natively via
   `go tool cover` (no third-party service), with the total written to the run summary and
   `coverage.out` kept as a build artifact
+- **release-please.yml**: on push to `main`, keeps the release PR open against `main` (`target-branch: main`;
+  `develop` is the default branch and is promoted to `main` via PR)
+- **pr-title.yml**: conventional PR title (`pr-title`, required on `develop`); `develop` PRs are squash-merged, so the
+  title is the commit release-please reads. `main` takes merge commits only (promotions and release PRs)
+- **e2e-test.yml**: e2e suite against `testbed-multi-org`; runs on `develop` → `main` promotion PRs (`e2e`, required on
+  `main`, gated by the `e2e-testbed` environment's reviewers) and on manual dispatch. See `tests/e2e/README.md`
 - **release.yml**: pre-flight `go test -race` + build smoke test, then GoReleaser on tag push (`v*`)
 
 ## Auth Pattern

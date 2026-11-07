@@ -1,7 +1,7 @@
 name: Release Please
 
 # Keeps a release PR open that bumps VERSION and the changelog from the
-# conventional commits on main. Merging it creates the vX.Y.Z tag and GitHub
+# conventional commits promoted from develop to main. Merging it creates the vX.Y.Z tag and GitHub
 # release, and the tag push runs release.yml (VERSION check, tests, GoReleaser).
 
 on:
@@ -32,5 +32,8 @@ jobs:
           # Not GITHUB_TOKEN: its tag pushes would not trigger release.yml and its
           # PRs get no CI. Not a PAT either: PAT commits are unsigned.
           token: ${{ steps.app.outputs.token }}
+          # The default branch is develop; releases are cut from main, the
+          # promotion target. Without this the release PR would target develop.
+          target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
