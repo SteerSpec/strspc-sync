@@ -139,6 +139,7 @@ type Client struct {
 	Issues       IssueService
 	httpClient   *http.Client
 	baseURL      string
+	graphqlURL   string // GITHUB_GRAPHQL_URL; empty derives it from baseURL (see graphqlEndpoint)
 	token        string
 	rateLimiter  *rateLimiter
 }
@@ -366,6 +367,7 @@ func NewClient(auth AuthConfig) (*Client, error) {
 	c := &Client{
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		baseURL:    baseURL,
+		graphqlURL: os.Getenv("GITHUB_GRAPHQL_URL"),
 		token:      token,
 		rateLimiter: &rateLimiter{
 			maxRetries: 5,

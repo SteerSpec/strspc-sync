@@ -4,7 +4,10 @@ package harness
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -48,6 +51,44 @@ func (e *Env) PRsWithPrefix(t *testing.T, repo, branchPrefix string) []*gh.PullR
 func (e *Env) PRsWithPrefixState(t *testing.T, repo, state, branchPrefix string) []*gh.PullRequest {
 	t.Helper()
 	return filterPRs(e.ListPRsState(t, repo, state), branchPrefix)
+}
+
+// UnverifiedPRCommits returns the commits of PR number in repo whose signature GitHub does not verify, as
+// "sha: reason". Sync commits through createCommitOnBranch, which GitHub signs (GH #126).
+func (e *Env) UnverifiedPRCommits(t *testing.T, repo string, number int) []string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), opTimeout)
+	defer cancel()
+	path := fmt.Sprintf("/repos/%s/%s/pulls/%d/commits", url.PathEscape(e.Org), url.PathEscape(repo), number)
+	status, body, err := e.api(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		t.Fatalf("UnverifiedPRCommits: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("UnverifiedPRCommits %s#%d: status %d: %s", repo, number, status, body)
+	}
+	var commits []struct {
+		SHA    string `json:"sha"`
+		Commit struct {
+			Verification struct {
+				Verified bool   `json:"verified"`
+				Reason   string `json:"reason"`
+			} `json:"verification"`
+		} `json:"commit"`
+	}
+	if err := json.Unmarshal(body, &commits); err != nil {
+		t.Fatalf("UnverifiedPRCommits: decoding: %v", err)
+	}
+	if len(commits) == 0 {
+		t.Fatalf("UnverifiedPRCommits %s#%d: no commits", repo, number)
+	}
+	var out []string
+	for _, c := range commits {
+		if !c.Commit.Verification.Verified {
+			out = append(out, c.SHA+": "+c.Commit.Verification.Reason)
+		}
+	}
+	return out
 }
 
 func filterPRs(prs []*gh.PullRequest, prefix string) []*gh.PullRequest {

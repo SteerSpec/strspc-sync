@@ -21,11 +21,13 @@ Required secrets, org-level, with `strspc-sync` in their repository scope:
 - `STEERSPEC_APP_ID`
 - `STEERSPEC_PRIVATE_KEY`
 
-The GitHub App installation token is used for sync itself and for injecting drift through the
-Contents API (App commits are signed by GitHub, so they pass the Signed Commit ruleset). The
-exception is the Contents API `DELETE`: its App commits are not signed and the ruleset rejects
-them with a 409, so the harness deletes files with the GraphQL `createCommitOnBranch` mutation,
-whose commits are signed. A new testbed should be smoke-tested for a write and a delete.
+The GitHub App installation token is used for sync itself and for injecting drift. Writes (sync
+and the harness) go through `CreateOrUpdateFile`, which commits with the GraphQL
+`createCommitOnBranch` mutation (#126), and the harness deletes files with the same mutation:
+GitHub signs those commits, so they pass the Signed Commit ruleset. The Contents API `DELETE` is
+not used because its App commits are unsigned and the ruleset rejects them with a 409 (#108).
+The forced-sync scenario checks that every sync PR commit is verified. A new testbed should be
+smoke-tested for a write and a delete.
 
 ### Testbed repos
 
@@ -97,9 +99,10 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
 ### Scenarios
 
 - Sync: a forced sync opens one PR per target with branch `steerspec-sync/<id>/<version>`,
-  expected file content and PR body; deployment state is committed; a rerun opens nothing (#94);
+  expected file content and PR body and only verified (signed) commits (#126);
+  deployment state is committed; a rerun opens nothing (#94);
   a closed-unmerged PR is reported (#91); a no-op rerun writes no state commit (#100).
-- Monitor: drift injected through the App Contents API gives one issue; a rerun adds none
+- Monitor: drift injected with an App commit gives one issue; a rerun adds none
   (fingerprint); reverting the drift closes it.
 - Conflict: tier 1 and tier 2 conflict issues open and auto-close.
 - Edge cases: the symlinked `CLAUDE.md` is skipped with a reason (#82); `develop` default
