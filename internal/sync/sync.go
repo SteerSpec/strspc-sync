@@ -367,6 +367,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 
 	// Compute hash
 	contentHash := hash.HashBytes(rendered)
+	sectionsHash := markerSectionsHash(tmpl, rendered)
 
 	// What the deployment state last recorded for this repo/template. Read
 	// before the force gate: the PR body reports the previous version
@@ -385,7 +386,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		if !dryRun {
 			// Bring the recorded PR status up to date first (GH #56), then the version and hash.
 			s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
-			s.recordInSync(target.Repo, tmpl, contentHash)
+			s.recordInSync(target.Repo, tmpl, contentHash, sectionsHash)
 		}
 		return rr
 	}
@@ -523,6 +524,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		PRNumber:        pr.Number,
 		PRStatus:        "open",
 		PreviousVersion: previousVersion,
+		SectionsHash:    sectionsHash,
 	})
 	s.stateMu.Unlock()
 
@@ -565,12 +567,15 @@ func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, tem
 
 // recordInSync records that the default branch already carries the rendered content, so the hash gate and the
 // monitor agree with the repository. A recorded PR number and status are kept: they describe a PR, not the file.
-func (s *Syncer) recordInSync(fullName string, tmpl config.TemplateConfig, contentHash string) {
+// A record written before SectionsHash existed is rewritten once to gain it.
+func (s *Syncer) recordInSync(fullName string, tmpl config.TemplateConfig, contentHash, sectionsHash string) {
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
-	entry := state.TemplateState{Version: tmpl.Version, Hash: contentHash, Timestamp: time.Now()}
+	entry := state.TemplateState{
+		Version: tmpl.Version, Hash: contentHash, SectionsHash: sectionsHash, Timestamp: time.Now(),
+	}
 	if cur := s.state.GetTemplateState(fullName, tmpl.ID); cur != nil {
-		if cur.Hash == contentHash && cur.Version == tmpl.Version {
+		if cur.Hash == contentHash && cur.Version == tmpl.Version && cur.SectionsHash == sectionsHash {
 			return
 		}
 		entry.PRNumber = cur.PRNumber
@@ -578,6 +583,19 @@ func (s *Syncer) recordInSync(fullName string, tmpl config.TemplateConfig, conte
 		entry.PreviousVersion = cur.PreviousVersion
 	}
 	s.state.SetTemplateState(fullName, tmpl.ID, entry)
+}
+
+// markerSectionsHash is the hash of the managed sections of a marker-strategy render, which drift checks compare
+// instead of the whole file. It is empty for other strategies and when the render holds no section.
+func markerSectionsHash(tmpl config.TemplateConfig, rendered []byte) string {
+	if template.Strategy(tmpl.Strategy) != template.StrategyMarker {
+		return ""
+	}
+	sum, ok, err := template.SectionsHash(rendered)
+	if err != nil || !ok {
+		return ""
+	}
+	return sum
 }
 
 func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string, error) {

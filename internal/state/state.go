@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/SteerSpec/strspc-sync/internal/hash"
+	"github.com/SteerSpec/strspc-sync/internal/template"
 )
 
 type DeploymentState struct {
@@ -25,6 +26,11 @@ type TemplateState struct {
 	// of the same open PR, which would otherwise overwrite the baseline with
 	// the proposed version.
 	PreviousVersion string `json:"previous_version,omitempty"`
+	// SectionsHash is the hash of the managed STEERSPEC:BEGIN/END sections of the rendered file
+	// (template.SectionsHash), recorded for marker-strategy templates only. Drift checks compare it instead of
+	// Hash, so content a repository adds outside the sections is not drift. Empty for other strategies and for
+	// records written before it existed, which fall back to Hash.
+	SectionsHash string `json:"sections_hash,omitempty"`
 }
 
 func NewDeploymentState() *DeploymentState {
@@ -84,4 +90,19 @@ func (ds *DeploymentState) SetTemplateState(repo, templateID string, ts Template
 func (ds *DeploymentState) computeHash() string {
 	data, _ := json.Marshal(ds.Repositories)
 	return hash.HashBytes(data)
+}
+
+// Drift compares content with what this record describes. With a SectionsHash only the managed sections count;
+// otherwise the whole file does. expected and actual are the hashes compared. actual is empty when the record has
+// a SectionsHash and content holds no readable section, which is drift: the managed part is gone or broken.
+func (ts TemplateState) Drift(content []byte) (drifted bool, expected, actual string) {
+	if ts.SectionsHash == "" {
+		actual = hash.HashBytes(content)
+		return actual != ts.Hash, ts.Hash, actual
+	}
+	actual, ok, err := template.SectionsHash(content)
+	if err != nil || !ok {
+		actual = ""
+	}
+	return actual != ts.SectionsHash, ts.SectionsHash, actual
 }

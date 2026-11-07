@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
+	"github.com/SteerSpec/strspc-sync/internal/hash"
+	"github.com/SteerSpec/strspc-sync/internal/template"
 	"github.com/SteerSpec/strspc-sync/tests/e2e/harness"
 )
 
@@ -66,6 +68,16 @@ func TestSyncMarkerKeepsRepoContent(t *testing.T) {
 	}
 	if rendered := string(renderTemplate(t, env, harness.RepoPublic, "sync-marker", src, existing)); got != rendered {
 		t.Errorf("branch content differs from in-process render:\n got: %q\nwant: %q", got, rendered)
+	}
+
+	// Drift checks compare only the managed sections (GH #133), so the state records their hash too.
+	sections, ok, err := template.SectionsHash([]byte(want))
+	if err != nil || !ok {
+		t.Fatalf("SectionsHash of the expected render: %v, %v", ok, err)
+	}
+	ts := env.ReadState(t).GetTemplateState(env.Org+"/"+harness.RepoPublic, env.TemplateID("sync-marker"))
+	if ts == nil || ts.SectionsHash != sections || ts.Hash != hash.HashBytes([]byte(want)) {
+		t.Errorf("state = %+v, want sections_hash %s and the whole-file hash", ts, sections)
 	}
 }
 

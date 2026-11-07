@@ -159,10 +159,10 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 				continue
 			}
 
-			actualHash := hash.HashBytes(content)
+			drifted, expectedHash, actualHash := ts.Drift(content)
 			issTitle := driftIssueTitle(repoFullName, templateID)
 
-			if actualHash == ts.Hash {
+			if !drifted {
 				// In sync. Close existing issue if auto-close is enabled.
 				if autoClose {
 					existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
@@ -184,7 +184,7 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 				Repo:            repoFullName,
 				TemplateID:      templateID,
 				ExpectedVersion: ts.Version,
-				ExpectedHash:    ts.Hash,
+				ExpectedHash:    expectedHash,
 				ActualHash:      actualHash,
 				PRNumber:        ts.PRNumber,
 				FirstDetected:   time.Now(),
