@@ -124,11 +124,21 @@ func TestSyncVersionBumpClosesStalePR(t *testing.T) {
 // forced run opens nothing either, because the default branch already holds the content.
 func TestSyncMergedPRIsRecorded(t *testing.T) {
 	env := harness.New(t)
+	// The merge changes the default branch, and Cleanup restores it only from memory. A run-scoped marker keeps
+	// the merged content distinct from every other run's render, so a run killed before Cleanup cannot leave a
+	// CLAUDE.md that makes later forced syncs see the repo as already current.
+	setTemplate(t, env, basicTemplateShortName, func(tm *config.TemplateConfig) {
+		if tm.Variables == nil {
+			tm.Variables = map[string]string{}
+		}
+		tm.Variables["e2e_marker"] = "merged-" + env.RunID
+	})
 	seedAndForceSync(t, env)
 
 	repo := harness.RepoPublic
 	pr := onlyPR(t, env, repo, basicTemplateShortName)
 	want := renderBasic(t, env, repo)
+	containsAll(t, "merged render", string(want), "merged-"+env.RunID)
 	env.Track(t, repo, basicDestination)
 	env.MergePR(t, repo, pr.Number)
 	harness.Eventually(t, mcWait, func() bool {
