@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.1.5",
-    "timestamp": "2026-11-07T19:04:52Z",
-    "hash": "blake3:af5e84541d98c8690b4d28e7e5968baa5684070b3a06684aab1a216c3569f327"
+    "version": "0.1.8",
+    "timestamp": "2026-11-07T21:26:12Z",
+    "hash": "blake3:a49d9f26d44ea28715dbccd49008cb87326624d9fefc29bdd0b3245e05204053"
   },
   "rules": [
     {
@@ -40,9 +40,9 @@
     },
     {
       "id": "TMPLT-004",
-      "revision": 1,
+      "revision": 2,
       "state": "D",
-      "body": "HAS a source path relative to the central repository, or an owner/repo:path reference to another repository, and MAY declare a source per target visibility (public, internal, private) with the plain source as the fallback; a template MUST have at least one.",
+      "body": "A source IS a path relative to the central repository, or an owner/repo:path reference to another repository.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -88,6 +88,24 @@
       "revision": 0,
       "state": "D",
       "body": "When using the marker strategy, content outside the template's own managed sections belongs to the target repository, and drift detection MUST compare only the template's own sections.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-010",
+      "revision": 0,
+      "state": "D",
+      "body": "MAY declare a source per target visibility (public, internal, private), with the plain source as the fallback.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-011",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST have at least one source, plain or per target visibility.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
       "supersedes": null

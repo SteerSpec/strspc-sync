@@ -617,7 +617,7 @@ func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {
 		t.Errorf("CNFLACT-007: expected no new issues created (should update existing), got %d", len(issues.created))
 	}
 	if len(issues.updated) != 1 {
-		t.Errorf("CNFLACT-007: expected 1 issue updated, got %d", len(issues.updated))
+		t.Errorf("CNFLACT-016: expected 1 issue updated, got %d", len(issues.updated))
 	}
 }
 
