@@ -83,6 +83,9 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
 7. Create the `e2e-testbed` environment in `strspc-sync` (Settings, Environments) with required
    reviewers. The workflow runs the dispatched ref's tests with the App key, so the reviewer
    approving the run is the trust boundary; do not remove the protection rule.
+8. Give `strspc-e2e-develop`, and no other repo in the org, the topic `strspc-e2e-topic`
+   (`TestSyncTargetSelection` selects it by topic and fails with this step's reference if it is
+   missing).
 
 ### Isolation and cleanup
 
@@ -114,6 +117,16 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
 - Edge cases: the symlinked `CLAUDE.md` is skipped with a reason (#82); `develop` default
   branch is honored; per-visibility sources (#80): public targets get the central source,
   private targets get `strspc-e2e-src`, and only the private PR links it.
+- Lifecycle (#156): a template edit at the same version updates the open PR on its branch; a
+  version bump opens a PR on the new branch, reports the previous version and closes the stale
+  PR (`close-stale-prs`); a merged sync PR is recorded as `merged`, and neither a plain nor a
+  forced rerun opens anything.
+- Strategies (#156): `marker` replaces only the managed section and keeps the repo's content
+  byte for byte, appending a section the file lacks; `full-replace` overwrites the file with
+  `{{var}}` substitution.
+- Target selection (#156), from the config alone: include glob plus explicit include, topic,
+  exclude glob, and overrides (an override variable, `exclude_templates`, `include_templates`)
+  yield exactly the expected (repo, template) pairs.
 
 ### Recorded automated runs
 

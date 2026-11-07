@@ -137,6 +137,17 @@ func (e *Env) WriteFile(t *testing.T, repo, path string, content []byte) {
 	}
 }
 
+// Track records how path on repo's default branch looks now, so Cleanup restores it (or deletes it if it did not
+// exist). Use it before a change the harness does not make itself, such as merging a sync PR.
+func (e *Env) Track(t *testing.T, repo, path string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), opTimeout)
+	defer cancel()
+	if err := e.snapshot(ctx, repo, path); err != nil {
+		t.Fatalf("Track: %v", err)
+	}
+}
+
 // ResetFile makes path hold exactly content, writing only when it differs so a no-op reset leaves no commit.
 func (e *Env) ResetFile(t *testing.T, repo, path string, content []byte) {
 	t.Helper()
