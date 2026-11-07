@@ -11,6 +11,7 @@ import (
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/hash"
 	"github.com/SteerSpec/strspc-sync/internal/state"
+	"github.com/SteerSpec/strspc-sync/internal/template"
 )
 
 // --- Mock implementations ---
@@ -187,6 +188,46 @@ func TestTier1_VersionDrift(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected version drift entry, got none")
+	}
+}
+
+// GH #133: with a sections hash recorded, tier 1 ignores a repo's own content outside the managed sections and
+// still reports an edit inside them, with a resolution that says re-running sync keeps the repo's content.
+func TestTier1_VersionDriftManagedSectionsOnly(t *testing.T) {
+	const managed = "<!-- STEERSPEC:BEGIN:org -->\nOrg rules.\n<!-- STEERSPEC:END:org -->\n"
+	deployed := []byte(managed)
+	sections, ok := template.SectionsHash(deployed, []string{"org"})
+	if !ok {
+		t.Fatal("SectionsHash: no sections")
+	}
+	tests := []struct {
+		name    string
+		content string
+		drifted bool
+	}{
+		{"repo-owned content added", "# Repo\n\n## Build\n\nmake\n\n" + managed, false},
+		{"managed section edited", "<!-- STEERSPEC:BEGIN:org -->\nChanged.\n<!-- STEERSPEC:END:org -->\n", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte(tt.content)}}
+			ds := state.NewDeploymentState()
+			ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+				Version: "1.0.0", Hash: hash.HashBytes(deployed), Sections: []string{"org"}, SectionsHash: sections, Timestamp: time.Now(),
+			})
+			scanner := New(testConfig(), newTestClient(repos, &mockIssueService{}), "org", "central")
+			scanner.missingTracked = make(map[string]map[string]bool)
+			entries, err := scanner.checkVersionDrift(context.Background(), ds, "org", "repo1", "org/repo1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := len(entries) == 1; got != tt.drifted {
+				t.Fatalf("drift entries = %+v, want drifted %v", entries, tt.drifted)
+			}
+			if tt.drifted && !strings.Contains(entries[0].SuggestedResolution, "--force") {
+				t.Errorf("resolution = %q, want it to say re-running sync keeps repo content", entries[0].SuggestedResolution)
+			}
+		})
 	}
 }
 

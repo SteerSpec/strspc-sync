@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.1.4",
-    "timestamp": "2026-11-05T07:49:16Z",
-    "hash": "blake3:2be8d6deb03bc876a70a98f86ef434172708bd29d7bea1f58aa17e6f5ac42bb8"
+    "version": "0.1.5",
+    "timestamp": "2026-11-07T19:04:52Z",
+    "hash": "blake3:af5e84541d98c8690b4d28e7e5968baa5684070b3a06684aab1a216c3569f327"
   },
   "rules": [
     {
@@ -81,6 +81,15 @@
       "body": "MAY define template-specific variables.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "TMPLT-009",
+      "revision": 0,
+      "state": "D",
+      "body": "When using the marker strategy, content outside the template's own managed sections belongs to the target repository, and drift detection MUST compare only the template's own sections.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-07",
       "supersedes": null
     }
   ],

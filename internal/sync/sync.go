@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"strings"
 	gosync "sync"
 	"time"
@@ -367,6 +368,12 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 
 	// Compute hash
 	contentHash := hash.HashBytes(rendered)
+	managed, err := markerSections(tmpl, templateContent, rendered)
+	if err != nil {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("reading managed sections: %v", err)
+		return rr
+	}
 
 	// What the deployment state last recorded for this repo/template. Read
 	// before the force gate: the PR body reports the previous version
@@ -385,7 +392,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		if !dryRun {
 			// Bring the recorded PR status up to date first (GH #56), then the version and hash.
 			s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
-			s.recordInSync(target.Repo, tmpl, contentHash)
+			s.recordInSync(target.Repo, tmpl, contentHash, managed)
 		}
 		return rr
 	}
@@ -523,6 +530,8 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		PRNumber:        pr.Number,
 		PRStatus:        "open",
 		PreviousVersion: previousVersion,
+		Sections:        managed.names,
+		SectionsHash:    managed.hash,
 	})
 	s.stateMu.Unlock()
 
@@ -565,12 +574,17 @@ func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, tem
 
 // recordInSync records that the default branch already carries the rendered content, so the hash gate and the
 // monitor agree with the repository. A recorded PR number and status are kept: they describe a PR, not the file.
-func (s *Syncer) recordInSync(fullName string, tmpl config.TemplateConfig, contentHash string) {
+// A record written before SectionsHash existed is rewritten once to gain it.
+func (s *Syncer) recordInSync(fullName string, tmpl config.TemplateConfig, contentHash string, managed managedSections) {
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
-	entry := state.TemplateState{Version: tmpl.Version, Hash: contentHash, Timestamp: time.Now()}
+	entry := state.TemplateState{
+		Version: tmpl.Version, Hash: contentHash, Sections: managed.names, SectionsHash: managed.hash,
+		Timestamp: time.Now(),
+	}
 	if cur := s.state.GetTemplateState(fullName, tmpl.ID); cur != nil {
-		if cur.Hash == contentHash && cur.Version == tmpl.Version {
+		if cur.Hash == contentHash && cur.Version == tmpl.Version && cur.SectionsHash == managed.hash &&
+			slices.Equal(cur.Sections, managed.names) {
 			return
 		}
 		entry.PRNumber = cur.PRNumber
@@ -578,6 +592,36 @@ func (s *Syncer) recordInSync(fullName string, tmpl config.TemplateConfig, conte
 		entry.PreviousVersion = cur.PreviousVersion
 	}
 	s.state.SetTemplateState(fullName, tmpl.ID, entry)
+}
+
+// managedSections names the sections a marker template manages and hashes them in the render. Drift checks
+// compare the hash instead of the whole file. Both are empty for other strategies and for a template without
+// sections.
+type managedSections struct {
+	names []string
+	hash  string
+}
+
+// An error means the template's markers are malformed, or the render holds one of its sections unreadably (a
+// duplicated section in the existing file, of which the marker strategy replaces only the first). Recording only the
+// whole-file hash then would bring back drift for every edit outside the sections, so the repo is reported instead.
+func markerSections(tmpl config.TemplateConfig, templateContent, rendered []byte) (managedSections, error) {
+	if template.Strategy(tmpl.Strategy) != template.StrategyMarker {
+		return managedSections{}, nil
+	}
+	names, err := template.SectionNames(templateContent)
+	if err != nil {
+		return managedSections{}, err
+	}
+	if len(names) == 0 {
+		return managedSections{}, nil
+	}
+	sum, ok := template.SectionsHash(rendered, names)
+	if !ok {
+		return managedSections{}, fmt.Errorf("the managed sections %v are not each present exactly once with "+
+			"matching STEERSPEC markers in %s; fix the markers by hand", names, tmpl.Destination)
+	}
+	return managedSections{names: names, hash: sum}, nil
 }
 
 func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string, error) {

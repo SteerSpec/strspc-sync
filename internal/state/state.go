@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/SteerSpec/strspc-sync/internal/hash"
+	"github.com/SteerSpec/strspc-sync/internal/template"
 )
 
 type DeploymentState struct {
@@ -25,6 +26,13 @@ type TemplateState struct {
 	// of the same open PR, which would otherwise overwrite the baseline with
 	// the proposed version.
 	PreviousVersion string `json:"previous_version,omitempty"`
+	// Sections names the STEERSPEC:BEGIN/END sections the template manages, and SectionsHash is the hash of those
+	// sections in the rendered file (template.SectionsHash). Both are recorded for marker-strategy templates only.
+	// Drift checks compare SectionsHash instead of Hash, so content a repository adds outside those sections, and
+	// sections other templates or the repository own, are not drift. Empty for other strategies and for records
+	// written before they existed, which fall back to Hash.
+	Sections     []string `json:"sections,omitempty"`
+	SectionsHash string   `json:"sections_hash,omitempty"`
 }
 
 func NewDeploymentState() *DeploymentState {
@@ -84,4 +92,28 @@ func (ds *DeploymentState) SetTemplateState(repo, templateID string, ts Template
 func (ds *DeploymentState) computeHash() string {
 	data, _ := json.Marshal(ds.Repositories)
 	return hash.HashBytes(data)
+}
+
+// ExpectedHash is the hash Drift compares a file against: SectionsHash when the record has one, otherwise Hash.
+func (ts TemplateState) ExpectedHash() string {
+	if ts.SectionsHash != "" && len(ts.Sections) > 0 {
+		return ts.SectionsHash
+	}
+	return ts.Hash
+}
+
+// Drift compares content with what this record describes. With a SectionsHash only the template's own sections
+// count; otherwise the whole file does. expected and actual are the hashes compared. actual is empty when the record
+// has a SectionsHash and content lacks one of the sections or has a broken marker, which is drift: the managed
+// part is gone or unreadable.
+func (ts TemplateState) Drift(content []byte) (drifted bool, expected, actual string) {
+	if ts.SectionsHash == "" || len(ts.Sections) == 0 {
+		actual = hash.HashBytes(content)
+		return actual != ts.Hash, ts.Hash, actual
+	}
+	actual, ok := template.SectionsHash(content, ts.Sections)
+	if !ok {
+		actual = ""
+	}
+	return actual != ts.SectionsHash, ts.SectionsHash, actual
 }

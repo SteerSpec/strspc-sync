@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/SteerSpec/strspc-sync/internal/hash"
 	"github.com/SteerSpec/strspc-sync/internal/state"
 )
 
@@ -66,20 +65,38 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 			continue // file may not exist yet (PR not merged) or was deleted
 		}
 
-		actualHash := hash.HashBytes(content)
-		if actualHash != ts.Hash {
-			entries = append(entries, ConflictEntry{
-				Severity:            SeverityCritical,
-				Type:                TypeVersionDrift,
-				Repo:                target,
-				FilePath:            tmplCfg.Destination,
-				Description:         fmt.Sprintf("template %q has drifted: expected hash %s, got %s", templateID, ts.Hash, actualHash),
-				SuggestedResolution: "Re-run sync to update the file, or update the deployment state if the change is intentional.",
-			})
+		drifted, expected, actual := ts.Drift(content)
+		if !drifted {
+			continue
 		}
+		entry := ConflictEntry{
+			Severity:            SeverityCritical,
+			Type:                TypeVersionDrift,
+			Repo:                target,
+			FilePath:            tmplCfg.Destination,
+			Description:         fmt.Sprintf("template %q has drifted: expected hash %s, got %s", templateID, expected, actual),
+			SuggestedResolution: "Re-run sync to update the file, or update the deployment state if the change is intentional.",
+		}
+		if ts.SectionsHash != "" && len(ts.Sections) > 0 {
+			entry.Description = fmt.Sprintf("the managed STEERSPEC sections of template %q have changed: expected hash %s, got %s",
+				templateID, expected, actualOrNone(actual))
+			entry.SuggestedResolution = "Re-run sync with force (`--force`, or the action's `force` input) to " +
+				"restore the managed sections; content outside them is kept. To change a managed section, change " +
+				"the template in the central repository. If a STEERSPEC marker is broken (unclosed, unpaired or " +
+				"nested), fix it by hand first: sync cannot render a file it cannot parse."
+		}
+		entries = append(entries, entry)
 	}
 
 	return entries, nil
+}
+
+// actualOrNone names a missing hash in a drift description.
+func actualOrNone(actual string) string {
+	if actual == "" {
+		return "no readable section"
+	}
+	return actual
 }
 
 func (s *Scanner) checkCrossReferences(ctx context.Context, owner, repo, target string) ([]ConflictEntry, error) {
