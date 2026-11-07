@@ -3,7 +3,7 @@ name: PR Auto-Approve (Copilot)
 # This IS the live workflow for this repo -- not a template to copy anywhere.
 #
 # Generated from templates/pr-auto-approve.yml in SteerSpec/strspc-pr-review
-# (v1.10.0) with only the per-repo values changed: secrets.BOT_TOKEN and the
+# (v1.11.0) with only the per-repo values changed: secrets.BOT_TOKEN and the
 # workflow_run list. Settings come from STRSPC_PR_AUTO_APPROVE_* variables, so
 # policy changes need no edit here; re-sync with the pr-caller-sync skill.
 #
@@ -140,6 +140,11 @@ jobs:
     # trigger a wasted job run and a noisy "skipped: workflow_run: no associated
     # PRs" Slack notification. Delete that branch only if you also deleted the
     # workflow_run trigger.
+    # Every conclusion but skipped re-enters, not only success: a check that fails
+    # on a head the bot already approved (a retitle reruns the title check with
+    # the head unchanged) must reach the action so it can withdraw the approval,
+    # and the action, not this filter, decides what counts as failing (a timeout
+    # or a startup failure does).
     if: >-
       (
         (
@@ -161,7 +166,7 @@ jobs:
         github.event.check_run.pull_requests[0] != null
       ) || (
         github.event_name == 'workflow_run' &&
-        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.conclusion != 'skipped' &&
         github.event.workflow_run.head_repository.full_name == github.repository &&
         github.event.workflow_run.pull_requests[0] != null
       )
@@ -201,6 +206,15 @@ jobs:
           # rounds-by-type to apply (default: '**/*.md,docs/**/*.md').
           copilot-optional-paths: ${{ vars.STRSPC_PR_AUTO_APPROVE_COPILOT_OPTIONAL_PATHS }}
 
+          # Globs whose change stops auto-approval, e.g. 'rules/**,.strspc/**'
+          # (default: off), and what happens then: 'manual' waits for a human
+          # (the default, also for an empty or unknown value), 'allowlist' lets
+          # the normal rules apply when every party is on the allowed logins,
+          # 'approve' always applies them. Promotion and release PRs are not gated.
+          protected-paths: ${{ vars.STRSPC_PR_AUTO_APPROVE_PROTECTED_PATHS }}
+          protected-paths-mode: ${{ vars.STRSPC_PR_AUTO_APPROVE_PROTECTED_PATHS_MODE }}
+          protected-paths-allowed: ${{ vars.STRSPC_PR_AUTO_APPROVE_PROTECTED_PATHS_ALLOWED }}
+
           # Which verdicts in Copilot's overview can pass as clean (default:
           # 'verdict', only 'Approval recommended'). 'no-open-issues' also passes
           # 'Needs a closer look', whose sentence can still name a finding.
@@ -228,7 +242,7 @@ jobs:
           # 0 above are skipped. Disable the ruleset's automatic review first.
           request-copilot-review: ${{ vars.STRSPC_PR_AUTO_APPROVE_REQUEST_COPILOT_REVIEW }}
 
-          # STRONGLY RECOMMENDED if Copilot reviews your PRs: set it to 300.
+          # STRONGLY RECOMMENDED if Copilot reviews your PRs: set it to 600.
           # Without it, a PR whose Copilot review lands AFTER CI is never
           # re-evaluated and sits unapproved forever: Copilot's check_run is
           # GITHUB_TOKEN-created, and any workflow run Copilot itself triggers is
