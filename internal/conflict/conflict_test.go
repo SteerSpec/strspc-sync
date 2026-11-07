@@ -222,6 +222,91 @@ func TestTier1_CrossReferenceBroken(t *testing.T) {
 	}
 }
 
+// TestTier1_CrossReferenceResolution: a reference is resolved as written from the repository root, an unprefixed
+// one may also live under .claude/, globs are not checked, and only a path that resolves nowhere is broken.
+func TestTier1_CrossReferenceResolution(t *testing.T) {
+	tests := []struct {
+		name       string
+		claudeMD   string
+		files      []string
+		wantBroken []string
+	}{
+		{
+			name:     "root-relative path that exists at the root",
+			claudeMD: "Skills live in `skills/deploy/SKILL.md`.",
+			files:    []string{"skills/deploy/SKILL.md"},
+		},
+		{
+			name:     "unprefixed path that exists under .claude",
+			claudeMD: "See agents/helper.md.",
+			files:    []string{".claude/agents/helper.md"},
+		},
+		{
+			name:       ".claude path is not looked up at the root",
+			claudeMD:   "See .claude/agents/helper.md.",
+			files:      []string{"agents/helper.md"},
+			wantBroken: []string{".claude/agents/helper.md"},
+		},
+		{
+			name:     "./ prefix",
+			claudeMD: "See [the skill](./skills/x.md).",
+			files:    []string{"skills/x.md"},
+		},
+		{
+			name:     "glob is not checked",
+			claudeMD: "Each skill has a `skills/*/SKILL.md`, and agents match agents/[a-z]*.md.",
+		},
+		{
+			name:     "path inside another path or a URL is not a reference",
+			claudeMD: "Read docs/skills/x.md and https://example.com/agents/y.md.",
+		},
+		{
+			name:       "missing file reported once, as written",
+			claudeMD:   "Use skills/gone.md.\nAgain: skills/gone.md\n",
+			wantBroken: []string{"skills/gone.md"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := map[string][]byte{"org/repo1/CLAUDE.md": []byte(tt.claudeMD)}
+			for _, f := range tt.files {
+				files["org/repo1/"+f] = []byte("x")
+			}
+			scanner := New(testConfig(), newTestClient(&mockRepoService{files: files}, &mockIssueService{}), "org", "central")
+			entries, err := scanner.checkCrossReferences(context.Background(), "org", "repo1", "org/repo1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, e := range entries {
+				got = append(got, e.FilePath)
+			}
+			if strings.Join(got, ",") != strings.Join(tt.wantBroken, ",") {
+				t.Errorf("broken = %v, want %v", got, tt.wantBroken)
+			}
+		})
+	}
+}
+
+func TestTier1_CrossReferenceReadFailure(t *testing.T) {
+	repos := &mockRepoService{
+		files:     map[string][]byte{"org/repo1/CLAUDE.md": []byte("See skills/x.md.")},
+		failPaths: map[string]bool{"org/repo1/skills/x.md": true},
+	}
+	scanner := New(testConfig(), newTestClient(repos, &mockIssueService{}), "org", "central")
+	scanner.incomplete = make(map[string]bool)
+	entries, err := scanner.checkCrossReferences(context.Background(), "org", "repo1", "org/repo1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("a failed read must not be reported as a broken reference: %+v", entries)
+	}
+	if !scanner.incomplete["org/repo1"] {
+		t.Error("a failed read must mark the repo incomplete")
+	}
+}
+
 func TestTier1_UnmanagedFile(t *testing.T) {
 	repos := &mockRepoService{
 		files: map[string][]byte{},
