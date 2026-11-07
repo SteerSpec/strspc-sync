@@ -196,9 +196,9 @@ func TestTier1_VersionDrift(t *testing.T) {
 func TestTier1_VersionDriftManagedSectionsOnly(t *testing.T) {
 	const managed = "<!-- STEERSPEC:BEGIN:org -->\nOrg rules.\n<!-- STEERSPEC:END:org -->\n"
 	deployed := []byte(managed)
-	sections, ok, err := template.SectionsHash(deployed, []string{"org"})
-	if err != nil || !ok {
-		t.Fatal(err)
+	sections, ok := template.SectionsHash(deployed, []string{"org"})
+	if !ok {
+		t.Fatal("SectionsHash: no sections")
 	}
 	tests := []struct {
 		name    string

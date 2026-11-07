@@ -35,9 +35,9 @@ func savedTemplateState(t *testing.T, repoSvc *mockRepoService, repo string) *st
 
 func wantSectionsHash(t *testing.T, content []byte) string {
 	t.Helper()
-	sum, ok, err := template.SectionsHash(content, []string{"org"})
-	if err != nil || !ok {
-		t.Fatalf("SectionsHash: %v, %v", ok, err)
+	sum, ok := template.SectionsHash(content, []string{"org"})
+	if !ok {
+		t.Fatal("SectionsHash: no sections")
 	}
 	return sum
 }

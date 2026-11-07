@@ -73,9 +73,9 @@ func TestSyncMarkerKeepsRepoContent(t *testing.T) {
 
 	// Drift checks compare only the template's own sections (GH #133), so the state records their names and hash.
 	names := []string{"e2e-extra", "e2e-rules"}
-	sections, ok, err := template.SectionsHash([]byte(want), names)
-	if err != nil || !ok {
-		t.Fatalf("SectionsHash of the expected render: %v, %v", ok, err)
+	sections, ok := template.SectionsHash([]byte(want), names)
+	if !ok {
+		t.Fatal("SectionsHash of the expected render: no sections")
 	}
 	ts := env.ReadState(t).GetTemplateState(env.Org+"/"+harness.RepoPublic, env.TemplateID("sync-marker"))
 	if ts == nil || !slices.Equal(ts.Sections, names) || ts.SectionsHash != sections ||

@@ -605,8 +605,8 @@ func markerSections(tmpl config.TemplateConfig, templateContent, rendered []byte
 	if err != nil || len(names) == 0 {
 		return managedSections{}
 	}
-	sum, ok, err := template.SectionsHash(rendered, names)
-	if err != nil || !ok {
+	sum, ok := template.SectionsHash(rendered, names)
+	if !ok {
 		return managedSections{}
 	}
 	return managedSections{names: names, hash: sum}

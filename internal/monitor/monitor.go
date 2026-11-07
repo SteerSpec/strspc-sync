@@ -126,7 +126,7 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 					Repo:            repoFullName,
 					TemplateID:      templateID,
 					ExpectedVersion: ts.Version,
-					ExpectedHash:    ts.Hash,
+					ExpectedHash:    ts.ExpectedHash(),
 					ActualHash:      "",
 					PRNumber:        ts.PRNumber,
 					FirstDetected:   time.Now(),

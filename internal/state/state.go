@@ -94,6 +94,14 @@ func (ds *DeploymentState) computeHash() string {
 	return hash.HashBytes(data)
 }
 
+// ExpectedHash is the hash Drift compares a file against: SectionsHash when the record has one, otherwise Hash.
+func (ts TemplateState) ExpectedHash() string {
+	if ts.SectionsHash != "" && len(ts.Sections) > 0 {
+		return ts.SectionsHash
+	}
+	return ts.Hash
+}
+
 // Drift compares content with what this record describes. With a SectionsHash only the template's own sections
 // count; otherwise the whole file does. expected and actual are the hashes compared. actual is empty when the record
 // has a SectionsHash and content lacks one of the sections or has a broken marker, which is drift: the managed
@@ -103,8 +111,8 @@ func (ts TemplateState) Drift(content []byte) (drifted bool, expected, actual st
 		actual = hash.HashBytes(content)
 		return actual != ts.Hash, ts.Hash, actual
 	}
-	actual, ok, err := template.SectionsHash(content, ts.Sections)
-	if err != nil || !ok {
+	actual, ok := template.SectionsHash(content, ts.Sections)
+	if !ok {
 		actual = ""
 	}
 	return actual != ts.SectionsHash, ts.SectionsHash, actual

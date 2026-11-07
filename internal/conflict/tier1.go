@@ -77,12 +77,13 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 			Description:         fmt.Sprintf("template %q has drifted: expected hash %s, got %s", templateID, expected, actual),
 			SuggestedResolution: "Re-run sync to update the file, or update the deployment state if the change is intentional.",
 		}
-		if ts.SectionsHash != "" {
+		if ts.SectionsHash != "" && len(ts.Sections) > 0 {
 			entry.Description = fmt.Sprintf("the managed STEERSPEC sections of template %q have changed: expected hash %s, got %s",
 				templateID, expected, actualOrNone(actual))
 			entry.SuggestedResolution = "Re-run sync with force (`--force`, or the action's `force` input) to " +
 				"restore the managed sections; content outside them is kept. To change a managed section, change " +
-				"the template in the central repository."
+				"the template in the central repository. If a STEERSPEC marker is broken (unclosed, unpaired or " +
+				"nested), fix it by hand first: sync cannot render a file it cannot parse."
 		}
 		entries = append(entries, entry)
 	}
