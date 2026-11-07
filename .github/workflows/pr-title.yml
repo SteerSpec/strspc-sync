@@ -1,0 +1,28 @@
+name: PR title
+
+# Pull requests into develop are squashed (merge-method-develop ruleset), so the
+# title is the commit release-please reads. `edited` lets a title fix clear the
+# check without a push.
+#
+# pull_request_target, not pull_request: the check is required, and under
+# pull_request a PR could replace this file with a no-op that still reports
+# `pr-title`. This way the definition comes from the default branch. Safe because
+# nothing is checked out and the action only reads PR metadata; do not add a
+# checkout step here.
+on:
+  pull_request_target:
+    branches: [main, develop]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned by SHA: this runs under pull_request_target with a token, so a
+      # moved tag must not change what runs. Dependabot bumps the pin.
+      - uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6  # v6.1.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

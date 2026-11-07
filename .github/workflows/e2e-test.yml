@@ -1,8 +1,13 @@
 name: E2E (testbed-multi-org)
 
-# Manual-only: this suite WRITES to a real GitHub org (testbed-multi-org). It opens and closes PRs, creates and
-# deletes steerspec-sync/e2e-<run_id>-* branches, commits to default branches through the Contents API (drift
-# injection, state file) and opens/closes drift and conflict issues. Never run it on push, PR or schedule.
+# This suite WRITES to a real GitHub org (testbed-multi-org). It opens and closes PRs, creates and deletes
+# steerspec-sync/e2e-<run_id>-* branches, commits to default branches (drift injection, state file) and opens/closes
+# drift and conflict issues.
+#
+# Triggers: workflow_dispatch for ad-hoc runs, and pull_request into main so every develop -> main promotion is
+# tested before it ships (#154). The job runs only for promotion PRs (head `develop` in this repo, never a fork);
+# other PRs into main, such as release-please's, skip it, and a skipped job satisfies the required `e2e` check. Never
+# add push, schedule or other PR triggers: each run costs a reviewer approval and writes to the testbed.
 #
 # Repos touched (all in testbed-multi-org): strspc-e2e-central (templates, config, state), targets
 # strspc-e2e-public, strspc-e2e-private, strspc-e2e-src, strspc-e2e-symlink and strspc-e2e-develop.
@@ -18,11 +23,14 @@ on:
       ref:
         description: git ref of strspc-sync to build and test
         type: string
-        default: main
+        default: develop
       keep:
         description: skip cleanup for debugging (leaves PRs, branches and issues in the testbed)
         type: boolean
         default: false
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -37,6 +45,12 @@ jobs:
     runs-on: ubuntu-latest
     # Tests 25m + cleanup up to 10m + checkout, setup and build.
     timeout-minutes: 45
+    # Dispatch, or a promotion PR from this repo's develop. The repo check matters: a fork's branch can also be
+    # named develop.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.ref == 'develop' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     # The checked-out ref's tests run with the App key. The environment's required reviewers are the trust gate: the
     # job (and so the secrets) starts only after a reviewer has looked at the ref being run.
     environment: e2e-testbed
@@ -46,11 +60,13 @@ jobs:
       E2E_ORG: testbed-multi-org
       E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
       # Read by the harness so in-test cleanup also leaves the run in place for debugging.
+      # Empty on pull_request, which the harness and the cleanup step treat as false.
       E2E_KEEP: ${{ inputs.keep }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          # The PR head SHA on promotion PRs, so the run tests exactly what is being promoted.
+          ref: ${{ github.event.pull_request.head.sha || inputs.ref }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -93,7 +109,7 @@ jobs:
       - name: Job summary
         if: always()
         env:
-          REF: ${{ inputs.ref }}
+          REF: ${{ github.event.pull_request.head.sha || inputs.ref }}
           KEEP: ${{ inputs.keep }}
           RESULT: ${{ steps.e2e.outcome }}
         run: |
