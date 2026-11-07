@@ -115,6 +115,8 @@ versions and hashes stay consistent: `strspc rule add <EUID> --body ... --added-
   `develop` is the default branch and is promoted to `main` via PR)
 - **pr-title.yml**: conventional PR title (`pr-title`, required on `develop`); `develop` PRs are squash-merged, so the
   title is the commit release-please reads. `main` takes merge commits only (promotions and release PRs)
+- **e2e-test.yml**: e2e suite against `testbed-multi-org`; runs on `develop` → `main` promotion PRs (`e2e`, required on
+  `main`, gated by the `e2e-testbed` environment's reviewers) and on manual dispatch. See `tests/e2e/README.md`
 - **release.yml**: pre-flight `go test -race` + build smoke test, then GoReleaser on tag push (`v*`)
 
 ## Auth Pattern

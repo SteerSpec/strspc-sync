@@ -10,11 +10,17 @@ organization. `go test ./...` never runs them (no tag).
 
 ### How to run
 
-Dispatch the `e2e-test.yml` workflow (`workflow_dispatch` only) with a `ref` input: a branch,
-tag or SHA of this repo. The workflow builds `strspc` from that ref, runs
+The `e2e-test.yml` workflow runs automatically on every `develop` → `main` promotion PR
+(head `develop` in this repo), against the PR head SHA. The repo ruleset `required-e2e` makes
+its `e2e` check required on `main`, so nothing ships untested. Other PRs into `main`, such as
+release-please's, skip the job, and a skipped job passes the check. Each run still waits for an
+`e2e-testbed` reviewer to approve it.
+
+For ad-hoc runs, dispatch the workflow with a `ref` input: a branch, tag or SHA of this repo.
+
+Either way the workflow builds `strspc` from that ref, runs
 `go test -tags e2e ./tests/e2e/... -count=1`, and always runs a cleanup step. Runs are
-serialized by the `e2e-testbed` concurrency group (`cancel-in-progress: false`). Run it before
-tagging a release.
+serialized by the `e2e-testbed` concurrency group (`cancel-in-progress: false`).
 
 Required secrets, org-level, with `strspc-sync` in their repository scope:
 
