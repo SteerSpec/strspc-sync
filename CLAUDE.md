@@ -113,6 +113,8 @@ versions and hashes stay consistent: `strspc rule add <EUID> --body ... --added-
   `coverage.out` kept as a build artifact
 - **release-please.yml**: on push to `main`, keeps the release PR open against `main` (`target-branch: main`;
   `develop` is the default branch and is promoted to `main` via PR)
+- **pr-title.yml**: conventional PR title (`pr-title`, required on `develop`); `develop` PRs are squash-merged, so the
+  title is the commit release-please reads. `main` takes merge commits only (promotions and release PRs)
 - **release.yml**: pre-flight `go test -race` + build smoke test, then GoReleaser on tag push (`v*`)
 
 ## Auth Pattern
