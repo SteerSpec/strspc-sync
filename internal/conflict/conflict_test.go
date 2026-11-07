@@ -123,6 +123,8 @@ func (m *mockPRService) Get(_ context.Context, _, _ string, _ int) (*gh.PullRequ
 	return nil, nil
 }
 
+func (m *mockPRService) DeleteBranch(_ context.Context, _, _, _ string) error { return nil }
+
 func (m *mockPRService) CreateBranch(_ context.Context, _, _, _, _ string) error {
 	return nil
 }

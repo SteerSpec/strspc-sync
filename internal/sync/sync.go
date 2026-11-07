@@ -434,10 +434,20 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	// Create the branch. A 422 means it already exists, which is the normal case
 	// on re-runs; anything else is a real failure and must not be swallowed —
 	// every step below would otherwise operate on a branch that does not exist.
-	if err := s.ghClient.PullRequests.CreateBranch(ctx, owner, repo, branchName, baseSHA); err != nil && !isAlreadyExists(err) {
+	createErr := s.ghClient.PullRequests.CreateBranch(ctx, owner, repo, branchName, baseSHA)
+	if createErr != nil && !isAlreadyExists(createErr) {
 		rr.Status = "error"
-		rr.Error = fmt.Sprintf("creating branch: %v", err)
+		rr.Error = fmt.Sprintf("creating branch: %v", createErr)
 		return rr
+	}
+	// A branch this run created holds no commit of its own until the file is written. If the write fails, delete
+	// it, so failed runs do not leave empty sync branches behind (GH #150). A branch that already existed may
+	// carry an open PR and is left alone.
+	createdBranch := createErr == nil
+	dropBranch := func() {
+		if createdBranch {
+			s.deleteEmptyBranch(ctx, owner, repo, target.Repo, branchName, baseSHA)
+		}
 	}
 
 	// Get the file SHA on the branch (for updates). Only a 404 means the file is absent: an empty sha makes the
@@ -446,6 +456,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	if err != nil && !isNotFound(err) {
 		rr.Status = "error"
 		rr.Error = fmt.Sprintf("reading %s on %s: %v", tmpl.Destination, branchName, err)
+		dropBranch()
 		return rr
 	}
 
@@ -455,6 +466,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	if err != nil {
 		rr.Status = "error"
 		rr.Error = fmt.Sprintf("creating/updating file: %v", err)
+		dropBranch()
 		return rr
 	}
 
@@ -647,7 +659,30 @@ func (s *Syncer) saveState(ctx context.Context) error {
 		return fmt.Errorf("serializing state: %w", err)
 	}
 	msg := s.commitPrefix() + ": update deployment state"
-	return s.ghClient.Repos.CreateOrUpdateFile(ctx, s.centralOwner, s.centralRepo, ".steerspec/deployment-state.json", "", data, s.stateSHA, msg)
+	err = s.ghClient.Repos.CreateOrUpdateFile(ctx, s.centralOwner, s.centralRepo, ".steerspec/deployment-state.json", "", data, s.stateSHA, msg)
+	if err != nil && isRuleRejection(err) {
+		return fmt.Errorf("deployment state not saved: a ruleset or branch protection on the default branch of %s/%s "+
+			"rejected the commit; allow the identity running sync to bypass it "+
+			"(docs/configuration.md, \"Writing the deployment state\"): %w", s.centralOwner, s.centralRepo, err)
+	}
+	return err
+}
+
+// deleteEmptyBranch deletes a sync branch this run created when no file was written to it. The branch is deleted
+// only while its head is still baseSHA, the commit it was created at: a concurrent run that found the branch
+// already there may have committed to it, or opened a PR on it, since. A failure is logged and otherwise ignored:
+// the sync result already reports the write error.
+func (s *Syncer) deleteEmptyBranch(ctx context.Context, owner, repo, fullName, branch, baseSHA string) {
+	head, err := s.ghClient.Repos.GetBranchSHA(ctx, owner, repo, branch)
+	if err != nil || head != baseSHA {
+		sslog.L().Warn("sync branch not deleted: it moved since this run created it, or its head could not be read",
+			"operation", "sync", "repo", fullName, "branch", branch, "head", head, "base", baseSHA, "err", err)
+		return
+	}
+	if err := s.ghClient.PullRequests.DeleteBranch(ctx, owner, repo, branch); err != nil {
+		sslog.L().Warn("could not delete the empty sync branch",
+			"operation", "sync", "repo", fullName, "branch", branch, "err", err)
+	}
 }
 
 // legacyTitlePrefix is the title prefix earlier releases generated
@@ -854,6 +889,13 @@ func isAlreadyExists(err error) bool {
 		return false
 	}
 	return strings.Contains(strings.ToLower(apiErr.Message), "already exists")
+}
+
+// isRuleRejection reports whether err is GitHub refusing a commit because of a ruleset ("Repository rule
+// violations found") or classic branch protection ("Protected branch update failed").
+func isRuleRejection(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "repository rule violation") || strings.Contains(msg, "protected branch")
 }
 
 func splitRepo(fullName string) (owner, repo string) {

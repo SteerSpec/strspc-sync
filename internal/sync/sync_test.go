@@ -32,6 +32,8 @@ type mockRepoService struct {
 	getFileErr   map[string]error
 	createdFiles []string
 	branchSHAErr error
+	// branchSHAs overrides the head GetBranchSHA reports for a branch; any other branch is at "abc123sha".
+	branchSHAs map[string]string
 	// createFileErr maps "owner/repo/path/branch" to an error to return.
 	createFileErr map[string]error
 	// commitMessages records, per CreateOrUpdateFile call, the "owner/repo/path/branch"
@@ -61,9 +63,14 @@ func (m *mockRepoService) GetDefaultBranch(_ context.Context, _, _ string) (stri
 	return m.defaultBranch, nil
 }
 
-func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, _ string) (string, error) {
+func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, branch string) (string, error) {
 	if m.branchSHAErr != nil {
 		return "", m.branchSHAErr
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if sha, ok := m.branchSHAs[branch]; ok {
+		return sha, nil
 	}
 	return "abc123sha", nil
 }
@@ -123,6 +130,8 @@ type mockPRService struct {
 
 	// createBranchErr, when set, is returned by CreateBranch instead of nil.
 	createBranchErr error
+	// deleted records the branches DeleteBranch was called for.
+	deleted []string
 	// createLabelErr, when set, is returned by Create alongside the created PR,
 	// like the real client does when adding the label fails.
 	createLabelErr error
@@ -222,6 +231,13 @@ func (m *mockPRService) Close(_ context.Context, _, _ string, number int) error 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.closed = append(m.closed, number)
+	return nil
+}
+
+func (m *mockPRService) DeleteBranch(_ context.Context, _, _, branch string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.deleted = append(m.deleted, branch)
 	return nil
 }
 
@@ -506,6 +522,10 @@ func (f *failingPRService) Close(ctx context.Context, owner, repo string, number
 	return f.inner.Close(ctx, owner, repo, number)
 }
 
+func (f *failingPRService) DeleteBranch(ctx context.Context, owner, repo, branch string) error {
+	return f.inner.DeleteBranch(ctx, owner, repo, branch)
+}
+
 func (f *failingPRService) CreateBranch(ctx context.Context, owner, repo, branch, baseSHA string) error {
 	return f.inner.CreateBranch(ctx, owner, repo, branch, baseSHA)
 }
@@ -589,6 +609,10 @@ func (s *slowPRService) Get(ctx context.Context, owner, repo string, number int)
 
 func (s *slowPRService) Close(ctx context.Context, owner, repo string, number int) error {
 	return s.inner.Close(ctx, owner, repo, number)
+}
+
+func (s *slowPRService) DeleteBranch(ctx context.Context, owner, repo, branch string) error {
+	return s.inner.DeleteBranch(ctx, owner, repo, branch)
 }
 
 func (s *slowPRService) CreateBranch(ctx context.Context, owner, repo, branch, baseSHA string) error {
