@@ -120,7 +120,8 @@ func (e *Env) PutFile(ctx context.Context, repo, path string, content []byte, me
 	if err != nil && !IsNotFound(err) {
 		return err
 	}
-	if err := e.Client.Repos.CreateOrUpdateFile(ctx, e.Org, repo, escapePath(path), "", content, sha, message); err != nil {
+	// CreateOrUpdateFile takes a repository path (it commits through GraphQL), so the path is not escaped.
+	if err := e.Client.Repos.CreateOrUpdateFile(ctx, e.Org, repo, path, "", content, sha, message); err != nil {
 		return fmt.Errorf("writing %s/%s: %w", repo, path, err)
 	}
 	return nil
@@ -154,7 +155,7 @@ func (e *Env) resetFile(ctx context.Context, repo, path string, content []byte) 
 	if err == nil && bytes.Equal(cur, content) {
 		return nil
 	}
-	if err := e.Client.Repos.CreateOrUpdateFile(ctx, e.Org, repo, escapePath(path), "", content, sha,
+	if err := e.Client.Repos.CreateOrUpdateFile(ctx, e.Org, repo, path, "", content, sha,
 		"test(e2e): reset "+path+" ["+e.RunID+"]"); err != nil {
 		return fmt.Errorf("resetting %s/%s: %w", repo, path, err)
 	}
