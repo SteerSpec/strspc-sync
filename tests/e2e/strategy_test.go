@@ -3,10 +3,13 @@
 package e2e
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
+	"github.com/SteerSpec/strspc-sync/internal/hash"
+	"github.com/SteerSpec/strspc-sync/internal/template"
 	"github.com/SteerSpec/strspc-sync/tests/e2e/harness"
 )
 
@@ -66,6 +69,18 @@ func TestSyncMarkerKeepsRepoContent(t *testing.T) {
 	}
 	if rendered := string(renderTemplate(t, env, harness.RepoPublic, "sync-marker", src, existing)); got != rendered {
 		t.Errorf("branch content differs from in-process render:\n got: %q\nwant: %q", got, rendered)
+	}
+
+	// Drift checks compare only the template's own sections (GH #133), so the state records their names and hash.
+	names := []string{"e2e-extra", "e2e-rules"}
+	sections, ok := template.SectionsHash([]byte(want), names)
+	if !ok {
+		t.Fatal("SectionsHash of the expected render: no sections")
+	}
+	ts := env.ReadState(t).GetTemplateState(env.Org+"/"+harness.RepoPublic, env.TemplateID("sync-marker"))
+	if ts == nil || !slices.Equal(ts.Sections, names) || ts.SectionsHash != sections ||
+		ts.Hash != hash.HashBytes([]byte(want)) {
+		t.Errorf("state = %+v, want sections %v, sections_hash %s and the whole-file hash", ts, names, sections)
 	}
 }
 

@@ -172,6 +172,20 @@ func (s *pullRequestService) CreateBranch(ctx context.Context, owner, repo, bran
 	return nil
 }
 
+func (s *pullRequestService) DeleteBranch(ctx context.Context, owner, repo, branch string) error {
+	u := fmt.Sprintf("%s/repos/%s/%s/git/refs/heads/%s", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo),
+		escapeRepoPath(branch))
+	resp, err := s.client.doRequest(ctx, http.MethodDelete, u, nil)
+	if err != nil {
+		return err
+	}
+	if err := checkResponse(resp); err != nil {
+		return fmt.Errorf("delete branch %s in %s/%s: %w", branch, owner, repo, err)
+	}
+	resp.Body.Close() //nolint:errcheck // success response body close is best-effort
+	return nil
+}
+
 type apiPullRequest struct {
 	Number int    `json:"number"`
 	Title  string `json:"title"`

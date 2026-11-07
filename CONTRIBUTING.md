@@ -68,6 +68,16 @@ is promoted to `main` through a `develop` → `main` pull request.
 The composite actions download the binary named by `VERSION` at the tag, so never edit `VERSION`
 outside the release PR.
 
+release-please reads `main` newest first by commit date and stops at the last release commit, so a
+commit merged to `develop` before a release merged, and promoted after it, can be left out of the
+next changelog. The `release-changelog` status on the release PR
+([`release-changelog.yml`](.github/workflows/release-changelog.yml),
+[`scripts/release-changelog-gate.sh`](scripts/release-changelog-gate.sh)) compares the commits
+`main` gained since the last release, by ancestry, with the PR's `CHANGELOG.md`. When it fails,
+list the missing commits in a `BEGIN_COMMIT_OVERRIDE` block in the body of the latest promotion PR
+(one subject per paragraph, each ending in `(#<pr>)`, closed by `END_COMMIT_OVERRIDE`), then
+re-run the Release Please workflow. Other PRs into `main` get a passing status.
+
 ## Code conventions
 
 - **Formatting**: gofumpt with extra rules (enforced through golangci-lint)

@@ -129,9 +129,10 @@ func TestConflictTier1Lifecycle(t *testing.T) {
 	repo := harness.RepoPublic
 	full := env.Org + "/" + repo
 	synced := mcSyncedContent(env.Org)
+	// refPath is reported as written in CLAUDE.md; neither agents/ nor .claude/agents/ holds the file.
 	const (
 		driftTitle = "[SteerSpec Conflict] version-drift: CLAUDE.md"
-		refPath    = ".claude/agents/e2e-missing.md"
+		refPath    = "agents/e2e-missing.md"
 		refTitle   = "[SteerSpec Conflict] cross-reference-broken: " + refPath
 	)
 
