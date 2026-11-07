@@ -42,6 +42,8 @@ type PullRequestService interface {
 	Update(ctx context.Context, owner, repo string, number int, pr *PullRequestUpdate) error
 	Close(ctx context.Context, owner, repo string, number int) error
 	CreateBranch(ctx context.Context, owner, repo, branch, baseSHA string) error
+	// DeleteBranch deletes a branch. Branch names may contain "/".
+	DeleteBranch(ctx context.Context, owner, repo, branch string) error
 	// Get fetches one pull request, including whether it was merged.
 	Get(ctx context.Context, owner, repo string, number int) (*PullRequest, error)
 }

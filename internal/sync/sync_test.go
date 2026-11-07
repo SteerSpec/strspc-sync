@@ -123,6 +123,8 @@ type mockPRService struct {
 
 	// createBranchErr, when set, is returned by CreateBranch instead of nil.
 	createBranchErr error
+	// deleted records the branches DeleteBranch was called for.
+	deleted []string
 	// createLabelErr, when set, is returned by Create alongside the created PR,
 	// like the real client does when adding the label fails.
 	createLabelErr error
@@ -222,6 +224,13 @@ func (m *mockPRService) Close(_ context.Context, _, _ string, number int) error 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.closed = append(m.closed, number)
+	return nil
+}
+
+func (m *mockPRService) DeleteBranch(_ context.Context, _, _, branch string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.deleted = append(m.deleted, branch)
 	return nil
 }
 
@@ -506,6 +515,10 @@ func (f *failingPRService) Close(ctx context.Context, owner, repo string, number
 	return f.inner.Close(ctx, owner, repo, number)
 }
 
+func (f *failingPRService) DeleteBranch(ctx context.Context, owner, repo, branch string) error {
+	return f.inner.DeleteBranch(ctx, owner, repo, branch)
+}
+
 func (f *failingPRService) CreateBranch(ctx context.Context, owner, repo, branch, baseSHA string) error {
 	return f.inner.CreateBranch(ctx, owner, repo, branch, baseSHA)
 }
@@ -589,6 +602,10 @@ func (s *slowPRService) Get(ctx context.Context, owner, repo string, number int)
 
 func (s *slowPRService) Close(ctx context.Context, owner, repo string, number int) error {
 	return s.inner.Close(ctx, owner, repo, number)
+}
+
+func (s *slowPRService) DeleteBranch(ctx context.Context, owner, repo, branch string) error {
+	return s.inner.DeleteBranch(ctx, owner, repo, branch)
 }
 
 func (s *slowPRService) CreateBranch(ctx context.Context, owner, repo, branch, baseSHA string) error {
