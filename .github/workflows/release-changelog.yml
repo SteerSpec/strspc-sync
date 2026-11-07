@@ -1,0 +1,125 @@
+name: Release changelog
+
+# release-please reads main newest first by commit date and stops at the last
+# release commit, so a commit merged to develop before a release merged, and
+# promoted after it, is left out of the next changelog (GH #148, ported from
+# SteerSpec/strspc-manager).
+# This compares the commits main gained since the last release, by ancestry,
+# with the CHANGELOG.md of the open release pull request, or of main when none
+# is open, and posts the result as the `release-changelog` status on the
+# release pull request head.
+#
+# It runs after every Release Please run, which follows every push to main,
+# because release-please may leave the release pull request untouched when a
+# promotion only brings skipped commits. It also runs on the release pull
+# request itself, so each new head gets a status.
+#
+# pull_request_target, not pull_request: the jobs hold `statuses: write`, so
+# their definition must come from a protected branch (GitHub reads it from the
+# default branch, develop), not from a branch that could be named like the
+# release branch. Safe because it checks out main and only reads the pull
+# request head's CHANGELOG.md as data; never run code from the head here.
+on:
+  workflow_run:
+    workflows: [Release Please]
+    types: [completed]
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+# Concurrency is per job: a group keeps one pending run and a newer one
+# replaces it, so a shared group could drop the run a head is waiting for.
+jobs:
+  # `release-changelog` is a required status on main, so every other pull
+  # request into main, such as a promotion from develop, needs it too. Nothing
+  # to check there: the release pull request that follows is checked.
+  # Statuses belong to a commit, not a pull request, so a head that is also the
+  # release branch head is left alone. A release head is a new commit that
+  # release-please makes, so no other pull request can have it first.
+  other:
+    if: >-
+      github.event_name == 'pull_request_target'
+      && !(github.head_ref == 'release-please--branches--main'
+        && github.event.pull_request.head.repo.full_name == github.repository)
+    # Only the newest head of a pull request needs the status.
+    concurrency:
+      group: release-changelog-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark as not the release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # A missing release branch (404) means no release head to protect;
+          # any other failure stops before posting.
+          if ! release="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release-please--branches--main" \
+            --jq .object.sha 2>&1)"; then
+            if [[ "$release" != *"HTTP 404"* ]]; then
+              echo "$release" >&2
+              exit 1
+            fi
+            release=
+          fi
+          if [[ "$release" == "$HEAD_SHA" ]]; then
+            echo "Head is the release branch head; its status comes from the check job."
+            exit 0
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" \
+            -f state=success -f context=release-changelog \
+            -f description="Not the release pull request" > /dev/null
+
+  check:
+    # Any Release Please conclusion: after a failed run the release pull
+    # request may be stale, which this reports rather than skips.
+    if: >-
+      github.event_name == 'workflow_run'
+      || (github.event_name == 'pull_request_target'
+        && github.head_ref == 'release-please--branches--main'
+        && github.event.pull_request.head.repo.full_name == github.repository)
+    # Serial, and a replaced pending run is harmless: the run that replaces it
+    # reads the current release pull request head and posts on it.
+    concurrency:
+      group: release-changelog
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check the changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # --head matches the branch name only, so a fork could use it too.
+          head="$(gh pr list --base main --head release-please--branches--main \
+            --state open --json headRefOid,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not)][0].headRefOid // empty')"
+          ref=origin/main
+          if [[ -n "$head" ]]; then
+            git fetch --quiet origin "$head"
+            ref="$head"
+          fi
+          status=0
+          scripts/release-changelog-gate.sh origin/main "$ref" || status=$?
+          if [[ -n "$head" ]]; then
+            if ((status == 0)); then
+              state=success description="Every new visible commit is listed"
+            else
+              state=failure description="Commits missing from CHANGELOG.md, see the run"
+            fi
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$head" \
+              -f state="$state" -f context=release-changelog \
+              -f description="$description" \
+              -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+              > /dev/null
+          fi
+          exit "$status"
