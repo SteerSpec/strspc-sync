@@ -439,7 +439,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	createdBranch := createErr == nil
 	dropBranch := func() {
 		if createdBranch {
-			s.deleteEmptyBranch(ctx, owner, repo, target.Repo, branchName)
+			s.deleteEmptyBranch(ctx, owner, repo, target.Repo, branchName, baseSHA)
 		}
 	}
 
@@ -624,9 +624,17 @@ func (s *Syncer) saveState(ctx context.Context) error {
 	return err
 }
 
-// deleteEmptyBranch deletes a sync branch this run created when no file was written to it. A failure is logged
-// and otherwise ignored: the sync result already reports the write error.
-func (s *Syncer) deleteEmptyBranch(ctx context.Context, owner, repo, fullName, branch string) {
+// deleteEmptyBranch deletes a sync branch this run created when no file was written to it. The branch is deleted
+// only while its head is still baseSHA, the commit it was created at: a concurrent run that found the branch
+// already there may have committed to it, or opened a PR on it, since. A failure is logged and otherwise ignored:
+// the sync result already reports the write error.
+func (s *Syncer) deleteEmptyBranch(ctx context.Context, owner, repo, fullName, branch, baseSHA string) {
+	head, err := s.ghClient.Repos.GetBranchSHA(ctx, owner, repo, branch)
+	if err != nil || head != baseSHA {
+		sslog.L().Warn("sync branch not deleted: it moved since this run created it, or its head could not be read",
+			"operation", "sync", "repo", fullName, "branch", branch, "head", head, "base", baseSHA, "err", err)
+		return
+	}
 	if err := s.ghClient.PullRequests.DeleteBranch(ctx, owner, repo, branch); err != nil {
 		sslog.L().Warn("could not delete the empty sync branch",
 			"operation", "sync", "repo", fullName, "branch", branch, "err", err)

@@ -32,6 +32,8 @@ type mockRepoService struct {
 	getFileErr   map[string]error
 	createdFiles []string
 	branchSHAErr error
+	// branchSHAs overrides the head GetBranchSHA reports for a branch; any other branch is at "abc123sha".
+	branchSHAs map[string]string
 	// createFileErr maps "owner/repo/path/branch" to an error to return.
 	createFileErr map[string]error
 	// commitMessages records, per CreateOrUpdateFile call, the "owner/repo/path/branch"
@@ -61,9 +63,14 @@ func (m *mockRepoService) GetDefaultBranch(_ context.Context, _, _ string) (stri
 	return m.defaultBranch, nil
 }
 
-func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, _ string) (string, error) {
+func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, branch string) (string, error) {
 	if m.branchSHAErr != nil {
 		return "", m.branchSHAErr
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if sha, ok := m.branchSHAs[branch]; ok {
+		return sha, nil
 	}
 	return "abc123sha", nil
 }

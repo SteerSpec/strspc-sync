@@ -43,6 +43,45 @@ func TestFailedWriteDeletesCreatedBranch(t *testing.T) {
 	}
 }
 
+// The read of the file on the new branch failing (other than 404) also stops before the write, so the branch is
+// deleted too.
+func TestFailedBranchReadDeletesCreatedBranch(t *testing.T) {
+	repoSvc, prSvc := singleRepoSetup()
+	repoSvc.getFileErr = map[string]error{
+		"testorg/repo-a/CLAUDE.md@" + syncBranch: &gh.APIError{StatusCode: 502, Message: "bad gateway"},
+	}
+
+	result, err := New(makeTestConfig(), &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central").
+		Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Errors != 1 {
+		t.Fatalf("want one error: %+v", result)
+	}
+	if !slices.Equal(prSvc.deleted, []string{syncBranch}) {
+		t.Errorf("deleted branches = %v, want [%s]", prSvc.deleted, syncBranch)
+	}
+}
+
+// A concurrent run that found the branch already there may have committed to it since this run created it. A
+// branch whose head moved off the base it was created at is not deleted.
+func TestFailedWriteKeepsBranchThatMoved(t *testing.T) {
+	repoSvc, prSvc := singleRepoSetup()
+	repoSvc.branchSHAs = map[string]string{syncBranch: "other-run-commit"}
+	repoSvc.createFileErr = map[string]error{
+		"testorg/repo-a/CLAUDE.md/" + syncBranch: errors.New("bad gateway"),
+	}
+
+	if _, err := New(makeTestConfig(), &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central").
+		Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(prSvc.deleted) != 0 {
+		t.Errorf("deleted branches = %v, want none", prSvc.deleted)
+	}
+}
+
 // A branch that already existed may carry an open sync PR: a failed write must not delete it.
 func TestFailedWriteKeepsExistingBranch(t *testing.T) {
 	repoSvc, prSvc := singleRepoSetup()
