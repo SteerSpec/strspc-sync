@@ -18,7 +18,7 @@ on:
       ref:
         description: git ref of strspc-sync to build and test
         type: string
-        default: main
+        default: develop
       keep:
         description: skip cleanup for debugging (leaves PRs, branches and issues in the testbed)
         type: boolean
