@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.3](https://github.com/SteerSpec/strspc-sync/compare/v0.4.2...v0.4.3) (2026-11-07)
+
+
+### Bug Fixes
+
+* **sync:** commit through GraphQL so token auth passes Signed Commit rulesets ([bd5e967](https://github.com/SteerSpec/strspc-sync/commit/bd5e967ec2d45cad1b26a31b1b3c436fa5f5bb63))
+* **sync:** commit through GraphQL so token auth passes Signed Commit rulesets ([f7a9a1c](https://github.com/SteerSpec/strspc-sync/commit/f7a9a1cac181bec367cab6642d896a48f8d18139)), closes [#126](https://github.com/SteerSpec/strspc-sync/issues/126)
+* **sync:** stop when the sync-branch read fails for a reason other than 404 ([4abc4e5](https://github.com/SteerSpec/strspc-sync/commit/4abc4e521ea128901202c94a604748ee0a3bb695)), closes [#126](https://github.com/SteerSpec/strspc-sync/issues/126)
+
+
+### Documentation
+
+* **readme:** center the header like the other SteerSpec repos ([f16de2b](https://github.com/SteerSpec/strspc-sync/commit/f16de2bfa7b05cc9cf1fb62ee678527ea674a216))
+* **readme:** center the header like the other SteerSpec repos ([b79a142](https://github.com/SteerSpec/strspc-sync/commit/b79a1422ef62d517cfe8059012369c4eddca4a5e))
+
 ## [0.4.2](https://github.com/SteerSpec/strspc-sync/compare/v0.4.1...v0.4.2) (2026-11-06)
 
 
