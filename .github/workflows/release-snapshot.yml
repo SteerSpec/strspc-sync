@@ -1,0 +1,61 @@
+name: Release snapshot
+
+# Runs the GoReleaser build of release.yml on pull requests, so a broken .goreleaser.yml (archive name template,
+# GoReleaser version, a missing field) fails here instead of after the signed tag exists. --snapshot builds the
+# linux and darwin, amd64 and arm64 archives locally and publishes nothing (GH #102).
+#
+# Only PRs that touch what the release build depends on run it: the build inputs, the release config and
+# workflows, and the four composite actions, which download the archives by name.
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '.goreleaser.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/release-snapshot.yml'
+      - 'action.yml'
+      - 'sync/action.yml'
+      - 'monitor/action.yml'
+      - 'conflict/action.yml'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/**'
+      - 'VERSION'
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      # Same action and version constraint as release.yml.
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: '~> v2'
+          args: release --snapshot --clean --skip=publish,sign
+      # action.yml downloads strspc_<VERSION>_<os>_<arch>.tar.gz and extracts the strspc binary from the archive
+      # root, so check that every archive exists under that name pattern, then extract and run the linux/amd64
+      # binary the way the action does.
+      - name: Archive names and layout
+        run: |
+          set -euo pipefail
+          ls dist
+          for target in linux_amd64.tar.gz linux_arm64.tar.gz darwin_amd64.zip darwin_arm64.zip; do
+            n=$(find dist -maxdepth 1 -name "strspc_*_${target}" | wc -l)
+            if [ "$n" -ne 1 ]; then
+              echo "::error::expected one dist/strspc_<version>_${target}, found ${n}"
+              exit 1
+            fi
+          done
+          bin="$RUNNER_TEMP/bin"
+          mkdir -p "$bin"
+          tar xzf dist/strspc_*_linux_amd64.tar.gz -C "$bin" strspc
+          "$bin/strspc" version
