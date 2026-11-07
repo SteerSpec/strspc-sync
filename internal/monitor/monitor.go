@@ -242,7 +242,7 @@ func driftIssueBody(e DriftEntry) string {
 	if e.ActualHash != "" {
 		fmt.Fprintf(&b, "**Actual Hash:** `%s`\n", e.ActualHash)
 	} else {
-		b.WriteString("**Actual Hash:** _(file not found)_\n")
+		b.WriteString("**Actual Hash:** _(file not found, or a managed section is missing or unreadable)_\n")
 	}
 	if e.PRNumber > 0 {
 		fmt.Fprintf(&b, "**PR:** #%d\n", e.PRNumber)

@@ -9,12 +9,16 @@ import (
 
 func TestTemplateStateDrift(t *testing.T) {
 	rendered := []byte("# Repo\n<!-- STEERSPEC:BEGIN:org -->\nOrg rules.\n<!-- STEERSPEC:END:org -->\n")
-	sections, ok, err := template.SectionsHash(rendered)
+	names := []string{"org"}
+	sections, ok, err := template.SectionsHash(rendered, names)
 	if err != nil || !ok {
 		t.Fatal(err)
 	}
 	full := hash.HashBytes(rendered)
+	marker := TemplateState{Hash: full, Sections: names, SectionsHash: sections}
 	localEdit := append([]byte("Local build notes.\n"), rendered...)
+	otherSection := append(append([]byte{}, rendered...),
+		[]byte("<!-- STEERSPEC:BEGIN:local -->\nrepo's own\n<!-- STEERSPEC:END:local -->\n")...)
 	sectionEdit := []byte("# Repo\n<!-- STEERSPEC:BEGIN:org -->\nEdited.\n<!-- STEERSPEC:END:org -->\n")
 
 	tests := []struct {
@@ -25,11 +29,13 @@ func TestTemplateStateDrift(t *testing.T) {
 	}{
 		{"whole file: unchanged", TemplateState{Hash: full}, rendered, false},
 		{"whole file: edit outside sections", TemplateState{Hash: full}, localEdit, true},
-		{"sections: unchanged", TemplateState{Hash: full, SectionsHash: sections}, rendered, false},
-		{"sections: edit outside sections", TemplateState{Hash: full, SectionsHash: sections}, localEdit, false},
-		{"sections: edit inside a section", TemplateState{Hash: full, SectionsHash: sections}, sectionEdit, true},
-		{"sections: section removed", TemplateState{Hash: full, SectionsHash: sections}, []byte("# Repo\n"), true},
-		{"sections: broken marker", TemplateState{Hash: full, SectionsHash: sections}, []byte("<!-- STEERSPEC:BEGIN:org -->\n"), true},
+		{"sections: unchanged", marker, rendered, false},
+		{"sections: edit outside sections", marker, localEdit, false},
+		{"sections: another section added", marker, otherSection, false},
+		{"sections: edit inside a section", marker, sectionEdit, true},
+		{"sections: section removed", marker, []byte("# Repo\n"), true},
+		{"sections: broken marker", marker, []byte("<!-- STEERSPEC:BEGIN:org -->\n"), true},
+		{"sections hash without names falls back to the whole file", TemplateState{Hash: full, SectionsHash: sections}, localEdit, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

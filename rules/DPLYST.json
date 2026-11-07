@@ -7,8 +7,8 @@
   },
   "rule_set": {
     "version": "0.1.2",
-    "timestamp": "2026-11-07T18:53:25Z",
-    "hash": "blake3:fbd2b7ca0793b6c09dc56a2020e7db9488babc7a19c57e3544420ac0772be541"
+    "timestamp": "2026-11-07T19:04:52Z",
+    "hash": "blake3:3790e5e86f633caaf69ceca8b81ae47acfdad5124e28c6ee45687bab25a8ba5c"
   },
   "rules": [
     {
@@ -60,7 +60,7 @@
       "id": "DPLYST-006",
       "revision": 0,
       "state": "D",
-      "body": "For a template using the marker strategy, a per-repository record HAS the Blake3 hash of the managed sections of the deployed file.",
+      "body": "For a template using the marker strategy, a per-repository record HAS the names of the sections the template manages and the Blake3 hash of those sections in the deployed file.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
       "supersedes": null

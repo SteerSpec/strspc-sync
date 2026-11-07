@@ -15,7 +15,7 @@ import (
 func TestDriftComparesManagedSectionsOnly(t *testing.T) {
 	const managed = "<!-- STEERSPEC:BEGIN:org -->\nOrg rules.\n<!-- STEERSPEC:END:org -->\n"
 	deployed := []byte("# App\n" + managed)
-	sections, ok, err := template.SectionsHash(deployed)
+	sections, ok, err := template.SectionsHash(deployed, []string{"org"})
 	if err != nil || !ok {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestDriftComparesManagedSectionsOnly(t *testing.T) {
 			issueSvc := newMockIssueService()
 			ds := makeState(map[string]map[string]state.TemplateState{
 				"org/app": {"claude-md": {
-					Version: "1.0", Hash: hash.HashBytes(deployed), SectionsHash: sections, Timestamp: time.Now(),
+					Version: "1.0", Hash: hash.HashBytes(deployed), Sections: []string{"org"}, SectionsHash: sections, Timestamp: time.Now(),
 				}},
 			})
 

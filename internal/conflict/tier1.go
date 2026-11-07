@@ -80,8 +80,9 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 		if ts.SectionsHash != "" {
 			entry.Description = fmt.Sprintf("the managed STEERSPEC sections of template %q have changed: expected hash %s, got %s",
 				templateID, expected, actualOrNone(actual))
-			entry.SuggestedResolution = "Re-run sync to restore the managed sections; content outside them is kept. " +
-				"To change a managed section, change the template in the central repository."
+			entry.SuggestedResolution = "Re-run sync with force (`--force`, or the action's `force` input) to " +
+				"restore the managed sections; content outside them is kept. To change a managed section, change " +
+				"the template in the central repository."
 		}
 		entries = append(entries, entry)
 	}

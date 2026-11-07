@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
@@ -34,7 +35,7 @@ func savedTemplateState(t *testing.T, repoSvc *mockRepoService, repo string) *st
 
 func wantSectionsHash(t *testing.T, content []byte) string {
 	t.Helper()
-	sum, ok, err := template.SectionsHash(content)
+	sum, ok, err := template.SectionsHash(content, []string{"org"})
 	if err != nil || !ok {
 		t.Fatalf("SectionsHash: %v, %v", ok, err)
 	}
@@ -62,6 +63,9 @@ func TestMarkerSyncRecordsSectionsHash(t *testing.T) {
 	ts := savedTemplateState(t, repoSvc, "testorg/repo-a")
 	if want := wantSectionsHash(t, []byte(markerTemplate)); ts.SectionsHash != want {
 		t.Errorf("sections_hash = %q, want %q", ts.SectionsHash, want)
+	}
+	if !slices.Equal(ts.Sections, []string{"org"}) {
+		t.Errorf("sections = %v, want [org]", ts.Sections)
 	}
 	if ts.Hash == ts.SectionsHash {
 		t.Error("hash must stay the whole-file hash")
@@ -97,12 +101,20 @@ func TestMarkerSyncBackfillsSectionsHash(t *testing.T) {
 	}
 }
 
-// Other strategies own the whole file and record no sections hash.
-func TestFullReplaceSyncRecordsNoSectionsHash(t *testing.T) {
-	if got := markerSectionsHash(config.TemplateConfig{Strategy: "full-replace"}, []byte(markerTemplate)); got != "" {
-		t.Errorf("full-replace sections hash = %q, want empty", got)
+// Other strategies own the whole file and record no sections; a marker template without sections records none
+// either. Only the template's own sections are hashed, not others the file holds.
+func TestMarkerSections(t *testing.T) {
+	full := config.TemplateConfig{Strategy: "full-replace"}
+	if got := markerSections(full, []byte(markerTemplate), []byte(markerTemplate)); got.hash != "" || got.names != nil {
+		t.Errorf("full-replace sections = %+v, want none", got)
 	}
-	if got := markerSectionsHash(config.TemplateConfig{Strategy: "marker"}, []byte("no sections\n")); got != "" {
-		t.Errorf("marker render without sections: sections hash = %q, want empty", got)
+	marker := config.TemplateConfig{Strategy: "marker"}
+	if got := markerSections(marker, []byte("no sections\n"), []byte("no sections\n")); got.hash != "" {
+		t.Errorf("marker template without sections = %+v, want none", got)
+	}
+	withOther := []byte(markerTemplate + "<!-- STEERSPEC:BEGIN:local -->\nrepo\n<!-- STEERSPEC:END:local -->\n")
+	got := markerSections(marker, []byte(markerTemplate), withOther)
+	if !slices.Equal(got.names, []string{"org"}) || got.hash != wantSectionsHash(t, []byte(markerTemplate)) {
+		t.Errorf("sections = %+v, want only org", got)
 	}
 }

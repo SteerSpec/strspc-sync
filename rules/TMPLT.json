@@ -7,8 +7,8 @@
   },
   "rule_set": {
     "version": "0.1.5",
-    "timestamp": "2026-11-07T18:53:25Z",
-    "hash": "blake3:fa9451796b4c017470b3d53dce240aa7cf6ffb601170459cc8b972ecae2b09a9"
+    "timestamp": "2026-11-07T19:04:52Z",
+    "hash": "blake3:af5e84541d98c8690b4d28e7e5968baa5684070b3a06684aab1a216c3569f327"
   },
   "rules": [
     {
@@ -87,7 +87,7 @@
       "id": "TMPLT-009",
       "revision": 0,
       "state": "D",
-      "body": "When using the marker strategy, content outside the managed sections belongs to the target repository, and drift detection MUST compare only the managed sections.",
+      "body": "When using the marker strategy, content outside the template's own managed sections belongs to the target repository, and drift detection MUST compare only the template's own sections.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
       "supersedes": null
