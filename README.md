@@ -1,10 +1,12 @@
+<div align="center">
+
 <img src="https://steerspec.dev/assets/logo-transparent.svg" alt="SteerSpec logo" width="96" height="96">
 
 # SteerSpec Sync
 
-SteerSpec Sync is a Go CLI and GitHub Action for platform and engineering teams that distribute AI configuration
-files (`CLAUDE.md`, `.claude/agents/`, `.claude/skills/`, `.claude/settings.json`) from one central repo to every
-repository in a GitHub organization, by pull request.
+**A Go CLI and GitHub Action for platform and engineering teams that distribute AI configuration files
+(`CLAUDE.md`, `.claude/agents/`, `.claude/skills/`, `.claude/settings.json`) from one central repo to every
+repository in a GitHub organization, by pull request.**
 
 <!-- markdownlint-disable MD013 -->
 [![CI](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/SteerSpec/strspc-sync/actions/workflows/ci.yml)
@@ -12,6 +14,11 @@ repository in a GitHub organization, by pull request.
 [![License](https://img.shields.io/badge/License-Apache%202.0-161B22?labelColor=161B22)](LICENSE)
 [![Marketplace](https://img.shields.io/badge/Marketplace-SteerSpec%20Sync-161B22?labelColor=161B22&logo=github&logoColor=E6EDF3)](https://github.com/marketplace/actions/steerspec-sync)
 <!-- markdownlint-enable MD013 -->
+
+[Install](#installation) · [Quick start](#quick-start) · [Where to go](#where-to-go) ·
+[Governance](#governance) · [Security](#security) · [Community](#community)
+
+</div>
 
 Pre-1.0; see [Releases](https://github.com/SteerSpec/strspc-sync/releases) for the current version.
 Sync never force-pushes a git ref and never merges for you (the `--force` flag only bypasses the
