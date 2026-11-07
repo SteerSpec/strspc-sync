@@ -140,3 +140,42 @@ func filterIssues(issues []*gh.Issue, labelOrTitlePrefix string) []*gh.Issue {
 	}
 	return out
 }
+
+// MergePR squash-merges pull request number of repo. GitHub signs the squash commit, so it passes the testbed's
+// Signed Commit ruleset. The merge changes the default branch, so call Track on every file the PR touches first:
+// Cleanup then puts those files back.
+func (e *Env) MergePR(t *testing.T, repo string, number int) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), opTimeout)
+	defer cancel()
+	path := fmt.Sprintf("/repos/%s/%s/pulls/%d/merge", url.PathEscape(e.Org), url.PathEscape(repo), number)
+	status, body, err := e.api(ctx, http.MethodPut, path, map[string]string{"merge_method": "squash"})
+	if err != nil {
+		t.Fatalf("MergePR: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("MergePR %s#%d: status %d: %s", repo, number, status, body)
+	}
+}
+
+// RepoTopics returns the topics of repo.
+func (e *Env) RepoTopics(t *testing.T, repo string) []string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), opTimeout)
+	defer cancel()
+	path := fmt.Sprintf("/repos/%s/%s/topics", url.PathEscape(e.Org), url.PathEscape(repo))
+	status, body, err := e.api(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		t.Fatalf("RepoTopics: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("RepoTopics %s: status %d: %s", repo, status, body)
+	}
+	var resp struct {
+		Names []string `json:"names"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		t.Fatalf("RepoTopics: decoding: %v", err)
+	}
+	return resp.Names
+}

@@ -14,6 +14,7 @@ import (
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/template"
 	"github.com/SteerSpec/strspc-sync/tests/e2e/harness"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -95,15 +96,22 @@ func basicPRs(t *testing.T, env *harness.Env, repo string) []*gh.PullRequest {
 	return env.PRsWithPrefix(t, repo, "steerspec-sync/"+env.TemplateID(basicTemplateShortName)+"/")
 }
 
-// renderBasic renders the sync-basic template for repo exactly as the binary does: global variables, then the
-// template's variables, then the built-ins.
+// renderBasic renders the sync-basic fixture for repo exactly as the binary does.
 func renderBasic(t *testing.T, env *harness.Env, repo string) []byte {
+	t.Helper()
+	return renderTemplate(t, env, repo, basicTemplateShortName, fixture(t, "templates/basic.mustache"), nil)
+}
+
+// renderTemplate renders src as template shortName of the run config for repo, as the binary does: global
+// variables, then the template's variables, then the built-ins. existing is the destination's current content,
+// which only the marker strategy reads. Target override variables are not applied.
+func renderTemplate(t *testing.T, env *harness.Env, repo, shortName string, src, existing []byte) []byte {
 	t.Helper()
 	cfg, err := config.Load(env.ConfigPath)
 	if err != nil {
 		t.Fatalf("loading run config: %v", err)
 	}
-	id := env.TemplateID(basicTemplateShortName)
+	id := env.TemplateID(shortName)
 	vars := map[string]string{}
 	var strategy string
 	for k, v := range cfg.Variables {
@@ -126,11 +134,62 @@ func renderBasic(t *testing.T, env *harness.Env, repo string) []byte {
 	vars["repo_name"] = repo
 	vars["repo_owner"] = env.Org
 	vars["repo_full_name"] = env.Org + "/" + repo
-	out, err := template.Render(template.Strategy(strategy), fixture(t, "templates/basic.mustache"), nil, vars)
+	out, err := template.Render(template.Strategy(strategy), src, existing, vars)
 	if err != nil {
-		t.Fatalf("rendering basic template: %v", err)
+		t.Fatalf("rendering %s: %v", shortName, err)
 	}
 	return out
+}
+
+// editConfig rewrites the run config of env through edit, so a scenario can change templates, targets or sync
+// behaviour the shared fixture does not configure. Template ids in the config are already run-scoped.
+func editConfig(t *testing.T, env *harness.Env, edit func(*config.SyncConfig)) {
+	t.Helper()
+	cfg, err := config.Load(env.ConfigPath)
+	if err != nil {
+		t.Fatalf("loading run config: %v", err)
+	}
+	edit(cfg)
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("encoding config: %v", err)
+	}
+	out := filepath.Join(t.TempDir(), "steerspec-sync.yml")
+	if err := os.WriteFile(out, data, 0o600); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+	env.ConfigPath = out
+}
+
+// setTemplate applies edit to template shortName of the run config, failing t if the config lacks it.
+func setTemplate(t *testing.T, env *harness.Env, shortName string, edit func(*config.TemplateConfig)) {
+	t.Helper()
+	id := env.TemplateID(shortName)
+	editConfig(t, env, func(cfg *config.SyncConfig) {
+		for i := range cfg.Templates {
+			if cfg.Templates[i].ID == id {
+				edit(&cfg.Templates[i])
+				return
+			}
+		}
+		t.Fatalf("template %s not in run config", id)
+	})
+}
+
+// prsFor returns the open sync PRs of repo for template shortName, any version.
+func prsFor(t *testing.T, env *harness.Env, repo, shortName string) []*gh.PullRequest {
+	t.Helper()
+	return env.PRsWithPrefix(t, repo, "steerspec-sync/"+env.TemplateID(shortName)+"/")
+}
+
+// onlyPR returns the single open sync PR of repo for template shortName, failing t unless there is exactly one.
+func onlyPR(t *testing.T, env *harness.Env, repo, shortName string) *gh.PullRequest {
+	t.Helper()
+	prs := prsFor(t, env, repo, shortName)
+	if len(prs) != 1 {
+		t.Fatalf("%s: %d open %s PRs, want 1", repo, len(prs), shortName)
+	}
+	return prs[0]
 }
 
 // closePR closes a pull request without merging it.

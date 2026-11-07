@@ -4,14 +4,10 @@ package e2e
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
@@ -91,22 +87,9 @@ func mcWaitIssues(t *testing.T, env *harness.Env, repo, label, titleSub string, 
 	return got
 }
 
-// mcAddTemplates rewrites the run config of env with extra templates appended, so scenarios can exercise features
-// the shared fixture does not configure (skill and marker templates for conflict tier 2).
+// mcAddTemplates appends extra templates to the run config of env, so scenarios can exercise features the shared
+// fixture does not configure (skill and marker templates for conflict tier 2).
 func mcAddTemplates(t *testing.T, env *harness.Env, extra ...config.TemplateConfig) {
 	t.Helper()
-	cfg, err := config.Load(env.ConfigPath)
-	if err != nil {
-		t.Fatalf("loading run config: %v", err)
-	}
-	cfg.Templates = append(cfg.Templates, extra...)
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		t.Fatalf("encoding config: %v", err)
-	}
-	out := filepath.Join(t.TempDir(), "steerspec-sync.yml")
-	if err := os.WriteFile(out, data, 0o600); err != nil {
-		t.Fatalf("writing config: %v", err)
-	}
-	env.ConfigPath = out
+	editConfig(t, env, func(cfg *config.SyncConfig) { cfg.Templates = append(cfg.Templates, extra...) })
 }
