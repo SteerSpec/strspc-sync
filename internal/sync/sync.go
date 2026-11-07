@@ -368,7 +368,12 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 
 	// Compute hash
 	contentHash := hash.HashBytes(rendered)
-	managed := markerSections(tmpl, templateContent, rendered)
+	managed, err := markerSections(tmpl, templateContent, rendered)
+	if err != nil {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("reading managed sections: %v", err)
+		return rr
+	}
 
 	// What the deployment state last recorded for this repo/template. Read
 	// before the force gate: the PR body reports the previous version
@@ -597,19 +602,26 @@ type managedSections struct {
 	hash  string
 }
 
-func markerSections(tmpl config.TemplateConfig, templateContent, rendered []byte) managedSections {
+// An error means the template's markers are malformed, or the render holds one of its sections unreadably (a
+// duplicated section in the existing file, of which the marker strategy replaces only the first). Recording only the
+// whole-file hash then would bring back drift for every edit outside the sections, so the repo is reported instead.
+func markerSections(tmpl config.TemplateConfig, templateContent, rendered []byte) (managedSections, error) {
 	if template.Strategy(tmpl.Strategy) != template.StrategyMarker {
-		return managedSections{}
+		return managedSections{}, nil
 	}
 	names, err := template.SectionNames(templateContent)
-	if err != nil || len(names) == 0 {
-		return managedSections{}
+	if err != nil {
+		return managedSections{}, err
+	}
+	if len(names) == 0 {
+		return managedSections{}, nil
 	}
 	sum, ok := template.SectionsHash(rendered, names)
 	if !ok {
-		return managedSections{}
+		return managedSections{}, fmt.Errorf("the managed sections %v are not each present exactly once with "+
+			"matching STEERSPEC markers in %s; fix the markers by hand", names, tmpl.Destination)
 	}
-	return managedSections{names: names, hash: sum}
+	return managedSections{names: names, hash: sum}, nil
 }
 
 func (s *Syncer) loadState(ctx context.Context) (*state.DeploymentState, string, error) {

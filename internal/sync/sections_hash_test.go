@@ -102,19 +102,47 @@ func TestMarkerSyncBackfillsSectionsHash(t *testing.T) {
 }
 
 // Other strategies own the whole file and record no sections; a marker template without sections records none
-// either. Only the template's own sections are hashed, not others the file holds.
+// either. Only the template's own sections are hashed, not others the file holds. A template section the render
+// holds unreadably, or a malformed template, is an error rather than a silent whole-file fallback.
 func TestMarkerSections(t *testing.T) {
 	full := config.TemplateConfig{Strategy: "full-replace"}
-	if got := markerSections(full, []byte(markerTemplate), []byte(markerTemplate)); got.hash != "" || got.names != nil {
-		t.Errorf("full-replace sections = %+v, want none", got)
+	if got, err := markerSections(full, []byte(markerTemplate), []byte(markerTemplate)); err != nil ||
+		got.hash != "" || got.names != nil {
+		t.Errorf("full-replace sections = %+v, %v; want none", got, err)
 	}
-	marker := config.TemplateConfig{Strategy: "marker"}
-	if got := markerSections(marker, []byte("no sections\n"), []byte("no sections\n")); got.hash != "" {
-		t.Errorf("marker template without sections = %+v, want none", got)
+	marker := config.TemplateConfig{Strategy: "marker", Destination: "CLAUDE.md"}
+	if got, err := markerSections(marker, []byte("no sections\n"), []byte("no sections\n")); err != nil || got.hash != "" {
+		t.Errorf("marker template without sections = %+v, %v; want none", got, err)
 	}
 	withOther := []byte(markerTemplate + "<!-- STEERSPEC:BEGIN:local -->\nrepo\n<!-- STEERSPEC:END:local -->\n")
-	got := markerSections(marker, []byte(markerTemplate), withOther)
-	if !slices.Equal(got.names, []string{"org"}) || got.hash != wantSectionsHash(t, []byte(markerTemplate)) {
-		t.Errorf("sections = %+v, want only org", got)
+	got, err := markerSections(marker, []byte(markerTemplate), withOther)
+	if err != nil || !slices.Equal(got.names, []string{"org"}) || got.hash != wantSectionsHash(t, []byte(markerTemplate)) {
+		t.Errorf("sections = %+v, %v; want only org", got, err)
+	}
+	if _, err := markerSections(marker, []byte(markerTemplate), []byte(markerTemplate+markerTemplate)); err == nil {
+		t.Error("a duplicated managed section in the render must be an error")
+	}
+	if _, err := markerSections(marker, []byte("<!-- STEERSPEC:BEGIN:org -->\n"), []byte("x")); err == nil {
+		t.Error("a malformed template must be an error")
+	}
+}
+
+// A repo whose file holds a managed section twice is reported, not recorded with a whole-file fallback.
+func TestMarkerSyncReportsDuplicatedSection(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte(markerTemplate)
+	repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = []byte(markerTemplate + "\n" + markerTemplate)
+
+	result, err := New(markerSyncConfig(), &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central").
+		Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Errors != 1 || result.PRsCreated != 0 {
+		t.Fatalf("want one error and no PR: %+v", result.RepoResults)
 	}
 }
