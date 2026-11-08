@@ -434,6 +434,7 @@ func TestTargets(t *testing.T) {
 		{"org/repo*", "org/repo1,org/repo2"},
 		{"org/legacy", "org/legacy"},
 		{"org/none", ""},
+		{"org/legacy, org/repo2", "org/legacy,org/repo2"},
 	} {
 		got, err := scanner.Targets(context.Background(), ds, tt.filter)
 		if err != nil {

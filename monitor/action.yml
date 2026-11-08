@@ -12,7 +12,7 @@ inputs:
     required: false
     default: 'steerspec-sync.yml'
   target-filter:
-    description: 'Glob pattern to filter target repositories'
+    description: 'Comma-separated owner/repo glob patterns; only matching target repositories are processed'
     required: false
     default: ''
   token:

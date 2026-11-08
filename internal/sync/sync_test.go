@@ -407,6 +407,58 @@ func TestTemplateFilter(t *testing.T) {
 	}
 }
 
+// TestFilterLists covers the comma-separated glob lists both filters take (GH #171): before, "a,b" was one glob
+// that matched nothing.
+func TestFilterLists(t *testing.T) {
+	for _, tt := range []struct {
+		name           string
+		targetFilter   string
+		templateFilter string
+		wantPRs        int
+	}{
+		{"template list", "", "claude-md, skill-*", 4},
+		{"target list", "testorg/repo-a,testorg/repo-b", "claude-md", 2},
+		{"target list one", "testorg/repo-b,testorg/none", "claude-md", 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			repoSvc := newMockRepoService()
+			prSvc := newMockPRService()
+			setupMockRepos(repoSvc)
+			cfg := makeTestConfig()
+			cfg.Templates = append(cfg.Templates, config.TemplateConfig{
+				ID:          "skill-review",
+				Version:     "1.0.0",
+				Type:        "skill",
+				Source:      "templates/review.md",
+				Destination: ".claude/skills/review.md",
+				Strategy:    "full-replace",
+			})
+			repoSvc.files["testorg/central/templates/review.md/"] = []byte("review content")
+
+			result, err := New(cfg, makeTestClient(repoSvc, prSvc), "testorg", "central").Run(context.Background(),
+				Options{TargetFilter: tt.targetFilter, TemplateFilter: tt.templateFilter, Trigger: "manual"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.PRsCreated != tt.wantPRs {
+				t.Errorf("PRsCreated = %d, want %d", result.PRsCreated, tt.wantPRs)
+			}
+		})
+	}
+}
+
+func TestInvalidFilter(t *testing.T) {
+	for _, opts := range []Options{{TargetFilter: "testorg/["}, {TemplateFilter: "claude-md,["}} {
+		repoSvc := newMockRepoService()
+		setupMockRepos(repoSvc)
+		_, err := New(makeTestConfig(), makeTestClient(repoSvc, newMockPRService()), "testorg", "central").
+			Run(context.Background(), opts)
+		if err == nil {
+			t.Errorf("Run(%+v) = nil error, want an invalid pattern error", opts)
+		}
+	}
+}
+
 func TestForceBypassesHashCheck(t *testing.T) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()

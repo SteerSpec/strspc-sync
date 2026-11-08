@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"slices"
 	"strings"
 	gosync "sync"
@@ -98,6 +97,18 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 		Timestamp: time.Now().UTC(),
 	}
 
+	// Parse the filters before any API call, so a malformed glob fails fast.
+	targetFilter, err := registry.ParseFilter(opts.TargetFilter)
+	if err != nil {
+		result.Status = "failed"
+		return result, fmt.Errorf("--target-filter: %w", err)
+	}
+	templateFilter, err := registry.ParseFilter(opts.TemplateFilter)
+	if err != nil {
+		result.Status = "failed"
+		return result, fmt.Errorf("--template-filter: %w", err)
+	}
+
 	// Resolve targets
 	targets, err := s.reg.Resolve(ctx, s.cfg.Targets, s.cfg.Variables)
 	if err != nil {
@@ -105,10 +116,7 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 		return result, fmt.Errorf("resolving targets: %w", err)
 	}
 
-	// Filter targets
-	if opts.TargetFilter != "" {
-		targets = filterTargets(targets, opts.TargetFilter)
-	}
+	targets = filterTargets(targets, targetFilter)
 	result.ReposTargeted = len(targets)
 	if len(targets) == 0 {
 		sslog.L().Warn("no target repositories resolved; check that the token can list the organization's repositories (a fine-grained PAT only sees the organization it was issued for) and that targets.include matches",
@@ -133,11 +141,7 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 		s.stateLoaded = fp
 	}
 
-	// Filter templates
-	templates := s.cfg.Templates
-	if opts.TemplateFilter != "" {
-		templates = filterTemplates(templates, opts.TemplateFilter)
-	}
+	templates := filterTemplates(s.cfg.Templates, templateFilter)
 
 	dryRun := opts.DryRun || s.cfg.Sync.DryRun
 
@@ -785,22 +789,20 @@ func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, templateID stri
 	}
 }
 
-func filterTargets(targets []registry.ResolvedTarget, filter string) []registry.ResolvedTarget {
+func filterTargets(targets []registry.ResolvedTarget, filter registry.Filter) []registry.ResolvedTarget {
 	var filtered []registry.ResolvedTarget
 	for _, t := range targets {
-		matched, err := path.Match(filter, t.Repo)
-		if err == nil && matched {
+		if filter.Match(t.Repo) {
 			filtered = append(filtered, t)
 		}
 	}
 	return filtered
 }
 
-func filterTemplates(templates []config.TemplateConfig, filter string) []config.TemplateConfig {
+func filterTemplates(templates []config.TemplateConfig, filter registry.Filter) []config.TemplateConfig {
 	var filtered []config.TemplateConfig
 	for _, t := range templates {
-		matched, err := path.Match(filter, t.ID)
-		if err == nil && matched {
+		if filter.Match(t.ID) {
 			filtered = append(filtered, t)
 		}
 	}

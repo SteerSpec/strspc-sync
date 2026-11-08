@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	pathpkg "path"
 	"sort"
 	"strings"
 	"time"
@@ -32,9 +31,8 @@ const (
 
 // Options controls what the scanner checks.
 type Options struct {
-	ConfigPath   string
-	TargetFilter string
-	Tiers        []int
+	ConfigPath string
+	Tiers      []int
 }
 
 // Scanner orchestrates conflict detection across target repositories.
@@ -178,8 +176,12 @@ func New(cfg *config.SyncConfig, ghClient *gh.Client, centralOwner, centralRepo 
 // Targets returns the repositories to scan, sorted: every repository the config's targets resolve to, so a target
 // without a deployment state entry is scanned too (unmanaged files, GH #174), plus every repository in the deployment
 // state, which may have left targets but still holds synced files. A non-empty filter keeps the repositories whose
-// "owner/repo" it matches as a path.Match glob, as sync applies --target-filter.
+// "owner/repo" it matches, parsed by registry.ParseFilter as sync and monitor parse --target-filter (GH #171).
 func (s *Scanner) Targets(ctx context.Context, deployState *state.DeploymentState, filter string) ([]string, error) {
+	targetFilter, err := registry.ParseFilter(filter)
+	if err != nil {
+		return nil, fmt.Errorf("--target-filter: %w", err)
+	}
 	resolved, err := registry.New(&registry.GitHubLister{Repos: s.ghClient.Repos}).
 		Resolve(ctx, s.cfg.Targets, s.cfg.Variables)
 	if err != nil {
@@ -194,12 +196,9 @@ func (s *Scanner) Targets(ctx context.Context, deployState *state.DeploymentStat
 	}
 	targets := make([]string, 0, len(seen))
 	for repo := range seen {
-		if filter != "" {
-			if ok, err := pathpkg.Match(filter, repo); err != nil || !ok {
-				continue
-			}
+		if targetFilter.Match(repo) {
+			targets = append(targets, repo)
 		}
-		targets = append(targets, repo)
 	}
 	sort.Strings(targets)
 	return targets, nil

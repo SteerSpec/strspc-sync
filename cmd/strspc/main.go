@@ -83,14 +83,14 @@ Commands:
 
 Common Flags:
   --config <path>           Config file path (default: steerspec-sync.yml)
-  --target-filter <glob>    Filter target repositories
+  --target-filter <globs>   Filter target repositories (owner/repo globs, comma-separated)
   --timeout <duration>      Overall operation timeout (default: 10m)
   --log-level <level>       Log level: debug|info|warn|error (default: info)
   --log-format <format>     Log format: auto|json|text (default: auto)
 
 Sync Flags:
   --dry-run                 Preview changes without creating PRs
-  --template-filter <glob>  Filter templates
+  --template-filter <globs> Filter templates (template ID globs, comma-separated)
   --force                   Force sync even if up to date
 
 Conflict Flags:
@@ -394,9 +394,8 @@ func runConflict(args []string, out, errOut io.Writer) error {
 	}
 
 	report, err := scanner.Run(ctx, deployState, targets, conflict.Options{
-		ConfigPath:   common.configPath,
-		TargetFilter: common.targetFilter,
-		Tiers:        tiers,
+		ConfigPath: common.configPath,
+		Tiers:      tiers,
 	})
 	if err != nil {
 		return fmt.Errorf("conflict detection error: %w", err)
