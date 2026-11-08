@@ -40,6 +40,9 @@ func TestSyncPATCommitsSigned(t *testing.T) {
 	for _, repo := range syncTargets {
 		pr := onlyPR(t, env, repo, basicTemplateShortName)
 		author := env.PRAuthor(t, repo, pr.Number)
+		if author == "" {
+			t.Fatalf("%s: PR #%d has no linked author", repo, pr.Number)
+		}
 		if strings.HasSuffix(author, "[bot]") {
 			t.Errorf("%s: PR #%d opened by %s, want the PAT's user, not an App", repo, pr.Number, author)
 		}
