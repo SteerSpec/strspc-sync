@@ -78,57 +78,13 @@ type Syncer struct {
 	stateLoaded string
 }
 
-// repoListerAdapter adapts gh.RepoService to registry.RepoLister.
-type repoListerAdapter struct {
-	repos gh.RepoService
-}
-
-func (a *repoListerAdapter) ListByOrg(ctx context.Context, org string) ([]*registry.ResolvedRepo, error) {
-	ghRepos, err := a.repos.ListByOrg(ctx, org)
-	if err != nil {
-		return nil, err
-	}
-	var result []*registry.ResolvedRepo
-	for _, r := range ghRepos {
-		result = append(result, &registry.ResolvedRepo{
-			Owner:         r.Owner,
-			Name:          r.Name,
-			FullName:      r.FullName,
-			DefaultBranch: r.DefaultBranch,
-			Topics:        r.Topics,
-			Visibility:    r.Visibility,
-		})
-	}
-	return result, nil
-}
-
-func (a *repoListerAdapter) ListByTopic(ctx context.Context, topic, org string) ([]*registry.ResolvedRepo, error) {
-	ghRepos, err := a.repos.ListByTopic(ctx, topic, org)
-	if err != nil {
-		return nil, err
-	}
-	var result []*registry.ResolvedRepo
-	for _, r := range ghRepos {
-		result = append(result, &registry.ResolvedRepo{
-			Owner:         r.Owner,
-			Name:          r.Name,
-			FullName:      r.FullName,
-			DefaultBranch: r.DefaultBranch,
-			Topics:        r.Topics,
-			Visibility:    r.Visibility,
-		})
-	}
-	return result, nil
-}
-
 // New creates a new Syncer. The centralOwner and centralRepo identify the
 // repository that holds templates and deployment state.
 func New(cfg *config.SyncConfig, ghClient *gh.Client, centralOwner, centralRepo string) *Syncer {
-	adapter := &repoListerAdapter{repos: ghClient.Repos}
 	return &Syncer{
 		cfg:          cfg,
 		ghClient:     ghClient,
-		reg:          registry.New(adapter),
+		reg:          registry.New(&registry.GitHubLister{Repos: ghClient.Repos}),
 		centralOwner: centralOwner,
 		centralRepo:  centralRepo,
 	}

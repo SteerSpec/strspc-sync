@@ -380,9 +380,9 @@ func runConflict(args []string, out, errOut io.Writer) error {
 
 	deployState := loadDeploymentState(client, centralOwner, centralRepo)
 
-	var targets []string
-	for repo := range deployState.Repositories {
-		targets = append(targets, repo)
+	targets, err := scanner.Targets(ctx, deployState, common.targetFilter)
+	if err != nil {
+		return fmt.Errorf("conflict detection error: %w", err)
 	}
 
 	report, err := scanner.Run(ctx, deployState, targets, conflict.Options{
