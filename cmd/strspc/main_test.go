@@ -619,3 +619,48 @@ func TestLoadDeploymentState_HappyPath(t *testing.T) {
 		t.Error("expected non-nil deployment state")
 	}
 }
+
+// TestRun_WritesSummaryOutput: every action exposes a summary output read from steps.run.outputs.summary, so each
+// command must write summary to GITHUB_OUTPUT as JSON (GH #172: conflict wrote only report).
+func TestRun_WritesSummaryOutput(t *testing.T) {
+	for _, args := range [][]string{
+		{"sync", "--dry-run"},
+		{"monitor"},
+		{"conflict", "--tiers", "1"},
+	} {
+		t.Run(args[0], func(t *testing.T) {
+			srv := newTestGHServer(t)
+			defer srv.Close()
+			t.Setenv("GITHUB_API_URL", srv.URL)
+			t.Setenv("GITHUB_TOKEN", "fake-token")
+			t.Setenv("GITHUB_REPOSITORY", "testorg/central")
+			outFile := filepath.Join(t.TempDir(), "github_output")
+			if err := os.WriteFile(outFile, nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("GITHUB_OUTPUT", outFile)
+
+			cfgPath := writeTestConfig(t, "")
+			var out, errOut strings.Builder
+			if code := run(append([]string{args[0], "--config", cfgPath}, args[1:]...), &out, &errOut); code != 0 {
+				t.Fatalf("exit %d; stderr: %s", code, errOut.String())
+			}
+			data, err := os.ReadFile(outFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var summary string
+			for _, line := range strings.Split(string(data), "\n") {
+				if v, ok := strings.CutPrefix(line, "summary="); ok {
+					summary = v
+				}
+			}
+			if summary == "" {
+				t.Fatalf("no summary output; GITHUB_OUTPUT:\n%s", data)
+			}
+			if !json.Valid([]byte(summary)) {
+				t.Errorf("summary is not JSON: %s", summary)
+			}
+		})
+	}
+}

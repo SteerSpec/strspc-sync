@@ -47,6 +47,17 @@ for action in "${actions[@]}"; do
   fi
 done
 
+# strspc conflict writes report and summary to GITHUB_OUTPUT; the actions that run it must expose both
+# (rule CNFLACT, SteerSpec/strspc-sync#172).
+for action in action.yml conflict/action.yml; do
+  for output in report summary; do
+    if ! grep -Eq "^    value: \\$\\{\\{ steps\\.run\\.outputs\\.${output} \\}\\}$" "$action"; then
+      echo "FAIL: $action does not expose the conflict output ${output}"
+      failures=$((failures + 1))
+    fi
+  done
+done
+
 if [ "$failures" -ne 0 ]; then
   echo "$failures assertion(s) failed"
   exit 1
