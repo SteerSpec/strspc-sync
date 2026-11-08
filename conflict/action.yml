@@ -16,7 +16,7 @@ inputs:
     required: false
     default: ''
   tiers:
-    description: 'Comma-separated detection tiers to run (e.g. "1,2,3")'
+    description: 'Comma-separated detection tiers to run (e.g. "1,2"; tier 3 is experimental and not implemented yet)'
     required: false
     default: ''
   token:

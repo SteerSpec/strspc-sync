@@ -94,7 +94,7 @@ Sync Flags:
   --force                   Force sync even if up to date
 
 Conflict Flags:
-  --tiers <list>            Detection tiers to run (e.g. "1,2,3")
+  --tiers <list>            Detection tiers to run (e.g. "1,2"; tier 3 is experimental, not implemented yet)
 `)
 }
 

@@ -20,7 +20,8 @@ repository in a GitHub organization, by pull request.**
 
 </div>
 
-Pre-1.0; see [Releases](https://github.com/SteerSpec/strspc-sync/releases) for the current version.
+Pre-1.0; see [Releases](https://github.com/SteerSpec/strspc-sync/releases) for the current version and
+[Compatibility](docs/compatibility.md) for what semver will cover from 1.0.0.
 Sync never force-pushes a git ref and never merges for you (the `--force` flag only bypasses the
 recorded deployment-state hash check; unchanged content never opens a pull request): every change
 lands as a reviewable pull request in the target repo. The behaviour is specified by the
@@ -106,6 +107,7 @@ The default `GITHUB_TOKEN` cannot open pull requests in other repositories; see
 | Look up a configuration key or set up authentication | [Configuration](docs/configuration.md) |
 | Keep the action pin current | [Keeping the pin current](docs/keeping-the-pin-current.md) |
 | Read the specification | [Specification](docs/specification.md) |
+| Know what a release may change | [Compatibility](docs/compatibility.md) |
 | Build, test or contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Report a vulnerability | [Security](#security) |
 
