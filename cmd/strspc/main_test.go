@@ -614,8 +614,52 @@ func TestLoadDeploymentState_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error creating client: %v", err)
 	}
-	ds := loadDeploymentState(client, "testorg", "central")
-	if ds == nil {
-		t.Error("expected non-nil deployment state")
+	ds, err := loadDeploymentState(client, "testorg", "central")
+	if err != nil || ds == nil {
+		t.Errorf("loadDeploymentState = %v, %v; want a state and no error", ds, err)
+	}
+}
+
+// TestLoadDeploymentState_Errors: a missing state file is a first run (empty state); any other failure is returned,
+// so conflict does not scan configured targets as if nothing were managed (GH #174).
+func TestLoadDeploymentState_Errors(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		status  int
+		body    string
+		wantErr bool
+	}{
+		{"missing", http.StatusNotFound, `{"message":"Not Found"}`, false},
+		{"server error", http.StatusInternalServerError, `{"message":"boom"}`, true},
+		{"bad json", http.StatusOK, `{"content":"` + base64.StdEncoding.EncodeToString([]byte("not json")) + `","encoding":"base64"}`, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.status)
+				_, _ = io.WriteString(w, tt.body)
+			}))
+			defer srv.Close()
+			t.Setenv("GITHUB_API_URL", srv.URL)
+			t.Setenv("GITHUB_TOKEN", "fake-token")
+			syncCfg, err := loadConfig(writeTestConfig(t, ""))
+			if err != nil {
+				t.Fatal(err)
+			}
+			client, err := newGHClient(syncCfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ds, err := loadDeploymentState(client, "testorg", "central")
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("want an error, got state %+v", ds)
+				}
+				return
+			}
+			if err != nil || ds == nil || len(ds.Repositories) != 0 {
+				t.Errorf("loadDeploymentState = %+v, %v; want an empty state", ds, err)
+			}
+		})
 	}
 }
