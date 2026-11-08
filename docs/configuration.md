@@ -16,3 +16,13 @@ every target repo. For `auth.method: github-app`, pass `app-id` and `private-key
 Sync commits files through the GraphQL `createCommitOnBranch` mutation, which GitHub signs for
 every token type, so its commits pass rulesets that require verified signatures with a PAT as
 well as with an App. Files are written with mode `100644`.
+
+### Writing the deployment state
+
+Target repos are only ever changed through pull requests. The deployment state is not:
+`.steerspec/deployment-state.json` is committed straight to the central repo's default branch
+after every sync. If a ruleset or branch protection on that branch requires pull requests or
+status checks, the identity running sync must be allowed to bypass it, for example by adding the
+GitHub App as a bypass actor (`always`) on that ruleset. Otherwise the run fails with
+`deployment state not saved: ... rejected the commit` and records nothing, so the next run
+proposes the same changes again.

@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.1.1",
-    "timestamp": "2026-11-05T07:49:16Z",
-    "hash": "blake3:4fa2ab85688b9fb633225a5add4fe944d0088c832613e1e0acb3907feaaabae2"
+    "version": "0.1.3",
+    "timestamp": "2026-11-07T19:07:18Z",
+    "hash": "blake3:1c80e467ecc26f572ea601fe30fd087623be71e37926e264a69f8d9704a4f879"
   },
   "rules": [
     {
@@ -76,9 +76,9 @@
     },
     {
       "id": "MNRACT-008",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "MUST NOT create duplicate issues for the same drift; an existing open issue for the same repo/template combination MUST be updated instead.",
+      "body": "MUST NOT create duplicate issues for the same drift.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -162,6 +162,15 @@
       "body": "HAS an output `summary` (JSON string) containing a detailed monitoring report.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "MNRACT-018",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST update the existing open issue for the same repo/template combination while its drift is still detected.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-07",
       "supersedes": null
     }
   ],

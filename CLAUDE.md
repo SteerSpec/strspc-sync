@@ -117,7 +117,12 @@ versions and hashes stay consistent: `strspc rule add <EUID> --body ... --added-
   title is the commit release-please reads. `main` takes merge commits only (promotions and release PRs)
 - **e2e-test.yml**: e2e suite against `testbed-multi-org`; runs on `develop` → `main` promotion PRs (`e2e`, required on
   `main`, gated by the `e2e-testbed` environment's reviewers) and on manual dispatch. See `tests/e2e/README.md`
+- **release-changelog.yml** + `scripts/release-changelog-gate.sh`: `release-changelog` status on the release PR;
+  fails when a commit `main` gained since the last release (by ancestry) is missing from its `CHANGELOG.md`
 - **release.yml**: pre-flight `go test -race` + build smoke test, then GoReleaser on tag push (`v*`)
+- **release-snapshot.yml**: `goreleaser release --snapshot` on PRs that touch the release build inputs
+  (`.goreleaser.yml`, release workflows, `action.yml`, `go.mod`/`go.sum`, `cmd/**`, `VERSION`); asserts the
+  archive names the actions download and runs the extracted linux binary. Publishes nothing
 
 ## Auth Pattern
 

@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.1.1",
-    "timestamp": "2026-11-05T07:49:16Z",
-    "hash": "blake3:f8bd7041af15544ead45d4709217340376a04a18f8e005062ec66e8f0c1cd6b9"
+    "version": "0.1.6",
+    "timestamp": "2026-11-07T19:07:34Z",
+    "hash": "blake3:efcb994d6c0958993a71c77a204189a8b404555878b65a7e67b1aa94f0431d20"
   },
   "rules": [
     {
@@ -121,18 +121,18 @@
     },
     {
       "id": "SYNCCFG-013",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "When using \"github-app\", the section MUST include `app-id` and `private-key` fields (MAY reference secrets).",
+      "body": "When using \"github-app\", the section MUST include `app-id` and `private-key` fields.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
     {
       "id": "SYNCCFG-014",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "When using \"pat\" or \"github-token\", the section MUST include a `token` field (MAY reference secrets).",
+      "body": "When using \"pat\" or \"github-token\", the section MUST include a `token` field.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -220,9 +220,9 @@
     },
     {
       "id": "SYNCCFG-024",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "Tier 3 (LLM-assisted) MUST be explicitly opted into and MUST NOT be enabled by default.",
+      "body": "Tier 3 (LLM-assisted) MUST stay disabled unless the configuration explicitly enables it.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -234,6 +234,24 @@
       "body": "The `conflicts` section MAY define `issue-label` as a string (default: \"steerspec-conflict\").",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-026",
+      "revision": 0,
+      "state": "D",
+      "body": "When using \"github-app\", the `app-id` and `private-key` fields MAY reference secrets.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-07",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-027",
+      "revision": 0,
+      "state": "D",
+      "body": "When using \"pat\" or \"github-token\", the `token` field MAY reference secrets.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-07",
       "supersedes": null
     }
   ],

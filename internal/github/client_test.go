@@ -759,6 +759,27 @@ func TestPRCreateBranch(t *testing.T) {
 	}
 }
 
+// A sync branch name contains "/", which stays a path separator in the ref URL.
+func TestPRDeleteBranch(t *testing.T) {
+	mux := http.NewServeMux()
+	called := false
+	mux.HandleFunc("DELETE /repos/o/r/git/refs/heads/steerspec-sync/claude-md/1.0.0", func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	c := testClient(t, mux)
+	if err := c.PullRequests.DeleteBranch(context.Background(), "o", "r", "steerspec-sync/claude-md/1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Error("DELETE on the branch ref was not sent")
+	}
+	if err := c.PullRequests.DeleteBranch(context.Background(), "o", "r", "missing"); err == nil {
+		t.Error("want an error for a 404")
+	}
+}
+
 func TestIssueCreate(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {

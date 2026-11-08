@@ -11,6 +11,7 @@ import (
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/hash"
 	"github.com/SteerSpec/strspc-sync/internal/state"
+	"github.com/SteerSpec/strspc-sync/internal/template"
 )
 
 // --- Mock implementations ---
@@ -122,6 +123,8 @@ func (m *mockPRService) Get(_ context.Context, _, _ string, _ int) (*gh.PullRequ
 	return nil, nil
 }
 
+func (m *mockPRService) DeleteBranch(_ context.Context, _, _, _ string) error { return nil }
+
 func (m *mockPRService) CreateBranch(_ context.Context, _, _, _, _ string) error {
 	return nil
 }
@@ -190,6 +193,46 @@ func TestTier1_VersionDrift(t *testing.T) {
 	}
 }
 
+// GH #133: with a sections hash recorded, tier 1 ignores a repo's own content outside the managed sections and
+// still reports an edit inside them, with a resolution that says re-running sync keeps the repo's content.
+func TestTier1_VersionDriftManagedSectionsOnly(t *testing.T) {
+	const managed = "<!-- STEERSPEC:BEGIN:org -->\nOrg rules.\n<!-- STEERSPEC:END:org -->\n"
+	deployed := []byte(managed)
+	sections, ok := template.SectionsHash(deployed, []string{"org"})
+	if !ok {
+		t.Fatal("SectionsHash: no sections")
+	}
+	tests := []struct {
+		name    string
+		content string
+		drifted bool
+	}{
+		{"repo-owned content added", "# Repo\n\n## Build\n\nmake\n\n" + managed, false},
+		{"managed section edited", "<!-- STEERSPEC:BEGIN:org -->\nChanged.\n<!-- STEERSPEC:END:org -->\n", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte(tt.content)}}
+			ds := state.NewDeploymentState()
+			ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+				Version: "1.0.0", Hash: hash.HashBytes(deployed), Sections: []string{"org"}, SectionsHash: sections, Timestamp: time.Now(),
+			})
+			scanner := New(testConfig(), newTestClient(repos, &mockIssueService{}), "org", "central")
+			scanner.missingTracked = make(map[string]map[string]bool)
+			entries, err := scanner.checkVersionDrift(context.Background(), ds, "org", "repo1", "org/repo1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := len(entries) == 1; got != tt.drifted {
+				t.Fatalf("drift entries = %+v, want drifted %v", entries, tt.drifted)
+			}
+			if tt.drifted && !strings.Contains(entries[0].SuggestedResolution, "--force") {
+				t.Errorf("resolution = %q, want it to say re-running sync keeps repo content", entries[0].SuggestedResolution)
+			}
+		})
+	}
+}
+
 func TestTier1_CrossReferenceBroken(t *testing.T) {
 	claudeContent := []byte("# Project\nSee agents/helper.md for agent docs.\nAlso check skills/deploy.md.")
 
@@ -219,6 +262,91 @@ func TestTier1_CrossReferenceBroken(t *testing.T) {
 	}
 	if brokenCount != 2 {
 		t.Errorf("expected 2 broken cross-references, got %d", brokenCount)
+	}
+}
+
+// TestTier1_CrossReferenceResolution: a reference is resolved as written from the repository root, an unprefixed
+// one may also live under .claude/, globs are not checked, and only a path that resolves nowhere is broken.
+func TestTier1_CrossReferenceResolution(t *testing.T) {
+	tests := []struct {
+		name       string
+		claudeMD   string
+		files      []string
+		wantBroken []string
+	}{
+		{
+			name:     "root-relative path that exists at the root",
+			claudeMD: "Skills live in `skills/deploy/SKILL.md`.",
+			files:    []string{"skills/deploy/SKILL.md"},
+		},
+		{
+			name:     "unprefixed path that exists under .claude",
+			claudeMD: "See agents/helper.md.",
+			files:    []string{".claude/agents/helper.md"},
+		},
+		{
+			name:       ".claude path is not looked up at the root",
+			claudeMD:   "See .claude/agents/helper.md.",
+			files:      []string{"agents/helper.md"},
+			wantBroken: []string{".claude/agents/helper.md"},
+		},
+		{
+			name:     "./ prefix",
+			claudeMD: "See [the skill](./skills/x.md).",
+			files:    []string{"skills/x.md"},
+		},
+		{
+			name:     "glob is not checked",
+			claudeMD: "Each skill has a `skills/*/SKILL.md`, and agents match agents/[a-z]*.md.",
+		},
+		{
+			name:     "path inside another path or a URL is not a reference",
+			claudeMD: "Read docs/skills/x.md and https://example.com/agents/y.md.",
+		},
+		{
+			name:       "missing file reported once, as written",
+			claudeMD:   "Use skills/gone.md.\nAgain: skills/gone.md\n",
+			wantBroken: []string{"skills/gone.md"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := map[string][]byte{"org/repo1/CLAUDE.md": []byte(tt.claudeMD)}
+			for _, f := range tt.files {
+				files["org/repo1/"+f] = []byte("x")
+			}
+			scanner := New(testConfig(), newTestClient(&mockRepoService{files: files}, &mockIssueService{}), "org", "central")
+			entries, err := scanner.checkCrossReferences(context.Background(), "org", "repo1", "org/repo1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, e := range entries {
+				got = append(got, e.FilePath)
+			}
+			if strings.Join(got, ",") != strings.Join(tt.wantBroken, ",") {
+				t.Errorf("broken = %v, want %v", got, tt.wantBroken)
+			}
+		})
+	}
+}
+
+func TestTier1_CrossReferenceReadFailure(t *testing.T) {
+	repos := &mockRepoService{
+		files:     map[string][]byte{"org/repo1/CLAUDE.md": []byte("See skills/x.md.")},
+		failPaths: map[string]bool{"org/repo1/skills/x.md": true},
+	}
+	scanner := New(testConfig(), newTestClient(repos, &mockIssueService{}), "org", "central")
+	scanner.incomplete = make(map[string]bool)
+	entries, err := scanner.checkCrossReferences(context.Background(), "org", "repo1", "org/repo1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("a failed read must not be reported as a broken reference: %+v", entries)
+	}
+	if !scanner.incomplete["org/repo1"] {
+		t.Error("a failed read must mark the repo incomplete")
 	}
 }
 
@@ -489,7 +617,7 @@ func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {
 		t.Errorf("CNFLACT-007: expected no new issues created (should update existing), got %d", len(issues.created))
 	}
 	if len(issues.updated) != 1 {
-		t.Errorf("CNFLACT-007: expected 1 issue updated, got %d", len(issues.updated))
+		t.Errorf("CNFLACT-016: expected 1 issue updated, got %d", len(issues.updated))
 	}
 }
 
