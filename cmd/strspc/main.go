@@ -402,6 +402,8 @@ func runConflict(args []string, out, errOut io.Writer) error {
 	setOutput("info-count", strconv.Itoa(report.SeveritySummary.Info))
 	reportJSON, _ := json.Marshal(report)
 	setOutput("report", string(reportJSON))
+	// The actions expose summary, like sync and monitor; report stays for direct callers of the binary (GH #172).
+	setOutput("summary", string(reportJSON))
 
 	if report.SeveritySummary.Critical > 0 {
 		return fmt.Errorf("conflict detection found %d critical conflict(s)", report.SeveritySummary.Critical)

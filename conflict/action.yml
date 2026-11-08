@@ -52,6 +52,9 @@ outputs:
   info-count:
     description: 'Info-severity conflicts'
     value: ${{ steps.run.outputs.info-count }}
+  report:
+    description: 'Full ConflictReport as JSON'
+    value: ${{ steps.run.outputs.report }}
   summary:
     description: 'JSON summary of the operation'
     value: ${{ steps.run.outputs.summary }}
