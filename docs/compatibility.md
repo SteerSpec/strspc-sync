@@ -6,16 +6,19 @@ A breaking change waits for the next major version.
 
 ## Covered
 
-- **Config file:** every key of `steerspec-sync.yml`, its meaning and its defaults, as specified
-  by the `SYNCCFG` entity under [`rules/`](../rules/). The top-level `version` is the config
-  schema version; a release may add optional keys but does not remove a key or change its meaning.
+- **Config file:** every key `steerspec-sync.yml` accepts, its meaning and its default, as
+  documented in [Configuration](configuration.md) and specified by the `SYNCCFG` entity under
+  [`rules/`](../rules/). The top-level `version` is the config schema version; a release may add
+  optional keys but does not remove a key or change its meaning.
 - **Action inputs and outputs** of the root action and of `sync/`, `monitor/` and `conflict/`:
   names, accepted values and output formats.
 - **CLI:** the commands (`sync`, `monitor`, `conflict`, `version`), their flags, and their exit
   status: 0 on success, non-zero on failure, and for `conflict` non-zero when it finds a critical
   conflict.
-- **JSON output:** the report each command writes to stdout and to the `summary` / `report`
-  outputs. A release may add fields; it does not remove or rename one or change its type.
+- **JSON output:** the report `sync`, `monitor` and `conflict` write to stdout, and the same JSON
+  in each action's `summary` output (and, for conflict, in `report` too). A release may add
+  fields; it does not remove or rename one or change its type. `version` prints plain text and
+  sets no outputs.
 - **Deployment state:** `.steerspec/deployment-state.json` in the central repo. A new release
   reads the state an older 1.x release wrote.
 - **Issue and PR markers:** the branch names (`steerspec-sync/...`), labels and HTML comment
