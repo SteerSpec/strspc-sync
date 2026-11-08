@@ -13,8 +13,8 @@ organization. `go test ./...` never runs them (no tag).
 The `e2e-test.yml` workflow runs automatically on every `develop` → `main` promotion PR
 (head `develop` in this repo), against the PR head SHA. The repo ruleset `required-e2e` makes
 its `e2e` check required on `main`, so nothing ships untested. Other PRs into `main`, such as
-release-please's, skip the job, and a skipped job passes the check. Each run still waits for an
-`e2e-testbed` reviewer to approve it.
+release-please's, skip the job, and a skipped job passes the check. Runs start without an
+approval: the `e2e-testbed` environment has no protection rules.
 
 For ad-hoc runs, dispatch the workflow with a `ref` input: a branch, tag or SHA of this repo.
 
@@ -87,9 +87,10 @@ visibility source), `PRIVATE-SOURCE` (`strspc-e2e-src` visibility source).
    on `strspc-e2e-central` `main`, so sync can commit its deployment state.
 6. Add `strspc-sync` to the repository scope of the `STEERSPEC_APP_ID` and
    `STEERSPEC_PRIVATE_KEY` org secrets.
-7. Create the `e2e-testbed` environment in `strspc-sync` (Settings, Environments) with required
-   reviewers. The workflow runs the dispatched ref's tests with the App key, so the reviewer
-   approving the run is the trust boundary; do not remove the protection rule.
+7. Create the `e2e-testbed` environment in `strspc-sync` (Settings, Environments), with no
+   protection rules. The workflow runs the dispatched ref's tests with the App key, and the
+   secrets are org secrets that any workflow of this repo can read, so the trust boundary is write
+   access to `strspc-sync` and PR review on `develop`, not an environment approval.
 8. Give `strspc-e2e-develop`, and no other repo in the org, the topic `strspc-e2e-topic`
    (`TestSyncTargetSelection` selects it by topic and fails with this step's reference if it is
    missing).
