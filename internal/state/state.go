@@ -38,7 +38,7 @@ type TemplateState struct {
 func NewDeploymentState() *DeploymentState {
 	return &DeploymentState{
 		Repositories: make(map[string]map[string]TemplateState),
-		UpdatedAt:    time.Now(),
+		UpdatedAt:    time.Now().UTC(),
 	}
 }
 
@@ -65,7 +65,7 @@ func (ds *DeploymentState) Fingerprint() (string, error) {
 }
 
 func (ds *DeploymentState) Save() ([]byte, error) {
-	ds.UpdatedAt = time.Now()
+	ds.UpdatedAt = time.Now().UTC()
 	ds.Hash = ds.computeHash()
 	return json.MarshalIndent(ds, "", "  ")
 }

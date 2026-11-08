@@ -139,7 +139,7 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 	result := &Result{
 		ID:        uuid.New().String(),
 		Trigger:   opts.Trigger,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC(),
 	}
 
 	// Resolve targets
@@ -538,7 +538,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	s.state.SetTemplateState(target.Repo, tmpl.ID, state.TemplateState{
 		Version:         tmpl.Version,
 		Hash:            contentHash,
-		Timestamp:       time.Now(),
+		Timestamp:       time.Now().UTC(),
 		PRNumber:        pr.Number,
 		PRStatus:        "open",
 		PreviousVersion: previousVersion,
@@ -592,7 +592,7 @@ func (s *Syncer) recordInSync(fullName string, tmpl config.TemplateConfig, conte
 	defer s.stateMu.Unlock()
 	entry := state.TemplateState{
 		Version: tmpl.Version, Hash: contentHash, Sections: managed.names, SectionsHash: managed.hash,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC(),
 	}
 	if cur := s.state.GetTemplateState(fullName, tmpl.ID); cur != nil {
 		if cur.Hash == contentHash && cur.Version == tmpl.Version && cur.SectionsHash == managed.hash &&

@@ -96,6 +96,7 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 		}
 	}
 
+	now := time.Now().UTC()
 	result := &Result{}
 	driftedRepos := make(map[string]bool)
 	inSyncRepos := make(map[string]bool)
@@ -119,6 +120,9 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 
 			fp := driftFingerprint(repoFullName, templateID)
 
+			issTitle := driftIssueTitle(repoFullName, templateID)
+			existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
+
 			content, _, err := m.ghClient.Repos.GetFileContent(ctx, owner, repo, destPath, "")
 			if err != nil {
 				// Treat fetch error as drift (file may be missing).
@@ -127,32 +131,11 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 					TemplateID:      templateID,
 					ExpectedVersion: ts.Version,
 					ExpectedHash:    ts.ExpectedHash(),
-					ActualHash:      "",
 					PRNumber:        ts.PRNumber,
-					FirstDetected:   time.Now(),
+					FirstDetected:   firstDetected(existing, now),
 				}
-				issTitle := driftIssueTitle(repoFullName, templateID)
-				existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
-				if existing != nil {
-					body := driftIssueBody(entry)
-					if err := m.ghClient.Issues.Update(ctx, m.centralOwner, m.centralRepo, existing.Number, &gh.IssueUpdate{Body: &body}); err != nil {
-						return nil, fmt.Errorf("updating drift issue #%d: %w", existing.Number, err)
-					}
-					entry.IssueNumber = existing.Number
-					entry.IssueURL = existing.URL
-				} else {
-					body := driftIssueBody(entry)
-					iss, err := m.ghClient.Issues.Create(ctx, m.centralOwner, m.centralRepo, &gh.IssueCreate{
-						Title:  issTitle,
-						Body:   body,
-						Labels: []string{label},
-					})
-					if err != nil {
-						return nil, fmt.Errorf("creating drift issue: %w", err)
-					}
-					entry.IssueNumber = iss.Number
-					entry.IssueURL = iss.URL
-					result.IssuesCreated++
+				if err := m.reportDrift(ctx, &entry, existing, issTitle, label, result); err != nil {
+					return nil, err
 				}
 				driftedRepos[repoFullName] = true
 				result.DriftEntries = append(result.DriftEntries, entry)
@@ -160,12 +143,10 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 			}
 
 			drifted, expectedHash, actualHash := ts.Drift(content)
-			issTitle := driftIssueTitle(repoFullName, templateID)
 
 			if !drifted {
 				// In sync. Close existing issue if auto-close is enabled.
 				if autoClose {
-					existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
 					if existing != nil {
 						if err := m.ghClient.Issues.Close(ctx, m.centralOwner, m.centralRepo, existing.Number); err != nil {
 							return nil, fmt.Errorf("closing resolved drift issue #%d: %w", existing.Number, err)
@@ -187,30 +168,10 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 				ExpectedHash:    expectedHash,
 				ActualHash:      actualHash,
 				PRNumber:        ts.PRNumber,
-				FirstDetected:   time.Now(),
+				FirstDetected:   firstDetected(existing, now),
 			}
-
-			existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
-			if existing != nil {
-				body := driftIssueBody(entry)
-				if err := m.ghClient.Issues.Update(ctx, m.centralOwner, m.centralRepo, existing.Number, &gh.IssueUpdate{Body: &body}); err != nil {
-					return nil, fmt.Errorf("updating drift issue #%d: %w", existing.Number, err)
-				}
-				entry.IssueNumber = existing.Number
-				entry.IssueURL = existing.URL
-			} else {
-				body := driftIssueBody(entry)
-				iss, err := m.ghClient.Issues.Create(ctx, m.centralOwner, m.centralRepo, &gh.IssueCreate{
-					Title:  issTitle,
-					Body:   body,
-					Labels: []string{label},
-				})
-				if err != nil {
-					return nil, fmt.Errorf("creating drift issue: %w", err)
-				}
-				entry.IssueNumber = iss.Number
-				entry.IssueURL = iss.URL
-				result.IssuesCreated++
+			if err := m.reportDrift(ctx, &entry, existing, issTitle, label, result); err != nil {
+				return nil, err
 			}
 			driftedRepos[repoFullName] = true
 			result.DriftEntries = append(result.DriftEntries, entry)
@@ -226,6 +187,49 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 	}
 
 	return result, nil
+}
+
+// reportDrift updates the open drift issue for entry, or opens one, and records its number and URL in entry.
+func (m *Monitor) reportDrift(ctx context.Context, entry *DriftEntry, existing *gh.Issue, title, label string, result *Result) error {
+	body := driftIssueBody(*entry)
+	if existing != nil {
+		if err := m.ghClient.Issues.Update(ctx, m.centralOwner, m.centralRepo, existing.Number, &gh.IssueUpdate{Body: &body}); err != nil {
+			return fmt.Errorf("updating drift issue #%d: %w", existing.Number, err)
+		}
+		entry.IssueNumber = existing.Number
+		entry.IssueURL = existing.URL
+		return nil
+	}
+	iss, err := m.ghClient.Issues.Create(ctx, m.centralOwner, m.centralRepo, &gh.IssueCreate{
+		Title:  title,
+		Body:   body,
+		Labels: []string{label},
+	})
+	if err != nil {
+		return fmt.Errorf("creating drift issue: %w", err)
+	}
+	entry.IssueNumber = iss.Number
+	entry.IssueURL = iss.URL
+	result.IssuesCreated++
+	return nil
+}
+
+const firstDetectedPrefix = "**First Detected:** "
+
+// firstDetected returns the time the open drift issue recorded as first detected, so rewriting the body on a later
+// run keeps it (MNRACT: time since drift was first detected); now when there is no issue or no parseable time.
+func firstDetected(existing *gh.Issue, now time.Time) time.Time {
+	if existing == nil {
+		return now
+	}
+	for _, line := range strings.Split(existing.Body, "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), firstDetectedPrefix); ok {
+			if t, err := time.Parse(time.RFC3339, strings.TrimSpace(v)); err == nil {
+				return t.UTC()
+			}
+		}
+	}
+	return now
 }
 
 func driftIssueTitle(repo, templateID string) string {
@@ -245,9 +249,10 @@ func driftIssueBody(e DriftEntry) string {
 		b.WriteString("**Actual Hash:** _(file not found, or a managed section is missing or unreadable)_\n")
 	}
 	if e.PRNumber > 0 {
-		fmt.Fprintf(&b, "**PR:** #%d\n", e.PRNumber)
+		// The issue lives in the central repo, so a bare #N would link the central repo's #N, not the sync PR.
+		fmt.Fprintf(&b, "**PR:** %s#%d\n", e.Repo, e.PRNumber)
 	}
-	fmt.Fprintf(&b, "**First Detected:** %s\n", e.FirstDetected.Format(time.RFC3339))
+	fmt.Fprintf(&b, "%s%s\n", firstDetectedPrefix, e.FirstDetected.UTC().Format(time.RFC3339))
 
 	fp := driftFingerprint(e.Repo, e.TemplateID)
 	fmt.Fprintf(&b, "\n%s%s%s\n", fingerprintPrefix, fp, fingerprintSuffix)

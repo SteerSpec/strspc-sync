@@ -176,7 +176,7 @@ func New(cfg *config.SyncConfig, ghClient *gh.Client, centralOwner, centralRepo 
 func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, targets []string, opts Options) (*ConflictReport, error) {
 	report := &ConflictReport{
 		ID:        uuid.New().String(),
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC(),
 	}
 
 	tiers := opts.Tiers
