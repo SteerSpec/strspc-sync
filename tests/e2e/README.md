@@ -29,7 +29,7 @@ Required secrets, org-level, with `strspc-sync` in their repository scope:
 
 The PAT scenario `TestSyncPATCommitsSigned` (#162) runs sync with `auth.method: github-token` and a user's token
 instead of the App, and checks that the PRs and the state commit are opened by that user and verified. It runs only
-on a dispatch with `pat: true`, which passes the org secret `BOT_GITHUB_TOKEN` (a `cnslr-bt` token) as
+on a dispatch with `pat: true`, which passes the org secret `BOT_TESTBED_GITHUB_TOKEN` (a `cnslr-bt` token) as
 `E2E_PAT_TOKEN`; promotion runs skip it. The token must reach `testbed-multi-org`, with Contents and Pull requests
 write on `strspc-e2e-central` and the sync targets: a fine-grained PAT owned by another organization only sees this
 one's public repositories.

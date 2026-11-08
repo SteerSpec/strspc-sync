@@ -29,7 +29,7 @@ on:
         type: boolean
         default: false
       pat:
-        description: also run the PAT sync scenario (GH 162) with the cnslr-bt token in BOT_GITHUB_TOKEN
+        description: also run the PAT sync scenario (GH 162) with the cnslr-bt token in BOT_TESTBED_GITHUB_TOKEN
         type: boolean
         default: false
   pull_request:
@@ -89,12 +89,12 @@ jobs:
           STEERSPEC_APP_ID: ${{ secrets.STEERSPEC_APP_ID }}
           STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
           # Only on a dispatch with `pat`: promotions never depend on the bot user's token. Empty skips the scenario.
-          E2E_PAT_TOKEN: ${{ inputs.pat && secrets.BOT_GITHUB_TOKEN || '' }}
+          E2E_PAT_TOKEN: ${{ inputs.pat && secrets.BOT_TESTBED_GITHUB_TOKEN || '' }}
           PAT_REQUESTED: ${{ inputs.pat || false }}
         run: |
           set -euo pipefail
           if [ "$PAT_REQUESTED" = true ] && [ -z "$E2E_PAT_TOKEN" ]; then
-            echo "::error::pat was requested but BOT_GITHUB_TOKEN is empty: the org secret must grant this repo access"
+            echo "::error::pat was requested but BOT_TESTBED_GITHUB_TOKEN is empty or not shared with this repo"
             exit 1
           fi
           # An unset secret or one outside this repo's scope expands to an empty string, which would make the harness
