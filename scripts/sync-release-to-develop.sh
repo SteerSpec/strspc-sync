@@ -25,17 +25,23 @@ if git diff --quiet origin/develop HEAD -- "${files[@]}"; then
   exit 0
 fi
 
-if [[ -n "$(gh pr list --repo "$repo" --head "$branch" --state open --json number -q '.[].number')" ]]; then
-  echo "A pull request from ${branch} is already open."
+# A standalone assignment, so a failed listing stops the script (set -e) instead of reading as "no PR".
+open_pr="$(gh pr list --repo "$repo" --head "$branch" --state open --json number -q '.[].number')"
+if [[ -n "$open_pr" ]]; then
+  echo "Pull request #${open_pr} from ${branch} is already open."
   exit 0
 fi
 
 develop_sha="$(git rev-parse origin/develop)"
-# Start the branch at develop's tip; reset it there if a previous run left it behind.
-if gh api "repos/${repo}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+# Start the branch at develop's tip; reset it there if a previous run left it behind. Only a 404 means the branch is
+# missing: any other failure of the probe stops the script.
+if probe="$(gh api "repos/${repo}/git/ref/heads/${branch}" 2>&1)"; then
   gh api -X PATCH "repos/${repo}/git/refs/heads/${branch}" -f sha="$develop_sha" -F force=true >/dev/null
-else
+elif [[ "$probe" == *"HTTP 404"* ]]; then
   gh api "repos/${repo}/git/refs" -f ref="refs/heads/${branch}" -f sha="$develop_sha" >/dev/null
+else
+  echo "checking branch ${branch}: ${probe}" >&2
+  exit 1
 fi
 
 additions="$(for f in "${files[@]}"; do

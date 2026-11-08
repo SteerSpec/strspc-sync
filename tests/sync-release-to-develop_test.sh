@@ -35,19 +35,27 @@ setup() {
   git -C "$dir" commit -q -am release
 }
 
-# stub_gh DIR OPEN_PR: a gh that logs each call to DIR/calls, saves the graphql payload to
-# DIR/graphql.json, and lists an open PR when OPEN_PR is 1.
+# stub_gh DIR PR_LIST [PROBE]: a gh that logs each call to DIR/calls and saves the graphql
+# payload to DIR/graphql.json. PR_LIST is 0 (no open PR), 1 (PR #7 open) or fail; PROBE, the
+# branch lookup, is 404 (default, no branch) or 500.
 stub_gh() {
-  local dir=$1 open_pr=$2
+  local dir=$1 pr_list=$2 probe=${3:-404}
   mkdir -p "$dir/bin"
   cat >"$dir/bin/gh" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >>"$dir/calls"
 case "\$1 \$2" in
-  "pr list") [[ "$open_pr" == 1 ]] && echo 7; exit 0 ;;
+  "pr list")
+    case "$pr_list" in
+      1) echo 7 ;;
+      fail) echo "gh: Bad Gateway (HTTP 502)" >&2; exit 1 ;;
+    esac
+    exit 0 ;;
   "pr create") echo "https://github.com/o/r/pull/8"; exit 0 ;;
   "api graphql") cat >"$dir/graphql.json"; echo oid123; exit 0 ;;
-  "api repos/o/r/git/ref/heads/"*) exit 1 ;;
+  "api repos/o/r/git/ref/heads/"*)
+    if [[ "$probe" == 404 ]]; then echo "gh: Not Found (HTTP 404)" >&2; else echo "gh: Server Error (HTTP 500)" >&2; fi
+    exit 1 ;;
   *) exit 0 ;;
 esac
 EOF
@@ -99,6 +107,21 @@ if grep -qE "graphql|pr create" "$d/calls"; then
   fail "expected no commit or PR with one open: $(cat "$d/calls")"
 fi
 rm -rf "$d"
+
+# 4. A failing PR listing or branch probe stops the script before it touches a branch.
+for mode in "fail 404" "0 500"; do
+  d="$(mktemp -d)"
+  setup "$d/repo" 0
+  # shellcheck disable=SC2086 # mode is two words on purpose
+  stub_gh "$d" $mode
+  if run "$d"; then
+    fail "[$mode] expected a non-zero exit"
+  fi
+  if grep -qE "git/refs|graphql|pr create" "$d/calls"; then
+    fail "[$mode] expected no branch, commit or PR: $(cat "$d/calls")"
+  fi
+  rm -rf "$d"
+done
 
 if ((failures > 0)); then
   echo "$failures assertion(s) failed"
