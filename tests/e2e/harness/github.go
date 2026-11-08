@@ -179,3 +179,71 @@ func (e *Env) RepoTopics(t *testing.T, repo string) []string {
 	}
 	return resp.Names
 }
+
+// PRAuthor returns the login of the user who opened PR number in repo.
+func (e *Env) PRAuthor(t *testing.T, repo string, number int) string {
+	t.Helper()
+	var pr struct {
+		User struct {
+			Login string `json:"login"`
+		} `json:"user"`
+	}
+	e.getJSON(t, fmt.Sprintf("/repos/%s/%s/pulls/%d", url.PathEscape(e.Org), url.PathEscape(repo), number), &pr)
+	return pr.User.Login
+}
+
+// Commit is the author and signature status of one commit.
+type Commit struct {
+	SHA string
+	// Author is the login GitHub links to the commit's author (the API's top-level author), "" when it links none.
+	// createCommitOnBranch always authors as the authenticated user, so a sync commit links to the token's user;
+	// the committer is GitHub itself (web-flow), so it is not a fallback.
+	Author   string
+	Verified bool
+	Reason   string // verification reason, such as "valid" or "unsigned"
+}
+
+// LatestCommit returns the newest commit on the default branch of repo that touched path.
+func (e *Env) LatestCommit(t *testing.T, repo, path string) Commit {
+	t.Helper()
+	var commits []struct {
+		SHA    string `json:"sha"`
+		Author *struct {
+			Login string `json:"login"`
+		} `json:"author"`
+		Commit struct {
+			Verification struct {
+				Verified bool   `json:"verified"`
+				Reason   string `json:"reason"`
+			} `json:"verification"`
+		} `json:"commit"`
+	}
+	e.getJSON(t, fmt.Sprintf("/repos/%s/%s/commits?per_page=1&path=%s",
+		url.PathEscape(e.Org), url.PathEscape(repo), url.QueryEscape(path)), &commits)
+	if len(commits) == 0 {
+		t.Fatalf("LatestCommit %s:%s: no commits", repo, path)
+	}
+	c := commits[0]
+	out := Commit{SHA: c.SHA, Verified: c.Commit.Verification.Verified, Reason: c.Commit.Verification.Reason}
+	if c.Author != nil {
+		out.Author = c.Author.Login
+	}
+	return out
+}
+
+// getJSON GETs path with the harness token and decodes the 200 response into out, failing t otherwise.
+func (e *Env) getJSON(t *testing.T, path string, out any) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), opTimeout)
+	defer cancel()
+	status, body, err := e.api(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		t.Fatalf("GET %s: %v", path, err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("GET %s: status %d: %s", path, status, body)
+	}
+	if err := json.Unmarshal(body, out); err != nil {
+		t.Fatalf("GET %s: decoding: %v", path, err)
+	}
+}

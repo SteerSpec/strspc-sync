@@ -27,6 +27,11 @@ Required secrets, org-level, with `strspc-sync` in their repository scope:
 - `STEERSPEC_APP_ID`
 - `STEERSPEC_PRIVATE_KEY`
 
+The PAT scenario `TestSyncPATCommitsSigned` (#162) runs sync with `auth.method: github-token` and a user's token
+instead of the App, and checks that the PRs and the state commit are opened by that user and verified. It runs only
+on a dispatch with `pat: true`, which passes `BOT_TOKEN` (the `cnslr-bt` user's token) as `E2E_PAT_TOKEN`; promotion
+runs skip it. The token needs Contents and Pull requests write on `strspc-e2e-central` and the sync targets.
+
 The GitHub App installation token is used for sync itself and for injecting drift. Writes (sync
 and the harness) go through `CreateOrUpdateFile`, which commits with the GraphQL
 `createCommitOnBranch` mutation (#126), and the harness deletes files with the same mutation:
