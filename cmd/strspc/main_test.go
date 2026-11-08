@@ -21,7 +21,7 @@ import (
 // minimalConfig is a valid config that passes validation but has no real targets.
 // newGHClient will fail because GITHUB_TOKEN is empty, so commands requiring
 // a GitHub client will return exit code 1 without making any API calls.
-const minimalConfig = `version: "1"
+const minimalConfig = `version: "1.0.0"
 auth:
   method: github-token
 templates:
@@ -470,7 +470,7 @@ func writeTestConfig(t *testing.T, extraYAML string) string {
 	t.Helper()
 	dir := t.TempDir()
 	// Write the template source file (local path — but sync reads it from GitHub API)
-	cfg := fmt.Sprintf(`version: "1.0"
+	cfg := fmt.Sprintf(`version: "1.0.0"
 auth:
   method: github-token
 templates:
