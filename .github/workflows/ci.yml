@@ -121,3 +121,19 @@ jobs:
             !CHANGELOG.md
       - name: editorconfig-checker
         uses: editorconfig-checker/action-editorconfig-checker@v2
+
+  # Runs the local action on each runner OS so its download step fetches the archive the release publishes for
+  # that OS (.tar.gz on linux, .zip on darwin) and the binary runs (GH #168). `version` needs no token or config.
+  action-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./
+        with:
+          command: version
