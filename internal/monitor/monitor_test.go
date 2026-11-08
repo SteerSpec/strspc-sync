@@ -623,3 +623,71 @@ func TestMNRACT008_NoDuplicateDriftIssues_TwoPassScenario(t *testing.T) {
 		t.Errorf("MNRACT-008: expected 1 total issue created across both runs, got %d", totalCreated)
 	}
 }
+
+// TestDriftIssue_KeepsFirstDetected (GH #173): rewriting an open drift issue keeps the First Detected time it
+// recorded, for drift and for a missing file; a new issue stamps the run time in UTC.
+func TestDriftIssue_KeepsFirstDetected(t *testing.T) {
+	const recorded = "2026-01-02T03:04:05Z"
+	expectedHash := hash.HashBytes([]byte("expected"))
+	for _, tt := range []struct {
+		name  string
+		files map[string][]byte
+	}{
+		{"drifted", map[string][]byte{"org/app/CLAUDE.md": []byte("drifted")}},
+		{"missing file", map[string][]byte{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			issueSvc := newMockIssueService()
+			issueSvc.issues = []*gh.Issue{{
+				Number: 42,
+				Title:  "[SteerSpec Drift] org/app: claude-md",
+				Body:   "## SteerSpec Drift Detected\n\n**First Detected:** " + recorded + "\n",
+				State:  "open",
+				Labels: []string{"steerspec-drift"},
+			}}
+			ds := makeState(map[string]map[string]state.TemplateState{
+				"org/app": {"claude-md": {Version: "1.0", Hash: expectedHash}},
+			})
+			res, err := New(testConfig(), makeClient(&mockRepoService{files: tt.files}, issueSvc), "test", "central").
+				Run(context.Background(), ds, Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := res.DriftEntries[0].FirstDetected.Format(time.RFC3339); got != recorded {
+				t.Errorf("FirstDetected = %s, want %s", got, recorded)
+			}
+			if body := *issueSvc.updated[42].Body; !strings.Contains(body, "**First Detected:** "+recorded+"\n") {
+				t.Errorf("updated body lost First Detected:\n%s", body)
+			}
+		})
+	}
+
+	t.Run("new issue", func(t *testing.T) {
+		issueSvc := newMockIssueService()
+		ds := makeState(map[string]map[string]state.TemplateState{
+			"org/app": {"claude-md": {Version: "1.0", Hash: expectedHash}},
+		})
+		repos := &mockRepoService{files: map[string][]byte{"org/app/CLAUDE.md": []byte("drifted")}}
+		before := time.Now().Add(-time.Second)
+		res, err := New(testConfig(), makeClient(repos, issueSvc), "test", "central").Run(context.Background(), ds, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fd := res.DriftEntries[0].FirstDetected
+		if fd.Location() != time.UTC || fd.Before(before) {
+			t.Errorf("FirstDetected = %v, want the run time in UTC", fd)
+		}
+		if !strings.Contains(issueSvc.created[0].Body, "**First Detected:** "+fd.Format(time.RFC3339)+"\n") {
+			t.Errorf("new issue body lacks First Detected %s:\n%s", fd.Format(time.RFC3339), issueSvc.created[0].Body)
+		}
+	})
+}
+
+// TestDriftIssue_LinksPRInTargetRepo (GH #173): the drift issue lives in the central repo, so it links the sync PR
+// as owner/repo#N.
+func TestDriftIssue_LinksPRInTargetRepo(t *testing.T) {
+	body := driftIssueBody(DriftEntry{Repo: "org/app", TemplateID: "claude-md", PRNumber: 7, FirstDetected: time.Now()})
+	if !strings.Contains(body, "**PR:** org/app#7\n") {
+		t.Errorf("body does not link org/app#7:\n%s", body)
+	}
+}

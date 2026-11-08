@@ -7,15 +7,16 @@ name: E2E (testbed-multi-org)
 # Triggers: workflow_dispatch for ad-hoc runs, and pull_request into main so every develop -> main promotion is
 # tested before it ships (#154). The job runs only for promotion PRs (head `develop` in this repo, never a fork);
 # other PRs into main, such as release-please's, skip it, and a skipped job satisfies the required `e2e` check. Never
-# add push, schedule or other PR triggers: each run costs a reviewer approval and writes to the testbed.
+# add push, schedule or other PR triggers: each run writes to the shared testbed.
 #
 # Repos touched (all in testbed-multi-org): strspc-e2e-central (templates, config, state), targets
 # strspc-e2e-public, strspc-e2e-private, strspc-e2e-src, strspc-e2e-symlink and strspc-e2e-develop.
 #
 # STEERSPEC_APP_ID / STEERSPEC_PRIVATE_KEY are the credentials of the SteerSpec GitHub App with write access to those
 # repos. They must be scoped to this repository only and are passed through env, never echoed. The checked-out ref's
-# tests run with those secrets, so the job targets the `e2e-testbed` environment: configure it with required
-# reviewers (and restrict dispatch to people allowed to approve), so a ref is reviewed before the secrets are released.
+# tests run with those secrets. They are org secrets, which any workflow of this repository can read, so the trust
+# boundary is write access to the repository (needed to dispatch or push a branch) and PR review on develop (the only
+# head a promotion runs). The `e2e-testbed` environment has no protection rules and only groups the runs.
 
 on:
   workflow_dispatch:
@@ -26,6 +27,10 @@ on:
         default: develop
       keep:
         description: skip cleanup for debugging (leaves PRs, branches and issues in the testbed)
+        type: boolean
+        default: false
+      pat:
+        description: also run the PAT sync scenario (GH 162) with the cnslr-bt token in BOT_TESTBED_GITHUB_TOKEN
         type: boolean
         default: false
   pull_request:
@@ -51,8 +56,8 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.ref == 'develop' &&
        github.event.pull_request.head.repo.full_name == github.repository)
-    # The checked-out ref's tests run with the App key. The environment's required reviewers are the trust gate: the
-    # job (and so the secrets) starts only after a reviewer has looked at the ref being run.
+    # The checked-out ref's tests run with the App key; see the header for the trust boundary. The environment has no
+    # required reviewers, so runs start at once.
     environment: e2e-testbed
     # The App credentials are set only on the test and cleanup steps below, not here, so checkout, setup-go and the
     # build of the dispatched ref never see them.
@@ -84,8 +89,15 @@ jobs:
         env:
           STEERSPEC_APP_ID: ${{ secrets.STEERSPEC_APP_ID }}
           STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
+          # Only on a dispatch with `pat`: promotions never depend on the bot user's token. Empty skips the scenario.
+          E2E_PAT_TOKEN: ${{ inputs.pat && secrets.BOT_TESTBED_GITHUB_TOKEN || '' }}
+          PAT_REQUESTED: ${{ inputs.pat || false }}
         run: |
           set -euo pipefail
+          if [ "$PAT_REQUESTED" = true ] && [ -z "$E2E_PAT_TOKEN" ]; then
+            echo "::error::pat was requested but BOT_TESTBED_GITHUB_TOKEN is empty or not shared with this repo"
+            exit 1
+          fi
           # An unset secret or one outside this repo's scope expands to an empty string, which would make the harness
           # skip every test and let the run pass without touching GitHub.
           : "${STEERSPEC_APP_ID:?STEERSPEC_APP_ID is empty: check the secret and its repository scope}"

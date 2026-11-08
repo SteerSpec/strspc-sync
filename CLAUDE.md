@@ -112,11 +112,13 @@ versions and hashes stay consistent: `strspc rule add <EUID> --body ... --added-
   `go tool cover` (no third-party service), with the total written to the run summary and
   `coverage.out` kept as a build artifact
 - **release-please.yml**: on push to `main`, keeps the release PR open against `main` (`target-branch: main`;
-  `develop` is the default branch and is promoted to `main` via PR)
+  `develop` is the default branch and is promoted to `main` via PR). After a release, its `sync-develop` job
+  (`scripts/sync-release-to-develop.sh`) opens an App PR copying `VERSION`, the manifest and `CHANGELOG.md` to
+  `develop`, so branches cut from it run the released binary; merge it before the next promotion
 - **pr-title.yml**: conventional PR title (`pr-title`, required on `develop`); `develop` PRs are squash-merged, so the
   title is the commit release-please reads. `main` takes merge commits only (promotions and release PRs)
 - **e2e-test.yml**: e2e suite against `testbed-multi-org`; runs on `develop` → `main` promotion PRs (`e2e`, required on
-  `main`, gated by the `e2e-testbed` environment's reviewers) and on manual dispatch. See `tests/e2e/README.md`
+  `main`; the `e2e-testbed` environment has no approval gate) and on manual dispatch. See `tests/e2e/README.md`
 - **release-changelog.yml** + `scripts/release-changelog-gate.sh`: `release-changelog` status on the release PR;
   fails when a commit `main` gained since the last release (by ancestry) is missing from its `CHANGELOG.md`
 - **release.yml**: pre-flight `go test -race` + build smoke test, then GoReleaser on tag push (`v*`)

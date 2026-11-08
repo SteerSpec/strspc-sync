@@ -87,8 +87,16 @@ runs:
         OS="${{ steps.platform.outputs.os }}"
         ARCH="${{ steps.platform.outputs.arch }}"
         BASE="https://github.com/SteerSpec/strspc-sync/releases/download"
-        DOWNLOAD_URL="${BASE}/v${VERSION}/strspc_${VERSION}_${OS}_${ARCH}.tar.gz"
-        curl -fsSL "${DOWNLOAD_URL}" | tar xz -C /usr/local/bin strspc
+        ARCHIVE="${BASE}/v${VERSION}/strspc_${VERSION}_${OS}_${ARCH}"
+        # The release publishes darwin builds as .zip and linux builds as .tar.gz (.goreleaser.yml).
+        if [ "$OS" = "darwin" ]; then
+          ZIP="${RUNNER_TEMP:-/tmp}/strspc.zip"
+          curl -fsSL -o "${ZIP}" "${ARCHIVE}.zip"
+          unzip -o -q "${ZIP}" strspc -d /usr/local/bin
+          rm -f "${ZIP}"
+        else
+          curl -fsSL "${ARCHIVE}.tar.gz" | tar xz -C /usr/local/bin strspc
+        fi
         chmod +x /usr/local/bin/strspc
 
     - name: Run strspc sync

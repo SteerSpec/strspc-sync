@@ -5,7 +5,8 @@
 # The run step used to hardcode `GITHUB_TOKEN: ${{ github.token }}`, which
 # overrode the caller's `env:` and left the documented github-token auth path
 # unable to open pull requests in other repositories. This test keeps the input
-# and its wiring from regressing.
+# and its wiring from regressing, and checks each action downloads the archive
+# format the release publishes for its OS (.zip on darwin, .tar.gz on linux).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -33,10 +34,32 @@ for action in "${actions[@]}"; do
     echo "FAIL: $action still hardcodes GITHUB_TOKEN to github.token"
     failures=$((failures + 1))
   fi
+  # The release publishes darwin builds as .zip only (.goreleaser.yml format_overrides), so the download step must
+  # fetch and unzip the .zip on darwin and keep the .tar.gz for linux (SteerSpec/strspc-sync#168).
+  if ! grep -Eq 'curl -fsSL -o "\$\{ZIP\}" "\$\{ARCHIVE\}\.zip"' "$action" ||
+    ! grep -Eq 'unzip -o -q "\$\{ZIP\}" strspc -d /usr/local/bin' "$action"; then
+    echo "FAIL: $action does not download and unzip the darwin .zip archive"
+    failures=$((failures + 1))
+  fi
+  if ! grep -Eq 'curl -fsSL "\$\{ARCHIVE\}\.tar\.gz" \| tar xz -C /usr/local/bin strspc' "$action"; then
+    echo "FAIL: $action does not download the linux .tar.gz archive"
+    failures=$((failures + 1))
+  fi
+done
+
+# strspc conflict writes report and summary to GITHUB_OUTPUT; the actions that run it must expose both
+# (rule CNFLACT, SteerSpec/strspc-sync#172).
+for action in action.yml conflict/action.yml; do
+  for output in report summary; do
+    if ! grep -Eq "^    value: \\$\\{\\{ steps\\.run\\.outputs\\.${output} \\}\\}$" "$action"; then
+      echo "FAIL: $action does not expose the conflict output ${output}"
+      failures=$((failures + 1))
+    fi
+  done
 done
 
 if [ "$failures" -ne 0 ]; then
   echo "$failures assertion(s) failed"
   exit 1
 fi
-echo "OK: ${#actions[@]} actions declare and use inputs.token"
+echo "OK: ${#actions[@]} actions declare and use inputs.token and download the archive their OS publishes"

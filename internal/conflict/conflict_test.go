@@ -21,6 +21,7 @@ type mockRepoService struct {
 	// non-404 API error, as a transient outage would.
 	failPaths map[string]bool
 	files     map[string][]byte // key: "owner/repo/path"
+	orgRepos  []*gh.Repository  // returned by ListByOrg
 }
 
 func (m *mockRepoService) IsSymlink(_ context.Context, _, _, _, _ string) (bool, error) {
@@ -40,7 +41,7 @@ func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, _
 }
 
 func (m *mockRepoService) ListByOrg(_ context.Context, _ string) ([]*gh.Repository, error) {
-	return nil, nil
+	return m.orgRepos, nil
 }
 
 func (m *mockRepoService) ListByTopic(_ context.Context, _, _ string) ([]*gh.Repository, error) {
@@ -350,31 +351,97 @@ func TestTier1_CrossReferenceReadFailure(t *testing.T) {
 	}
 }
 
+// TestTier1_UnmanagedFile: an AI configuration file is unmanaged only when it exists in the target and the deployment
+// state does not track it there (rule CNFLRPT, GH #174).
 func TestTier1_UnmanagedFile(t *testing.T) {
-	repos := &mockRepoService{
-		files: map[string][]byte{},
+	tests := []struct {
+		name      string
+		files     []string // paths present in org/repo1
+		tracked   []string // template IDs the state records for org/repo1
+		failPaths []string
+		want      []string // unmanaged paths reported
+	}{
+		{name: "no state, no files", want: nil},
+		{name: "no state, CLAUDE.md present", files: []string{"CLAUDE.md"}, want: []string{"CLAUDE.md"}},
+		{
+			name:  "no state, both present",
+			files: []string{"CLAUDE.md", ".claude/skills/test.md"},
+			want:  []string{"CLAUDE.md", ".claude/skills/test.md"},
+		},
+		{
+			name: "CLAUDE.md tracked, skill present untracked", files: []string{"CLAUDE.md", ".claude/skills/test.md"},
+			tracked: []string{"claude-md"}, want: []string{".claude/skills/test.md"},
+		},
+		{
+			name: "all tracked", files: []string{"CLAUDE.md", ".claude/skills/test.md"},
+			tracked: []string{"claude-md", "skill-test"}, want: nil,
+		},
+		{name: "failed read is not reported", failPaths: []string{"CLAUDE.md"}, want: nil},
 	}
-	issues := &mockIssueService{}
-	client := newTestClient(repos, issues)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repos := &mockRepoService{files: map[string][]byte{}, failPaths: map[string]bool{}}
+			for _, p := range tt.files {
+				repos.files["org/repo1/"+p] = []byte("# file\n")
+			}
+			for _, p := range tt.failPaths {
+				repos.failPaths["org/repo1/"+p] = true
+			}
+			ds := state.NewDeploymentState()
+			for _, id := range tt.tracked {
+				ds.SetTemplateState("org/repo1", id, state.TemplateState{Version: "1.0.0"})
+			}
+			scanner := New(testConfig(), newTestClient(repos, &mockIssueService{}), "org", "central")
+			scanner.incomplete = make(map[string]bool)
+			got := scanner.checkUnmanagedFiles(context.Background(), ds, "org", "repo1", "org/repo1")
+			var paths []string
+			for _, e := range got {
+				if e.Type != TypeUnmanagedFile || e.Severity != SeverityInfo || e.Repo != "org/repo1" {
+					t.Errorf("unexpected entry %+v", e)
+				}
+				paths = append(paths, e.FilePath)
+			}
+			if strings.Join(paths, ",") != strings.Join(tt.want, ",") {
+				t.Errorf("unmanaged = %v, want %v", paths, tt.want)
+			}
+			if len(tt.failPaths) > 0 && !scanner.incomplete["org/repo1"] {
+				t.Error("a failed read must mark the repo incomplete")
+			}
+		})
+	}
+}
+
+// TestTargets: conflict scans the config's resolved targets and the deployment state's repositories, deduplicated
+// and sorted, and applies --target-filter as a glob on "owner/repo" (GH #174).
+func TestTargets(t *testing.T) {
+	repos := &mockRepoService{orgRepos: []*gh.Repository{
+		{Owner: "org", Name: "repo1", FullName: "org/repo1"},
+		{Owner: "org", Name: "repo2", FullName: "org/repo2"},
+		{Owner: "org", Name: "other", FullName: "org/other"},
+	}}
 	cfg := testConfig()
-
-	// Target has NO deployment state entries at all
+	cfg.Targets.Include = []string{"org/repo*"}
 	ds := state.NewDeploymentState()
-	scanner := New(cfg, client, "org", "central")
-	entries, err := scanner.runTier1(context.Background(), ds, []string{"org/repo1"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0"})
+	ds.SetTemplateState("org/legacy", "claude-md", state.TemplateState{Version: "1.0.0"})
+	scanner := New(cfg, newTestClient(repos, &mockIssueService{}), "org", "central")
 
-	unmanagedCount := 0
-	for _, e := range entries {
-		if e.Type == TypeUnmanagedFile {
-			unmanagedCount++
+	for _, tt := range []struct {
+		filter string
+		want   string
+	}{
+		{"", "org/legacy,org/repo1,org/repo2"},
+		{"org/repo*", "org/repo1,org/repo2"},
+		{"org/legacy", "org/legacy"},
+		{"org/none", ""},
+	} {
+		got, err := scanner.Targets(context.Background(), ds, tt.filter)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-	// Should flag CLAUDE.md and the two template destinations as unmanaged
-	if unmanagedCount == 0 {
-		t.Error("expected unmanaged file entries, got none")
+		if strings.Join(got, ",") != tt.want {
+			t.Errorf("Targets(%q) = %v, want %s", tt.filter, got, tt.want)
+		}
 	}
 }
 
