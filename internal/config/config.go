@@ -189,6 +189,10 @@ func Validate(cfg *SyncConfig) error {
 	if cfg.Version == "" {
 		return fmt.Errorf("version is required")
 	}
+	// SYNCCFG-003: the config schema version is a semver, checked like template versions (GH #175).
+	if !semverRE.MatchString(cfg.Version) {
+		return fmt.Errorf("version %q must be a semver (e.g. \"1.0.0\")", cfg.Version)
+	}
 
 	if !validAuthMethods[cfg.Auth.Method] {
 		return fmt.Errorf("auth.method must be one of: github-app, pat, github-token")

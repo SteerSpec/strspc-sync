@@ -31,7 +31,7 @@ func TestParseSource(t *testing.T) {
 func TestValidationSources(t *testing.T) {
 	tmpl := func(extra string) string {
 		return `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "t"

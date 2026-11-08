@@ -8,7 +8,7 @@ import (
 )
 
 const validConfig = `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "ghp_test123"
@@ -40,8 +40,8 @@ func TestLoadValidConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Version != "1.0" {
-		t.Errorf("expected version 1.0, got %s", cfg.Version)
+	if cfg.Version != "1.0.0" {
+		t.Errorf("expected version 1.0.0, got %s", cfg.Version)
 	}
 	if cfg.Auth.Method != "pat" {
 		t.Errorf("expected auth method pat, got %s", cfg.Auth.Method)
@@ -103,7 +103,7 @@ targets:
 
 func TestValidationInvalidAuthMethod(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: invalid
 templates:
@@ -122,13 +122,18 @@ targets:
 	}
 }
 
-func TestValidationGithubAppRequiresFields(t *testing.T) {
+// TestValidationGithubAppFieldsOptional: a github-app config may omit app-id and private-key, which main reads from
+// STEERSPEC_APP_ID / STEERSPEC_PRIVATE_KEY after Load; github.NewClient rejects them if still empty (see
+// TestNewClient_AuthValidation in internal/github). This test used to expect an error and only got one from the missing template
+// version (GH #175).
+func TestValidationGithubAppFieldsOptional(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: github-app
 templates:
   - id: t1
+    version: "1.0.0"
     type: claude-md
     source: s
     destination: d
@@ -137,15 +142,47 @@ targets:
   include: ["org/*"]
 `
 	path := writeConfig(t, cfg)
-	_, err := Load(path)
-	if err == nil {
-		t.Fatal("expected error for github-app without app-id")
+	if _, err := Load(path); err != nil {
+		t.Fatalf("github-app without app-id in the config: %v", err)
+	}
+}
+
+func TestValidationVersionSemver(t *testing.T) {
+	for _, tt := range []struct {
+		version string
+		ok      bool
+	}{
+		{"1.0.0", true},
+		{"2.10.3", true},
+		{"1.0", false},
+		{"1", false},
+		{"v1.0.0", false},
+		{"latest", false},
+	} {
+		cfg := `
+version: "` + tt.version + `"
+auth:
+  method: github-token
+templates:
+  - id: t1
+    version: "1.0.0"
+    type: claude-md
+    source: s
+    destination: d
+    strategy: mustache
+targets:
+  include: ["org/*"]
+`
+		_, err := Load(writeConfig(t, cfg))
+		if (err == nil) != tt.ok {
+			t.Errorf("version %q: err = %v, want ok=%v", tt.version, err, tt.ok)
+		}
 	}
 }
 
 func TestValidationPatRequiresToken(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
 templates:
@@ -166,7 +203,7 @@ targets:
 
 func TestValidationNoTemplates(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "test"
@@ -183,7 +220,7 @@ targets:
 
 func TestValidationDuplicateTemplateID(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "test"
@@ -210,7 +247,7 @@ targets:
 
 func TestValidationInvalidTemplateType(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "test"
@@ -232,7 +269,7 @@ targets:
 
 func TestValidationInvalidStrategy(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "test"
@@ -254,7 +291,7 @@ targets:
 
 func TestValidationEmptyIncludes(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "test"
@@ -276,7 +313,7 @@ targets:
 
 func TestValidationInvalidConflictTier(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "test"
@@ -300,7 +337,7 @@ conflicts:
 
 func TestValidationTemplateVersionRequired(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "test"
@@ -322,7 +359,7 @@ targets:
 
 func TestValidationTemplateVersionInvalidFormat(t *testing.T) {
 	cfg := `
-version: "1.0"
+version: "1.0.0"
 auth:
   method: pat
   token: "test"

@@ -6,6 +6,9 @@ and the `SYNCCFG` entity in
 [`rules/` at v0.4.1](https://github.com/SteerSpec/strspc-sync/blob/v0.4.1/rules/SYNCCFG.json) for the specification
 of every key.
 
+The top-level `version` is the config schema version and must be a full semver such as
+`"1.0.0"`; `"1.0"` or `"v1"` fail validation. Template `version`s follow the same format.
+
 ## Authentication
 
 The `token` input defaults to the workflow's own `GITHUB_TOKEN`, which is scoped to the
