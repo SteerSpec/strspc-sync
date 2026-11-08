@@ -209,7 +209,7 @@ func (s *Scanner) Targets(ctx context.Context, deployState *state.DeploymentStat
 func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, targets []string, opts Options) (*ConflictReport, error) {
 	report := &ConflictReport{
 		ID:        uuid.New().String(),
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC(),
 	}
 
 	tiers := opts.Tiers
