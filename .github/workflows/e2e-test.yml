@@ -28,6 +28,10 @@ on:
         description: skip cleanup for debugging (leaves PRs, branches and issues in the testbed)
         type: boolean
         default: false
+      pat:
+        description: also run the PAT sync scenario (GH #162) with BOT_TOKEN, the cnslr-bt user's token
+        type: boolean
+        default: false
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
@@ -84,8 +88,15 @@ jobs:
         env:
           STEERSPEC_APP_ID: ${{ secrets.STEERSPEC_APP_ID }}
           STEERSPEC_PRIVATE_KEY: ${{ secrets.STEERSPEC_PRIVATE_KEY }}
+          # Only on a dispatch with `pat`: promotions never depend on the bot user's token. Empty skips the scenario.
+          E2E_PAT_TOKEN: ${{ inputs.pat && secrets.BOT_TOKEN || '' }}
+          PAT_REQUESTED: ${{ inputs.pat || false }}
         run: |
           set -euo pipefail
+          if [ "$PAT_REQUESTED" = true ] && [ -z "$E2E_PAT_TOKEN" ]; then
+            echo "::error::pat was requested but BOT_TOKEN is empty: check the secret and its repository scope"
+            exit 1
+          fi
           # An unset secret or one outside this repo's scope expands to an empty string, which would make the harness
           # skip every test and let the run pass without touching GitHub.
           : "${STEERSPEC_APP_ID:?STEERSPEC_APP_ID is empty: check the secret and its repository scope}"

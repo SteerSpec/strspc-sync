@@ -86,6 +86,21 @@ func (r *Result) RepoResultFor(repo, templateID string) (sync.RepoResult, bool) 
 // which scenarios assert on. Failing to start the binary does fail t.
 func (e *Env) Run(t *testing.T, cmd string, args ...string) *Result {
 	t.Helper()
+	return e.run(t, "", cmd, args...)
+}
+
+// RunWithToken is Run with GITHUB_TOKEN set to token, for a run config whose auth.method is github-token: the
+// binary then authenticates as the token's user instead of the App (GH #162). The harness itself keeps the App token.
+func (e *Env) RunWithToken(t *testing.T, token, cmd string, args ...string) *Result {
+	t.Helper()
+	if token == "" {
+		t.Fatal("RunWithToken: empty token")
+	}
+	return e.run(t, token, cmd, args...)
+}
+
+func (e *Env) run(t *testing.T, token, cmd string, args ...string) *Result {
+	t.Helper()
 	if e.Bin == "" {
 		t.Fatal("STRSPC_BIN is not set")
 	}
@@ -95,6 +110,9 @@ func (e *Env) Run(t *testing.T, cmd string, args ...string) *Result {
 
 	c := exec.CommandContext(ctx, e.Bin, full...)
 	c.Env = e.runEnv(os.Environ())
+	if token != "" {
+		c.Env = append(c.Env, "GITHUB_TOKEN="+token)
+	}
 	var stdout, stderr bytes.Buffer
 	c.Stdout, c.Stderr = &stdout, &stderr
 	exit := 0
@@ -115,7 +133,7 @@ func (e *Env) Run(t *testing.T, cmd string, args ...string) *Result {
 // runEnv returns base with the variables the binary needs set and GitHub Actions leftovers removed.
 func (e *Env) runEnv(base []string) []string {
 	drop := map[string]bool{
-		"GITHUB_REPOSITORY": true, "GITHUB_OUTPUT": true, "GITHUB_EVENT_NAME": true,
+		"GITHUB_REPOSITORY": true, "GITHUB_OUTPUT": true, "GITHUB_EVENT_NAME": true, "GITHUB_TOKEN": true,
 		"STEERSPEC_APP_ID": true, "STEERSPEC_PRIVATE_KEY": true,
 	}
 	out := make([]string, 0, len(base)+6)

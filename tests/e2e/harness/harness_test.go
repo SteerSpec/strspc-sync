@@ -137,7 +137,7 @@ func TestFilters(t *testing.T) {
 
 func TestRunEnv(t *testing.T) {
 	e := &Env{Org: "o", RunID: "1", appID: "42", privateKey: "k"}
-	got := e.runEnv([]string{"PATH=/bin", "GITHUB_REPOSITORY=x/y", "GITHUB_OUTPUT=/f", "STEERSPEC_APP_ID=old"})
+	got := e.runEnv([]string{"PATH=/bin", "GITHUB_REPOSITORY=x/y", "GITHUB_OUTPUT=/f", "STEERSPEC_APP_ID=old", "GITHUB_TOKEN=ambient"})
 	want := map[string]bool{
 		"PATH=/bin": true, "GITHUB_REPOSITORY=o/strspc-e2e-central": true, "STEERSPEC_APP_ID=42": true,
 		"STEERSPEC_PRIVATE_KEY=k": true, "E2E_ORG=o": true, "E2E_RUN_ID=1": true,
