@@ -31,7 +31,7 @@ inputs:
     required: false
     default: 'false'
   tiers:
-    description: 'Comma-separated detection tiers to run (conflict only, e.g. "1,2,3")'
+    description: 'Comma-separated detection tiers to run (conflict only, e.g. "1,2"; tier 3 is not implemented yet)'
     required: false
     default: ''
   token:
