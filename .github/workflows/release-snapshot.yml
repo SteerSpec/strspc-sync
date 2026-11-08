@@ -41,9 +41,9 @@ jobs:
         with:
           version: '~> v2'
           args: release --snapshot --clean --skip=publish,sign
-      # action.yml downloads strspc_<VERSION>_<os>_<arch>.tar.gz and extracts the strspc binary from the archive
-      # root, so check that every archive exists under that name pattern, then extract and run the linux/amd64
-      # binary the way the action does.
+      # The actions download strspc_<VERSION>_<os>_<arch>.tar.gz on linux and .zip on darwin and extract the strspc
+      # binary from the archive root, so check that every archive exists under that name pattern, extract the
+      # darwin binary the way the action does, then extract and run the linux/amd64 binary.
       - name: Archive names and layout
         run: |
           set -euo pipefail
@@ -57,5 +57,10 @@ jobs:
           done
           bin="$RUNNER_TEMP/bin"
           mkdir -p "$bin"
+          for arch in amd64 arm64; do
+            unzip -o -q dist/strspc_*_darwin_${arch}.zip strspc -d "$bin"
+            test -s "$bin/strspc" || { echo "::error::darwin_${arch}.zip has no strspc at its root"; exit 1; }
+            rm "$bin/strspc"
+          done
           tar xzf dist/strspc_*_linux_amd64.tar.gz -C "$bin" strspc
           "$bin/strspc" version
