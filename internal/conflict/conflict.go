@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	pathpkg "path"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/hash"
+	"github.com/SteerSpec/strspc-sync/internal/registry"
 	"github.com/SteerSpec/strspc-sync/internal/state"
 )
 
@@ -170,6 +173,36 @@ func New(cfg *config.SyncConfig, ghClient *gh.Client, centralOwner, centralRepo 
 		centralOwner: centralOwner,
 		centralRepo:  centralRepo,
 	}
+}
+
+// Targets returns the repositories to scan, sorted: every repository the config's targets resolve to, so a target
+// without a deployment state entry is scanned too (unmanaged files, GH #174), plus every repository in the deployment
+// state, which may have left targets but still holds synced files. A non-empty filter keeps the repositories whose
+// "owner/repo" it matches as a path.Match glob, as sync applies --target-filter.
+func (s *Scanner) Targets(ctx context.Context, deployState *state.DeploymentState, filter string) ([]string, error) {
+	resolved, err := registry.New(&registry.GitHubLister{Repos: s.ghClient.Repos}).
+		Resolve(ctx, s.cfg.Targets, s.cfg.Variables)
+	if err != nil {
+		return nil, fmt.Errorf("resolving targets: %w", err)
+	}
+	seen := make(map[string]bool, len(resolved)+len(deployState.Repositories))
+	for _, t := range resolved {
+		seen[t.Repo] = true
+	}
+	for repo := range deployState.Repositories {
+		seen[repo] = true
+	}
+	targets := make([]string, 0, len(seen))
+	for repo := range seen {
+		if filter != "" {
+			if ok, err := pathpkg.Match(filter, repo); err != nil || !ok {
+				continue
+			}
+		}
+		targets = append(targets, repo)
+	}
+	sort.Strings(targets)
+	return targets, nil
 }
 
 // Run executes conflict detection for the given targets and options.

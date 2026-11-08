@@ -26,8 +26,8 @@ func mcMonitor(t *testing.T, env *harness.Env, repo string) *harness.Result {
 }
 
 // mcConflict runs `strspc conflict --tiers tiers` and requires a parsed report and the wanted exit code. The
-// conflict command has no per-repo filter (it scans every repo in the deployment state), so scenarios keep the state
-// down to the repos they use.
+// conflict command scans every configured target plus every repo in the deployment state, so scenarios keep the state
+// down to the repos they use and assert only the findings of those repos' files.
 func mcConflict(t *testing.T, env *harness.Env, tiers string, wantExit int) *conflict.ConflictReport {
 	t.Helper()
 	r := env.Run(t, "conflict", "--tiers", tiers)

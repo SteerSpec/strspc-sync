@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -318,7 +320,10 @@ func runMonitor(args []string, out, errOut io.Writer) error {
 
 	mon := monitor.New(cfg, client, centralOwner, centralRepo)
 
-	deployState := loadDeploymentState(client, centralOwner, centralRepo)
+	deployState, err := loadDeploymentState(client, centralOwner, centralRepo)
+	if err != nil {
+		return err
+	}
 
 	result, err := mon.Run(ctx, deployState, monitor.Options{
 		ConfigPath:   common.configPath,
@@ -378,11 +383,14 @@ func runConflict(args []string, out, errOut io.Writer) error {
 
 	scanner := conflict.New(cfg, client, centralOwner, centralRepo)
 
-	deployState := loadDeploymentState(client, centralOwner, centralRepo)
+	deployState, err := loadDeploymentState(client, centralOwner, centralRepo)
+	if err != nil {
+		return err
+	}
 
-	var targets []string
-	for repo := range deployState.Repositories {
-		targets = append(targets, repo)
+	targets, err := scanner.Targets(ctx, deployState, common.targetFilter)
+	if err != nil {
+		return fmt.Errorf("conflict detection error: %w", err)
 	}
 
 	report, err := scanner.Run(ctx, deployState, targets, conflict.Options{
@@ -445,18 +453,28 @@ func detectCentralRepo(cfg *config.SyncConfig, errOut io.Writer) (string, string
 	return "", "", fmt.Errorf("cannot determine central repository; set central-repo in config or GITHUB_REPOSITORY env var")
 }
 
-func loadDeploymentState(client *gh.Client, owner, repo string) *state.DeploymentState {
+// loadDeploymentState reads the deployment state from the central repo. A missing file (404) is a first run and
+// yields an empty state; any other read or decode failure is returned, so monitor and conflict do not mistake an
+// outage for "nothing is managed": conflict would then report every configured target's files as unmanaged and
+// close its open issues on incomplete evidence.
+func loadDeploymentState(client *gh.Client, owner, repo string) (*state.DeploymentState, error) {
 	ctx := context.Background()
-	data, _, err := client.Repos.GetFileContent(ctx, owner, repo, ".steerspec/deployment-state.json", "")
+	data, _, err := client.Repos.GetFileContent(ctx, owner, repo, deploymentStatePath, "")
 	if err != nil {
-		return state.NewDeploymentState()
+		var apiErr *gh.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			return state.NewDeploymentState(), nil
+		}
+		return nil, fmt.Errorf("reading deployment state %s/%s/%s: %w", owner, repo, deploymentStatePath, err)
 	}
 	ds, err := state.Load(data)
 	if err != nil {
-		return state.NewDeploymentState()
+		return nil, fmt.Errorf("decoding deployment state %s/%s/%s: %w", owner, repo, deploymentStatePath, err)
 	}
-	return ds
+	return ds, nil
 }
+
+const deploymentStatePath = ".steerspec/deployment-state.json"
 
 func printJSON(v any, w io.Writer) {
 	enc := json.NewEncoder(w)

@@ -38,8 +38,7 @@ func (s *Scanner) runTier1(ctx context.Context, deployState *state.DeploymentSta
 		entries = append(entries, crossRefEntries...)
 
 		// 3. Unmanaged file detection
-		unmanagedEntries := s.checkUnmanagedFiles(deployState, target)
-		entries = append(entries, unmanagedEntries...)
+		entries = append(entries, s.checkUnmanagedFiles(ctx, deployState, owner, repo, target)...)
 	}
 
 	return entries, nil
@@ -162,44 +161,42 @@ func (s *Scanner) referenceExists(ctx context.Context, owner, repo, ref string) 
 	return false, true
 }
 
-func (s *Scanner) checkUnmanagedFiles(deployState *state.DeploymentState, target string) []ConflictEntry {
-	var entries []ConflictEntry
-
-	// Build set of managed destinations for this target
+// checkUnmanagedFiles reports the AI configuration files a target holds that the deployment state does not track for
+// it (rule CNFLRPT: CLAUDE.md or .claude/** not tracked in the manifest). With no directory listing it checks the
+// known paths, CLAUDE.md and every configured template destination, and reports only those that exist. A failed read
+// marks the repo incomplete and reports nothing.
+func (s *Scanner) checkUnmanagedFiles(
+	ctx context.Context, deployState *state.DeploymentState, owner, repo, target string,
+) []ConflictEntry {
 	managed := make(map[string]bool)
-	repoTemplates, ok := deployState.Repositories[target]
-	if ok {
-		for templateID := range repoTemplates {
-			tmplCfg := s.findTemplate(templateID)
-			if tmplCfg != nil {
-				managed[tmplCfg.Destination] = true
-			}
+	for templateID := range deployState.Repositories[target] {
+		if tmplCfg := s.findTemplate(templateID); tmplCfg != nil {
+			managed[tmplCfg.Destination] = true
 		}
 	}
 
-	// Check each configured template destination; if the file is not tracked, flag it.
-	// Since we can't list directory contents via the GitHub API without search,
-	// we check known paths that should be managed but aren't in the deployment state.
-	knownPaths := []string{"CLAUDE.md"}
+	known := []string{"CLAUDE.md"}
 	for _, tmpl := range s.cfg.Templates {
-		knownPaths = append(knownPaths, tmpl.Destination)
+		known = append(known, tmpl.Destination)
 	}
 
-	for _, path := range knownPaths {
-		if managed[path] {
+	var entries []ConflictEntry
+	checked := make(map[string]bool, len(known))
+	for _, p := range known {
+		if managed[p] || checked[p] {
 			continue
 		}
-		// If this target has no entry in deployment state at all, flag any template destination
-		if !ok {
-			entries = append(entries, ConflictEntry{
-				Severity:    SeverityInfo,
-				Type:        TypeUnmanagedFile,
-				Repo:        target,
-				FilePath:    path,
-				Description: fmt.Sprintf("file %q exists in template config but is not tracked in deployment state for this repo", path),
-			})
+		checked[p] = true
+		if _, found, err := s.readFile(ctx, owner, repo, p); err != nil || !found {
+			continue
 		}
+		entries = append(entries, ConflictEntry{
+			Severity:    SeverityInfo,
+			Type:        TypeUnmanagedFile,
+			Repo:        target,
+			FilePath:    p,
+			Description: fmt.Sprintf("file %q exists but is not tracked in the deployment state for this repo", p),
+		})
 	}
-
 	return entries
 }
