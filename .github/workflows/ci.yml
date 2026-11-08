@@ -125,9 +125,13 @@ jobs:
   # Runs the local action on each runner OS so its download step fetches the archive the release publishes for
   # that OS (.tar.gz on linux, .zip on darwin) and the binary runs (GH #168). `version` needs no token or config.
   # Pull requests only, and not the release-please PR: that PR, and the push to main that merges it, carry a VERSION
-  # whose release does not exist yet, so the download would 404.
+  # whose release does not exist yet, so the download would 404. Nor the release sync PR to develop
+  # (chore/sync-release-*): it opens as the release is cut, before release.yml has uploaded the archives (GH #189).
   action-install:
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'release-please--')
+    if: >-
+      github.event_name == 'pull_request' &&
+      !startsWith(github.head_ref, 'release-please--') &&
+      !startsWith(github.head_ref, 'chore/sync-release-')
     strategy:
       fail-fast: false
       matrix:
