@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.4](https://github.com/SteerSpec/strspc-sync/compare/v0.4.3...v0.4.4) (2026-11-08)
+
+
+### Bug Fixes
+
+* **conflict:** resolve CLAUDE.md references as written and skip globs ([#164](https://github.com/SteerSpec/strspc-sync/issues/164)) ([20e4bfd](https://github.com/SteerSpec/strspc-sync/commit/20e4bfd42a947d55dd87c5fed42a9d665660b4db))
+* **drift:** compare only the managed sections of marker-strategy files ([#165](https://github.com/SteerSpec/strspc-sync/issues/165)) ([502608d](https://github.com/SteerSpec/strspc-sync/commit/502608d863e5d75f25b62d51bb53c2ce99a648d9))
+* **sync:** delete the empty sync branch after a failed write; explain a rejected state write ([#166](https://github.com/SteerSpec/strspc-sync/issues/166)) ([fa56d22](https://github.com/SteerSpec/strspc-sync/commit/fa56d2218005698e326f7380154dc5d75312c204))
+
 ## [0.4.3](https://github.com/SteerSpec/strspc-sync/compare/v0.4.2...v0.4.3) (2026-11-07)
 
 
