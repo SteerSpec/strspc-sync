@@ -9,6 +9,7 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/hash"
+	"github.com/SteerSpec/strspc-sync/internal/registry"
 	"github.com/SteerSpec/strspc-sync/internal/state"
 )
 
@@ -65,6 +66,11 @@ func New(cfg *config.SyncConfig, ghClient *gh.Client, centralOwner, centralRepo 
 
 // Run checks all repos in the deployment state for drift and manages drift issues.
 func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, opts Options) (*Result, error) {
+	// The same comma-separated glob list as sync's --target-filter (GH #171).
+	targetFilter, err := registry.ParseFilter(opts.TargetFilter)
+	if err != nil {
+		return nil, fmt.Errorf("--target-filter: %w", err)
+	}
 	label := m.cfg.Monitor.IssueLabel
 	if label == "" {
 		label = "steerspec-drift"
@@ -102,7 +108,7 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 	inSyncRepos := make(map[string]bool)
 
 	for repoFullName, templates := range deployState.Repositories {
-		if opts.TargetFilter != "" && repoFullName != opts.TargetFilter {
+		if !targetFilter.Match(repoFullName) {
 			continue
 		}
 

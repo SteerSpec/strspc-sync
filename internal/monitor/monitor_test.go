@@ -424,6 +424,20 @@ func TestTargetFilter(t *testing.T) {
 	if res.IssuesCreated != 0 {
 		t.Errorf("expected 0 issues created, got %d", res.IssuesCreated)
 	}
+
+	// A glob, as sync takes it (GH #171): before, monitor compared the filter as an exact name, so this checked
+	// nothing.
+	res, err = New(testConfig(), client, "test", "central").Run(context.Background(), ds, Options{TargetFilter: "org/app*"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ReposInSync != 1 || res.ReposDrifted != 1 {
+		t.Errorf("glob filter: in sync %d, drifted %d; want 1 and 1", res.ReposInSync, res.ReposDrifted)
+	}
+
+	if _, err := New(testConfig(), client, "test", "central").Run(context.Background(), ds, Options{TargetFilter: "org/["}); err == nil {
+		t.Error("malformed glob: want an error")
+	}
 }
 
 func TestMNRACT005_HashBasedDriftDetection(t *testing.T) {

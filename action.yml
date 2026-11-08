@@ -19,11 +19,11 @@ inputs:
     required: false
     default: 'false'
   target-filter:
-    description: 'Glob pattern to filter target repositories'
+    description: 'Comma-separated owner/repo glob patterns; only matching target repositories are processed'
     required: false
     default: ''
   template-filter:
-    description: 'Comma-separated template IDs to sync (sync only)'
+    description: 'Comma-separated template ID glob patterns to sync (sync only)'
     required: false
     default: ''
   force:

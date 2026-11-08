@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.1.5",
-    "timestamp": "2026-11-07T19:07:34Z",
-    "hash": "blake3:4732cd968cefa07c1d896275cf4bf2c2c88296489eadfab4287530fab8931198"
+    "version": "0.1.7",
+    "timestamp": "2026-11-08T16:36:22Z",
+    "hash": "blake3:7415b104ea3658a03e8dd80312e8e81c5e79e7e7500c395fdb49368a4eb75863"
   },
   "rules": [
     {
@@ -112,18 +112,18 @@
     },
     {
       "id": "SYNCACT-012",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "HAS an input `target-filter` (string, optional) to limit sync to repositories matching a glob pattern.",
+      "body": "HAS an input `target-filter` (string, optional) to limit sync to repositories whose `owner/repo` matches any of a comma-separated list of glob patterns; a malformed pattern fails the run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
     {
       "id": "SYNCACT-013",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "HAS an input `template-filter` (string, optional) to limit sync to specific template identifiers.",
+      "body": "HAS an input `template-filter` (string, optional) to limit sync to templates whose identifier matches any of a comma-separated list of glob patterns; a malformed pattern fails the run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
