@@ -194,7 +194,7 @@ func (e *Env) PRAuthor(t *testing.T, repo string, number int) string {
 
 // Commit is the author and signature status of one commit.
 type Commit struct {
-	SHA      string
+	SHA string
 	// Author is the login GitHub links to the commit's author (the API's top-level author), "" when it links none.
 	// createCommitOnBranch always authors as the authenticated user, so a sync commit links to the token's user;
 	// the committer is GitHub itself (web-flow), so it is not a fallback.
