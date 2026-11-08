@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.5](https://github.com/SteerSpec/strspc-sync/compare/v0.4.4...v0.4.5) (2026-11-08)
+
+
+### Bug Fixes
+
+* **action:** download the darwin .zip on macOS runners ([#179](https://github.com/SteerSpec/strspc-sync/issues/179)) ([f812e09](https://github.com/SteerSpec/strspc-sync/commit/f812e097ae6f4b28027ab61c89eaccf0b6abc6ca))
+* **action:** give the conflict action its summary and report outputs ([#180](https://github.com/SteerSpec/strspc-sync/issues/180)) ([d40eae6](https://github.com/SteerSpec/strspc-sync/commit/d40eae6d15c185f99d395dc805575a12d0e74f7b)), closes [#172](https://github.com/SteerSpec/strspc-sync/issues/172)
+* **conflict:** scan configured targets so unmanaged files are found ([#181](https://github.com/SteerSpec/strspc-sync/issues/181)) ([04baf4b](https://github.com/SteerSpec/strspc-sync/commit/04baf4b6696fce720395451e73230df935f6f8b8))
+* **monitor:** keep First Detected, link the PR in its repo, stamp UTC ([#182](https://github.com/SteerSpec/strspc-sync/issues/182)) ([b86e7cc](https://github.com/SteerSpec/strspc-sync/commit/b86e7cc601353ae050a10369a92d92b6784579ef)), closes [#173](https://github.com/SteerSpec/strspc-sync/issues/173)
+
 ## [0.4.4](https://github.com/SteerSpec/strspc-sync/compare/v0.4.3...v0.4.4) (2026-11-08)
 
 
