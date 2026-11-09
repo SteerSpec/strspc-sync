@@ -226,28 +226,43 @@ func generateJWT(appID string, key *rsa.PrivateKey) (string, error) {
 	return sigInput + "." + base64.RawURLEncoding.EncodeToString(sig), nil
 }
 
+// newRateLimiter returns the retry policy every GitHub API call goes through.
+func newRateLimiter() *rateLimiter {
+	return &rateLimiter{
+		maxRetries: 5,
+		baseDelay:  time.Second,
+		remaining:  -1,
+		threshold:  50,
+	}
+}
+
+// newAuthRateLimiter builds the limiter for the App token exchange; tests
+// shorten its delay.
+var newAuthRateLimiter = newRateLimiter
+
 // exchangeInstallationToken trades a GitHub App JWT for an installation access token.
 // If installationID is empty, the installation is auto-discovered from the org name.
+// Both requests go through a rate limiter, as every other API call does
+// (SYNCACT-009): the client's own limiter does not exist yet at this point.
 func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installationID string) (string, map[string]string, error) {
 	hc := &http.Client{Timeout: 30 * time.Second}
+	rl := newAuthRateLimiter()
 
-	makeReq := func(method, url string) (*http.Request, error) {
-		req, err := http.NewRequestWithContext(ctx, method, url, http.NoBody)
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Authorization", "Bearer "+jwt)
-		req.Header.Set("Accept", "application/vnd.github+json")
-		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-		return req, nil
+	do := func(method, url string) (*http.Response, error) {
+		return rl.do(ctx, func() (*http.Response, error) {
+			req, err := http.NewRequestWithContext(ctx, method, url, http.NoBody)
+			if err != nil {
+				return nil, err
+			}
+			req.Header.Set("Authorization", "Bearer "+jwt)
+			req.Header.Set("Accept", "application/vnd.github+json")
+			req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+			return hc.Do(req)
+		})
 	}
 
 	if installationID == "" {
-		req, err := makeReq(http.MethodGet, baseURL+"/app/installations")
-		if err != nil {
-			return "", nil, fmt.Errorf("building installations request: %w", err)
-		}
-		resp, err := hc.Do(req)
+		resp, err := do(http.MethodGet, baseURL+"/app/installations")
 		if err != nil {
 			return "", nil, fmt.Errorf("listing installations: %w", err)
 		}
@@ -278,11 +293,7 @@ func exchangeInstallationToken(ctx context.Context, jwt, baseURL, org, installat
 		}
 	}
 
-	req, err := makeReq(http.MethodPost, baseURL+"/app/installations/"+installationID+"/access_tokens")
-	if err != nil {
-		return "", nil, fmt.Errorf("building access_tokens request: %w", err)
-	}
-	resp, err := hc.Do(req)
+	resp, err := do(http.MethodPost, baseURL+"/app/installations/"+installationID+"/access_tokens")
 	if err != nil {
 		return "", nil, fmt.Errorf("exchanging installation token: %w", err)
 	}
@@ -399,16 +410,11 @@ func NewClient(auth AuthConfig) (*Client, error) {
 	}
 
 	c := &Client{
-		httpClient: &http.Client{Timeout: 30 * time.Second},
-		baseURL:    baseURL,
-		graphqlURL: os.Getenv("GITHUB_GRAPHQL_URL"),
-		token:      token,
-		rateLimiter: &rateLimiter{
-			maxRetries: 5,
-			baseDelay:  time.Second,
-			remaining:  -1,
-			threshold:  50,
-		},
+		httpClient:  &http.Client{Timeout: 30 * time.Second},
+		baseURL:     baseURL,
+		graphqlURL:  os.Getenv("GITHUB_GRAPHQL_URL"),
+		token:       token,
+		rateLimiter: newRateLimiter(),
 	}
 	c.Repos = &repoService{client: c}
 	c.PullRequests = &pullRequestService{client: c}
