@@ -1,0 +1,43 @@
+{
+  "rule_id": "MNRACT-008",
+  "revision": 1,
+  "body_hash": "blake3:d70872b3a98bbb921d688473b3f5873517250c7dad608a1db5c62c058bf58f0e",
+  "promoted_at": "2026-11-09T14:37:56Z",
+  "entity_version": "0.9.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "7671ce36066c26355eae7e325d2638071c8e837a071c1e266aef76e221196762",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The monitor lists open central-repo issues, indexes them by fingerprint and title, and updates an existing issue instead of creating a new one. Unit and e2e tests assert that reruns create no duplicates. The only gap is that an untrusted look-alike issue is ignored on purpose, which is a deliberate security choice.",
+  "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 153,
+      "excerpt": "existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 225,
+      "excerpt": "if existing != nil {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor_test.go",
+      "line": 603,
+      "excerpt": "func TestMNRACT008_NoDuplicateDriftIssues_TwoPassScenario(t *testing.T) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor_test.go",
+      "line": 748,
+      "excerpt": "t.Errorf(\"MNRACT-008: created %d issue(s) next to the unlabeled one\", res.IssuesCreated)",
+      "line_confirmed": true
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "rule_id": "CNFLACT-016",
+  "revision": 0,
+  "body_hash": "blake3:ed35ba3005fa7096732312ee67540742a4dbcc5bb1ac9a1066196e1b136a7ebd",
+  "promoted_at": "2026-11-09T14:37:56Z",
+  "entity_version": "0.7.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "7671ce36066c26355eae7e325d2638071c8e837a071c1e266aef76e221196762",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.88,
+  "explanation": "A still-detected conflict is matched to an existing open issue by fingerprint or title and that issue is updated. A new issue is created only when no match is found, and unit and e2e tests cover this behavior. Untrusted look-alike issues are deliberately ignored, which is a reasonable safeguard.",
+  "evidence": [
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 331,
+      "excerpt": "if extractFingerprint(issue.Body) == fp || issue.Title == title {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 346,
+      "excerpt": "if err := s.ghClient.Issues.Update(ctx, owner, repoName, issue.Number, &gh.IssueUpdate{Body: &body}); err != nil {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 353,
+      "excerpt": "if !found {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict_test.go",
+      "line": 659,
+      "excerpt": "func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}

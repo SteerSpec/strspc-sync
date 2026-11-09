@@ -1,0 +1,49 @@
+{
+  "rule_id": "CNFLACT-007",
+  "revision": 1,
+  "body_hash": "blake3:b74a93f425ab1de9f7c1557cb1b22c887bae99c7d8f950fe6c2ffce9900a6e18",
+  "promoted_at": "2026-11-09T14:37:56Z",
+  "entity_version": "0.6.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "7671ce36066c26355eae7e325d2638071c8e837a071c1e266aef76e221196762",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The conflict flow lists open issues per repo and matches by fingerprint or title before creating. Matches are updated rather than duplicated. Created issues are cached to avoid duplicates within the same run, and unit and e2e tests verify reruns create no duplicates.",
+  "evidence": [
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 331,
+      "excerpt": "if extractFingerprint(issue.Body) == fp || issue.Title == title {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 354,
+      "excerpt": "created, err := s.ghClient.Issues.Create(ctx, owner, repoName, &gh.IssueCreate{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 363,
+      "excerpt": "openIssues[repo] = append(openIssues[repo], created)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict_test.go",
+      "line": 659,
+      "excerpt": "func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/e2e/monitor_conflict_test.go",
+      "line": 170,
+      "excerpt": "rep = mcConflict(t, env, \"1\", 1)",
+      "line_confirmed": true
+    }
+  ]
+}

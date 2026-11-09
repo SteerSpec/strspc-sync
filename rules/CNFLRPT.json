@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.3.1",
-    "timestamp": "2026-11-09T10:23:48Z",
-    "hash": "blake3:224eff61ceb27ad46343eee2419482c37c6235633bb400728de506eaad63788b"
+    "version": "0.3.2",
+    "timestamp": "2026-11-09T14:37:56Z",
+    "hash": "blake3:6b9b5dbe620a4951d69542cdcdd40acad985136e1bdc567793b3d97350f66cdd"
   },
   "rules": [
     {
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.3.0",
-        "timestamp": "2026-11-09T07:05:55Z",
-        "hash": "blake3:2cc14a9720d424eefda68cdb671efee0f5e19c02da5dde9e54023300843c3f7b"
+        "version": "0.4.0",
+        "timestamp": "2026-11-09T14:37:56Z",
+        "hash": "blake3:9bc41d7a0ae1210e280576e4371800cfacd0addc85a17bf92c8530d83cccdbf0"
       },
       "rules": [
         {
@@ -282,7 +282,7 @@
         {
           "id": "CNFLDTS-008",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "Results from all enabled tiers MUST be combined into a single ConflictReport.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
