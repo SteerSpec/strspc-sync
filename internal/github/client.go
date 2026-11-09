@@ -126,7 +126,8 @@ type Issue struct {
 // could plant a look-alike issue could also have labeled it. Owners, members
 // and collaborators can apply labels too.
 func (i *Issue) Trusted(label string) bool {
-	if label != "" && slices.Contains(i.Labels, label) {
+	// GitHub label names are case-insensitive, as the API's label filter is.
+	if label != "" && slices.ContainsFunc(i.Labels, func(l string) bool { return strings.EqualFold(l, label) }) {
 		return true
 	}
 	if i.AuthorType == "Bot" {
@@ -495,11 +496,15 @@ func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)
 			return resp, nil
 		}
 
-		io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20)) //nolint:errcheck // drain body to enable connection reuse
-		resp.Body.Close()                                     //nolint:errcheck // best-effort close before retry
+		// Keep GitHub's message for the error when retries run out; reading it
+		// also drains the body so the connection can be reused.
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		io.Copy(io.Discard, resp.Body) //nolint:errcheck // drain what is left past the limit
+		resp.Body.Close()              //nolint:errcheck // best-effort close before retry
 
 		if attempt == rl.maxRetries {
-			return nil, fmt.Errorf("rate limit exceeded after %d retries", rl.maxRetries)
+			return nil, fmt.Errorf("rate limit exceeded after %d retries: %w", rl.maxRetries,
+				&APIError{StatusCode: resp.StatusCode, Message: apiMessage(msg)})
 		}
 
 		// Prefer Retry-After header (secondary rate limits) over exponential backoff.
@@ -534,6 +539,18 @@ func isRateLimit403(resp *http.Response) bool {
 		return false
 	}
 	return strings.Contains(strings.ToLower(string(body)), "secondary rate limit")
+}
+
+// apiMessage returns the "message" field of a GitHub error body, or the body
+// itself, trimmed, when it is not that JSON.
+func apiMessage(body []byte) string {
+	var e struct {
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(body, &e) == nil && e.Message != "" {
+		return e.Message
+	}
+	return strings.TrimSpace(string(body))
 }
 
 // doRequest performs an authenticated HTTP request through the rate limiter.
