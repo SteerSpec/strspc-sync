@@ -684,8 +684,13 @@ func updateMessage(prefix, templateID, version string) string {
 // format. The current form matches up to and including " to " so that
 // "claude-md" does not claim PRs for "claude-md-extra".
 func isSyncPRForTemplate(title, prefix, templateID string) bool {
-	return strings.HasPrefix(title, prefix+": update "+templateID+" to ") ||
-		strings.HasPrefix(title, legacyTitlePrefix+templateID)
+	if strings.HasPrefix(title, prefix+": update "+templateID+" to ") {
+		return true
+	}
+	// The legacy form ends at the template ID or continues after a space, so
+	// "claude-md" does not claim "[SteerSpec] Update claude-md-extra".
+	rest, ok := strings.CutPrefix(title, legacyTitlePrefix+templateID)
+	return ok && (rest == "" || strings.HasPrefix(rest, " "))
 }
 
 // serverURL is the web (not API) base of the GitHub instance, used for links

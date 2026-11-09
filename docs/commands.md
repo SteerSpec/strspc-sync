@@ -37,7 +37,8 @@ strspc monitor --config steerspec-sync.yml
 ```
 
 Monitor finds an open drift issue by its fingerprint or title, not by `monitor.issue-label`, so an issue
-whose label was removed is still updated or closed instead of duplicated. A failure to create, update or
+whose label was removed is still updated or closed instead of duplicated. An issue without the label counts
+only when a bot, or an owner, member or collaborator of the repository, opened it. A failure to create, update or
 close one target's issue does not stop the others: it is counted in the summary's `errors` and listed in
 `repo_errors`, and the command then exits non-zero.
 
@@ -59,8 +60,10 @@ strspc conflict --config steerspec-sync.yml --tiers 1,2
 ```
 
 A tier that fails (tier 3 is not implemented yet) does not discard the others: the report of the tiers
-that ran is printed and the outputs are set, then the command exits non-zero. Open conflict issues are
-found by fingerprint or title, not by `conflicts.issue-label`.
+that ran is printed and the outputs are set, then the command exits non-zero. To update an open conflict
+issue instead of opening another, conflict finds it by fingerprint or title, not by `conflicts.issue-label`;
+the cleanup that closes resolved conflict issues still only considers issues carrying the label. As for
+monitor, an issue without the label counts only when a bot, or an owner, member or collaborator, opened it.
 
 **Action usage:**
 

@@ -832,6 +832,8 @@ func TestUpdateMessageAndMatching(t *testing.T) {
 		{"chore(steerspec-sync): update claude-md to 0.9.0", true},
 		{"[SteerSpec] Update claude-md", true},
 		{"[SteerSpec] Update claude-md (old v1)", true},
+		{"[SteerSpec] Update claude-md-extra", false},
+		{"[SteerSpec] Update claude-md-extra (old v1)", false},
 		{"chore(steerspec-sync): update claude-md-extra to 1.0.0", false},
 		{"chore(steerspec-sync): update claude-md", false},
 		{"ci(other): update claude-md to 1.0.0", false},

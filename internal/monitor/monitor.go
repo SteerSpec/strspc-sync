@@ -95,11 +95,12 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 		destByTemplate[t.ID] = t.Destination
 	}
 
-	// Fetch the open issues in the central repo. The label is not part of the
-	// lookup: a drift issue whose label was removed or renamed is still found
-	// by its fingerprint or title, so it is updated or closed rather than
-	// duplicated (MNRACT-008/009/018). Both keys are specific to one
-	// repo/template drift, so other issues never match.
+	// Fetch the open issues in the central repo. The label is not required: a
+	// drift issue whose label was removed or renamed is still found by its
+	// fingerprint or title, so it is updated or closed rather than duplicated
+	// (MNRACT-008/009/018). Both keys are specific to one repo/template drift.
+	// An unlabeled issue counts only when a trusted author opened it, so a
+	// copied title cannot capture or close the real drift issue.
 	existingIssues, err := m.ghClient.Issues.List(ctx, m.centralOwner, m.centralRepo, &gh.IssueListOptions{
 		State: "open",
 	})
@@ -111,6 +112,9 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 	issueByFingerprint := make(map[string]*gh.Issue, len(existingIssues))
 	issueByTitle := make(map[string]*gh.Issue, len(existingIssues))
 	for _, iss := range existingIssues {
+		if !iss.Trusted(label) {
+			continue
+		}
 		issueByTitle[iss.Title] = iss
 		if fp := extractFingerprint(iss.Body); fp != "" {
 			issueByFingerprint[fp] = iss

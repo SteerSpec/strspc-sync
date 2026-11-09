@@ -1154,10 +1154,11 @@ func TestUnlabeledConflictIssueUpdated(t *testing.T) {
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
 	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
 	issues := &mockIssueService{issues: []*gh.Issue{{
-		Number: 77,
-		Title:  "[SteerSpec Conflict] version_drift: CLAUDE.md",
-		Body:   "old body\n\n<!-- steerspec-fingerprint: " + fp + " -->",
-		State:  "open",
+		Number:            77,
+		Title:             "[SteerSpec Conflict] version_drift: CLAUDE.md",
+		Body:              "old body\n\n<!-- steerspec-fingerprint: " + fp + " -->",
+		State:             "open",
+		AuthorAssociation: "MEMBER", // opened with a member's PAT
 	}}}
 	ds := state.NewDeploymentState()
 	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
@@ -1198,5 +1199,35 @@ func TestFailedTierKeepsOtherResults(t *testing.T) {
 	s := report.SeveritySummary
 	if s.Critical+s.Warning+s.Info != len(report.Entries) {
 		t.Errorf("summary %+v does not count the %d entries", s, len(report.Entries))
+	}
+}
+
+// An unlabeled look-alike conflict issue from an outside user is never
+// updated in place of the real one: a new labeled issue is opened instead.
+func TestUntrustedLookAlikeConflictIssueIgnored(t *testing.T) {
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{issues: []*gh.Issue{{
+		Number:            66,
+		Title:             "[SteerSpec Conflict] version_drift: CLAUDE.md",
+		Body:              "spoofed\n\n<!-- steerspec-fingerprint: " + fp + " -->",
+		State:             "open",
+		AuthorType:        "User",
+		AuthorAssociation: "NONE",
+	}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now(),
+	})
+
+	scanner := New(testConfig(), newTestClient(repos, issues), "org", "central")
+	if _, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.updated) != 0 {
+		t.Errorf("updated %+v, want the look-alike #66 left alone", issues.updated)
+	}
+	if len(issues.created) != 1 {
+		t.Errorf("created %d issue(s), want 1", len(issues.created))
 	}
 }

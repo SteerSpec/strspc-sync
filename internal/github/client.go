@@ -16,6 +16,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -107,6 +108,31 @@ type Issue struct {
 	State  string
 	Labels []string
 	URL    string
+	// AuthorType is the author's account type ("User" or "Bot") and
+	// AuthorAssociation their association with the repository ("OWNER",
+	// "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "NONE", ...).
+	AuthorType        string
+	AuthorAssociation string
+}
+
+// Trusted reports whether the issue can be taken for one strspc manages:
+// it carries label, or it was opened by a bot (the workflow token or an
+// installed App) or by an owner, member or collaborator. Only those can
+// apply or remove labels, so an unlabeled issue from anyone else (a title
+// or fingerprint is easy to copy) is never updated or closed in place of
+// the real one.
+func (i *Issue) Trusted(label string) bool {
+	if label != "" && slices.Contains(i.Labels, label) {
+		return true
+	}
+	if i.AuthorType == "Bot" {
+		return true
+	}
+	switch i.AuthorAssociation {
+	case "OWNER", "MEMBER", "COLLABORATOR":
+		return true
+	}
+	return false
 }
 
 type IssueCreate struct {

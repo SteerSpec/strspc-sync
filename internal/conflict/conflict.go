@@ -267,10 +267,11 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		current[repo][key] = true
 	}
 
-	// Open issues per repo, listed once. The label is not part of the lookup:
-	// an issue whose label was removed or renamed is still found by its
-	// fingerprint or title, so it is updated rather than duplicated
-	// (CNFLACT-007/016). Both keys are specific to one conflict.
+	// Open issues per repo, listed once. The label is not required: an issue
+	// whose label was removed or renamed is still found by its fingerprint or
+	// title, so it is updated rather than duplicated (CNFLACT-007/016). Both
+	// keys are specific to one conflict. An unlabeled issue counts only when a
+	// trusted author opened it, so a copied title cannot capture the update.
 	openIssues := make(map[string][]*gh.Issue)
 
 	// Only create issues for critical and warning entries
@@ -324,6 +325,9 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 
 		found := false
 		for _, issue := range existing {
+			if !issue.Trusted(s.cfg.Conflicts.IssueLabel) {
+				continue
+			}
 			if extractFingerprint(issue.Body) == fp || issue.Title == title {
 				found = true
 				if len(participants) > 0 {

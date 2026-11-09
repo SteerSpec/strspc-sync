@@ -903,7 +903,7 @@ func TestIssueListFiltersPRs(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
 		issues := []map[string]any{
-			{"number": 1, "title": "Real issue", "state": "open"},
+			{"number": 1, "title": "Real issue", "state": "open", "user": map[string]string{"type": "Bot"}, "author_association": "NONE"},
 			{"number": 2, "title": "Actually a PR", "state": "open", "pull_request": map[string]string{"url": "https://api.github.com/repos/o/r/pulls/2"}},
 		}
 		json.NewEncoder(w).Encode(issues) //nolint:errcheck // test handler write
@@ -919,6 +919,9 @@ func TestIssueListFiltersPRs(t *testing.T) {
 	}
 	if issues[0].Number != 1 {
 		t.Fatalf("expected issue #1, got #%d", issues[0].Number)
+	}
+	if issues[0].AuthorType != "Bot" || issues[0].AuthorAssociation != "NONE" {
+		t.Fatalf("author = %q/%q, want Bot/NONE", issues[0].AuthorType, issues[0].AuthorAssociation)
 	}
 }
 
@@ -1334,5 +1337,29 @@ func TestRepoListByTopicRejectsEmptyOrg(t *testing.T) {
 	}
 	if called {
 		t.Error("an unscoped search was issued despite the empty org")
+	}
+}
+
+func TestIssueTrusted(t *testing.T) {
+	cases := []struct {
+		name string
+		iss  Issue
+		want bool
+	}{
+		{"labeled, outside author", Issue{Labels: []string{"steerspec-drift"}, AuthorType: "User", AuthorAssociation: "NONE"}, true},
+		{"bot", Issue{AuthorType: "Bot", AuthorAssociation: "NONE"}, true},
+		{"owner", Issue{AuthorType: "User", AuthorAssociation: "OWNER"}, true},
+		{"member", Issue{AuthorType: "User", AuthorAssociation: "MEMBER"}, true},
+		{"collaborator", Issue{AuthorType: "User", AuthorAssociation: "COLLABORATOR"}, true},
+		{"contributor", Issue{AuthorType: "User", AuthorAssociation: "CONTRIBUTOR"}, false},
+		{"outsider", Issue{AuthorType: "User", AuthorAssociation: "NONE"}, false},
+		{"other label", Issue{Labels: []string{"bug"}, AuthorType: "User", AuthorAssociation: "NONE"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.iss.Trusted("steerspec-drift"); got != tc.want {
+				t.Errorf("Trusted = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

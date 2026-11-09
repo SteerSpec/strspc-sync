@@ -730,10 +730,11 @@ func TestUnlabeledDriftIssue(t *testing.T) {
 			repoSvc := &mockRepoService{files: map[string][]byte{"org/app/CLAUDE.md": tc.content}}
 			issueSvc := newMockIssueService()
 			issueSvc.issues = []*gh.Issue{{
-				Number: 42,
-				Title:  "[SteerSpec Drift] org/app: claude-md",
-				Body:   "old body",
-				State:  "open",
+				Number:     42,
+				Title:      "[SteerSpec Drift] org/app: claude-md",
+				Body:       "old body",
+				State:      "open",
+				AuthorType: "Bot", // opened by the workflow token or the App
 			}}
 			ds := makeState(map[string]map[string]state.TemplateState{
 				"org/app": {"claude-md": {Version: "1.0", Hash: hash.HashBytes(expected), Timestamp: time.Now()}},
@@ -788,5 +789,44 @@ func TestPerRepoErrorIsolation(t *testing.T) {
 	}
 	if res.Errors != 1 || len(res.RepoErrors) != 1 || res.RepoErrors[0].Repo != "org/b" {
 		t.Errorf("Errors = %d, RepoErrors = %+v, want one error for org/b", res.Errors, res.RepoErrors)
+	}
+}
+
+// An unlabeled look-alike drift issue from an outside user (anyone can copy
+// the title) is never updated or closed in place of the real drift issue.
+func TestUntrustedLookAlikeDriftIssueIgnored(t *testing.T) {
+	expected := []byte("expected")
+	for _, tc := range []struct {
+		name    string
+		content []byte
+	}{
+		{"drift still detected", []byte("drifted")},
+		{"drift resolved", expected},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repoSvc := &mockRepoService{files: map[string][]byte{"org/app/CLAUDE.md": tc.content}}
+			issueSvc := newMockIssueService()
+			issueSvc.issues = []*gh.Issue{{
+				Number:            66,
+				Title:             "[SteerSpec Drift] org/app: claude-md",
+				Body:              "spoofed",
+				State:             "open",
+				AuthorType:        "User",
+				AuthorAssociation: "NONE",
+			}}
+			ds := makeState(map[string]map[string]state.TemplateState{
+				"org/app": {"claude-md": {Version: "1.0", Hash: hash.HashBytes(expected), Timestamp: time.Now()}},
+			})
+
+			if _, err := New(testConfig(), makeClient(repoSvc, issueSvc), "test", "central").Run(context.Background(), ds, Options{}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := issueSvc.updated[66]; ok {
+				t.Error("the look-alike issue #66 was updated")
+			}
+			if len(issueSvc.closed) != 0 {
+				t.Errorf("closed %v, want none", issueSvc.closed)
+			}
+		})
 	}
 }
