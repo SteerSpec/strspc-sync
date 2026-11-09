@@ -1,0 +1,55 @@
+{
+  "rule_id": "CNFLENT-002",
+  "revision": 0,
+  "body_hash": "blake3:b8be6e049c4a0396d4ed76e9562a1ef1e3cd9038424adf1f0f98553eeb2eea4e",
+  "promoted_at": "2026-11-09T10:23:48Z",
+  "entity_version": "0.3.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "21b750ec7b3d27abfa75a3d03497e67e41db6cdfd21944103a1b453b9f925bf9",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "ConflictEntry carries a Severity field typed as a string with exactly three constants (critical, warning, info), and every entry creation found uses one of them.",
+  "evidence": [
+    {
+      "file": "internal/conflict/report.go",
+      "line": 40,
+      "excerpt": "Severity            Severity     `json:\"severity\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 9,
+      "excerpt": "SeverityCritical Severity = \"critical\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 10,
+      "excerpt": "SeverityWarning  Severity = \"warning\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 11,
+      "excerpt": "SeverityInfo     Severity = \"info\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 75,
+      "excerpt": "Severity:            SeverityCritical,",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 83,
+      "excerpt": "Severity:            SeverityWarning,",
+      "line_confirmed": true
+    }
+  ]
+}

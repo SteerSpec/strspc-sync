@@ -1,0 +1,55 @@
+{
+  "rule_id": "CNFLRPT-005",
+  "revision": 0,
+  "body_hash": "blake3:cb0fab8326c55b3f419d82ce59369ed9ac6e11a70b841399e2dbbbe942f3f1af",
+  "promoted_at": "2026-11-09T10:23:48Z",
+  "entity_version": "0.3.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "21b750ec7b3d27abfa75a3d03497e67e41db6cdfd21944103a1b453b9f925bf9",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.95,
+  "explanation": "ConflictReport has a severity_summary field with critical, warning and info counts, computed in Run via ComputeSummary and consumed by the CLI and tests.",
+  "evidence": [
+    {
+      "file": "internal/conflict/report.go",
+      "line": 31,
+      "excerpt": "SeveritySummary SeveritySummary `json:\"severity_summary\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 50,
+      "excerpt": "Critical int `json:\"critical\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 51,
+      "excerpt": "Warning int `json:\"warning\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 52,
+      "excerpt": "Info int `json:\"info\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 61,
+      "excerpt": "func (r *ConflictReport) ComputeSummary() {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 244,
+      "excerpt": "report.ComputeSummary()",
+      "line_confirmed": true
+    }
+  ]
+}

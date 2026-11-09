@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.6.0",
-    "timestamp": "2026-11-09T07:05:55Z",
-    "hash": "blake3:1933e307f2fd026438890056eb660cd934962217154c462982779387eb48a720"
+    "version": "0.10.0",
+    "timestamp": "2026-11-09T10:23:55Z",
+    "hash": "blake3:586f6be8e910a3f4bc6185d2f9e2a23ea80836b056508814689ac87afaf01a34"
   },
   "rules": [
     {
@@ -113,7 +113,7 @@
     {
       "id": "SYNCACT-012",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "HAS an input `target-filter` (string, optional) to limit sync to repositories whose `owner/repo` matches any of a comma-separated list of glob patterns; a malformed pattern fails the run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -131,7 +131,7 @@
     {
       "id": "SYNCACT-014",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an input `force` (boolean, default: false) which when true forces sync even if DeploymentState shows current version.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -149,7 +149,7 @@
     {
       "id": "SYNCACT-016",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `prs-created` (integer) counting the number of new PRs created.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -212,7 +212,7 @@
     {
       "id": "SYNCACT-023",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST isolate errors per target repository, continuing with the other targets when one fails.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",

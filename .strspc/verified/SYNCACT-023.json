@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCACT-023",
+  "revision": 0,
+  "body_hash": "blake3:4e714d0011b3150b472f5cadecaa9256f2b20d6b831f489808abcb8b6ab969d0",
+  "promoted_at": "2026-11-09T10:23:55Z",
+  "entity_version": "0.10.0",
+  "scope": "tracked files under internal/sync/**, cmd/strspc/**, sync/action.yml, action.yml",
+  "files": 10,
+  "files_hash": "f83ac24855b49d963cb17409ca58f8f894c824d0053469e36cf1e09fae9e7d28",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Each repo/template pair runs in its own goroutine via syncOne, which returns an error-status RepoResult instead of aborting. Failures are tallied and the other targets continue, as TestPerRepoErrorIsolation confirms.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 181,
+      "excerpt": "rr := s.syncOne(ctx, it.target, it.template, dryRun, opts.Force)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 266,
+      "excerpt": "rr.Status = \"error\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 199,
+      "excerpt": "case \"error\":\n\t\t\tresult.Errors++",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync_test.go",
+      "line": 511,
+      "excerpt": "func TestPerRepoErrorIsolation(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}
