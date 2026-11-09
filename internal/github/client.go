@@ -533,9 +533,22 @@ func isRateLimit403(resp *http.Response) bool {
 }
 
 // doRequest performs an authenticated HTTP request through the rate limiter.
+// The body is read once up front and every attempt sends it from the start,
+// so a rate-limited POST or PATCH is retried with its full payload.
 func (c *Client) doRequest(ctx context.Context, method, url string, body io.Reader) (*http.Response, error) {
+	var payload []byte
+	if body != nil {
+		var err error
+		if payload, err = io.ReadAll(body); err != nil {
+			return nil, fmt.Errorf("reading request body: %w", err)
+		}
+	}
 	return c.rateLimiter.do(ctx, func() (*http.Response, error) {
-		req, err := http.NewRequestWithContext(ctx, method, url, body)
+		var reqBody io.Reader
+		if body != nil {
+			reqBody = bytes.NewReader(payload)
+		}
+		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 		if err != nil {
 			return nil, err
 		}

@@ -474,6 +474,33 @@ func TestRateLimiterSecondary(t *testing.T) {
 	}
 }
 
+// A rate-limited POST is retried with its full body, not the drained reader
+// the first attempt left behind.
+func TestRateLimiterRetryResendsBody(t *testing.T) {
+	var bodies []string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(b))
+		if len(bodies) == 1 {
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	c := testClient(t, mux)
+	resp, err := c.doRequest(context.Background(), http.MethodPost, c.baseURL+"/test", strings.NewReader(`{"title":"x"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
+	if len(bodies) != 2 || bodies[0] != `{"title":"x"}` || bodies[1] != bodies[0] {
+		t.Fatalf("bodies = %q, want the payload twice", bodies)
+	}
+}
+
 func TestRateLimiterExhausted(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
