@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.12.0",
-    "timestamp": "2026-11-09T14:37:56Z",
-    "hash": "blake3:90e0d34db6d98633f3f3d897c956d8a0f6ab1ee569194e1508092573d6f8ca54"
+    "version": "0.13.0",
+    "timestamp": "2026-11-09T16:25:30Z",
+    "hash": "blake3:9d58b2dc1867c7d210f67d0d31708b8f71dd00290895add7547a284848c7f357"
   },
   "rules": [
     {
@@ -176,7 +176,7 @@
     {
       "id": "MNRACT-019",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST isolate errors per target repository, continuing with the other targets when one fails.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-09",

@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.5.1",
-    "timestamp": "2026-11-09T14:37:56Z",
-    "hash": "blake3:88d0a152412901636fbb4ab6f8ac258e7359454433fb3e4ccb8e9e6f589997f7"
+    "version": "0.5.2",
+    "timestamp": "2026-11-09T16:25:30Z",
+    "hash": "blake3:4e00d855f462f717d4d260047bce0918dae8a3c27139f0728eb3c8fca0472b90"
   },
   "rules": [
     {
@@ -103,9 +103,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.8.1",
-        "timestamp": "2026-11-09T14:37:56Z",
-        "hash": "blake3:63a724ee230941d9a311decb444a903e5b463fc4cd3b46436fbc3301dfe059ca"
+        "version": "0.9.0",
+        "timestamp": "2026-11-09T16:25:30Z",
+        "hash": "blake3:cb773bb0faa2cf16f921052630aa5dec6f5e6e318ad7c0bc9a4674adbc00898d"
       },
       "rules": [
         {
@@ -165,7 +165,7 @@
         {
           "id": "SYNCPR-007",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "MUST close stale version PRs for the same template when a newer version PR is created (configurable via `close-stale-prs`).",
           "added_by": "github:pleberre",
           "added_at": "2026-11-09",
