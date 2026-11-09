@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.1.4",
-    "timestamp": "2026-11-08T16:36:22Z",
-    "hash": "blake3:c0212220ddb4dcf88965d517e7de14e2f00a6b505532485da70a57410267f1e7"
+    "version": "0.6.0",
+    "timestamp": "2026-11-09T07:05:55Z",
+    "hash": "blake3:d2c82a1614418ca7108362f262e7476a6b3d3ec72b78bccb89979450c32df782"
   },
   "rules": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "MNRACT-005",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST verify actual file content in target repositories against expected versions using Blake3 hash comparison.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -77,7 +77,7 @@
     {
       "id": "MNRACT-008",
       "revision": 1,
-      "state": "D",
+      "state": "P",
       "body": "MUST NOT create duplicate issues for the same drift.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -86,7 +86,7 @@
     {
       "id": "MNRACT-009",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST auto-close drift issues when the drift is resolved (configurable via `auto-close`).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -113,7 +113,7 @@
     {
       "id": "MNRACT-012",
       "revision": 1,
-      "state": "D",
+      "state": "P",
       "body": "HAS an input `target-filter` (string, optional) to limit monitoring to repositories whose `owner/repo` matches any of a comma-separated list of glob patterns, with the same semantics as the sync action; a malformed pattern fails the run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -167,7 +167,7 @@
     {
       "id": "MNRACT-018",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST update the existing open issue for the same repo/template combination while its drift is still detected.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
