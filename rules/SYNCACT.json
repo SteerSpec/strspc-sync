@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.10.0",
-    "timestamp": "2026-11-09T10:23:55Z",
-    "hash": "blake3:586f6be8e910a3f4bc6185d2f9e2a23ea80836b056508814689ac87afaf01a34"
+    "version": "0.11.0",
+    "timestamp": "2026-11-09T16:25:30Z",
+    "hash": "blake3:06b7030aba9840aacfabfbbedd8089786e768ccd19ef860f171752b02f672883"
   },
   "rules": [
     {
@@ -86,7 +86,7 @@
     {
       "id": "SYNCACT-009",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST handle GitHub API rate limiting with exponential backoff.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
