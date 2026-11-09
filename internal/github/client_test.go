@@ -1381,6 +1381,7 @@ func TestIssueTrusted(t *testing.T) {
 		{"contributor", Issue{AuthorType: "User", AuthorAssociation: "CONTRIBUTOR"}, false},
 		{"outsider", Issue{AuthorType: "User", AuthorAssociation: "NONE"}, false},
 		{"other label", Issue{Labels: []string{"bug"}, AuthorType: "User", AuthorAssociation: "NONE"}, false},
+		{"label in other case", Issue{Labels: []string{"SteerSpec-Drift"}, AuthorType: "User", AuthorAssociation: "NONE"}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1388,5 +1389,26 @@ func TestIssueTrusted(t *testing.T) {
 				t.Errorf("Trusted = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// When retries run out, the error keeps the status and GitHub's message.
+func TestRateLimiterExhaustedKeepsMessage(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-RateLimit-Remaining", "0")
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, `{"message":"API rate limit exceeded for installation"}`) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	c.rateLimiter.maxRetries = 1
+	_, err := c.doRequest(context.Background(), http.MethodGet, c.baseURL+"/test", nil)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("err = %v, want an *APIError", err)
+	}
+	if apiErr.StatusCode != http.StatusForbidden || apiErr.Message != "API rate limit exceeded for installation" {
+		t.Fatalf("APIError = %+v, want 403 with GitHub's message", apiErr)
 	}
 }
