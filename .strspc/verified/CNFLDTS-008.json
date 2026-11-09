@@ -1,0 +1,49 @@
+{
+  "rule_id": "CNFLDTS-008",
+  "revision": 0,
+  "body_hash": "blake3:69962b193bad6a90cf2bb340cb008ffa1b9d4115ff98f6725409892725449406",
+  "promoted_at": "2026-11-09T14:37:56Z",
+  "entity_version": "0.4.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "7671ce36066c26355eae7e325d2638071c8e837a071c1e266aef76e221196762",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The scanner creates one ConflictReport per run, loops over all enabled tiers and appends each tier's entries into it. A failed tier is recorded as an error but does not discard the others. Only an unknown tier aborts the run, which is an invalid input and not a case of enabled tiers.",
+  "evidence": [
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 209,
+      "excerpt": "report := &ConflictReport{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 223,
+      "excerpt": "for _, tier := range tiers {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 247,
+      "excerpt": "report.Entries = append(report.Entries, entries...)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 256,
+      "excerpt": "return report, errors.Join(tierErrs...)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict_test.go",
+      "line": 526,
+      "excerpt": "func TestFullScan_Tiers1And2(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}

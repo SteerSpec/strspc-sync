@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.4.1",
-    "timestamp": "2026-11-09T12:33:07Z",
-    "hash": "blake3:65ca5eaf37aa72c0fcd78cf6d774a2da108f982a0b48210572c168f484bbc0ab"
+    "version": "0.5.1",
+    "timestamp": "2026-11-09T14:37:56Z",
+    "hash": "blake3:88d0a152412901636fbb4ab6f8ac258e7359454433fb3e4ccb8e9e6f589997f7"
   },
   "rules": [
     {
@@ -86,7 +86,7 @@
     {
       "id": "SYNCOP-009",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST record results in the DeploymentState, except in dry-run mode, which MUST NOT write it.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-09",
@@ -103,9 +103,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.7.0",
-        "timestamp": "2026-11-09T10:23:48Z",
-        "hash": "blake3:2bb0adb530c45be2ee66e881777ebf827a8aeee5b9f5f059fe5901c463d0951d"
+        "version": "0.8.1",
+        "timestamp": "2026-11-09T14:37:56Z",
+        "hash": "blake3:63a724ee230941d9a311decb444a903e5b463fc4cd3b46436fbc3301dfe059ca"
       },
       "rules": [
         {
@@ -147,7 +147,7 @@
         {
           "id": "SYNCPR-005",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "MUST update an existing open PR for the same template rather than creating a duplicate.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -161,6 +161,15 @@
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
+        },
+        {
+          "id": "SYNCPR-007",
+          "revision": 0,
+          "state": "D",
+          "body": "MUST close stale version PRs for the same template when a newer version PR is created (configurable via `close-stale-prs`).",
+          "added_by": "github:pleberre",
+          "added_at": "2026-11-09",
+          "supersedes": "SYNCPR-006"
         }
       ],
       "notes": [

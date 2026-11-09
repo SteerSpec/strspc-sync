@@ -1,0 +1,43 @@
+{
+  "rule_id": "MNRACT-018",
+  "revision": 0,
+  "body_hash": "blake3:466d0c18ef77426fc2197c5f6a237b43160e5149322fecf36c401e5e22a92fa9",
+  "promoted_at": "2026-11-09T14:37:56Z",
+  "entity_version": "0.11.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "7671ce36066c26355eae7e325d2638071c8e837a071c1e266aef76e221196762",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The monitor indexes open issues by fingerprint and title for each repo/template, and reportDrift updates the existing issue's body when drift is detected, creating a new one only when none is found. Tests cover this, including unlabeled issues and fingerprint matching.",
+  "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 153,
+      "excerpt": "existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 203,
+      "excerpt": "if err := m.reportDrift(ctx, &entry, existing, issTitle, label, result); err != nil {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 226,
+      "excerpt": "if err := m.ghClient.Issues.Update(ctx, m.centralOwner, m.centralRepo, existing.Number, &gh.IssueUpdate{Body: &body}); err != nil {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor_test.go",
+      "line": 755,
+      "excerpt": "t.Error(\"MNRACT-018: the unlabeled issue #42 was not updated\")",
+      "line_confirmed": true
+    }
+  ]
+}

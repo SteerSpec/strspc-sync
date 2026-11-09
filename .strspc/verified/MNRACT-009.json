@@ -1,0 +1,43 @@
+{
+  "rule_id": "MNRACT-009",
+  "revision": 0,
+  "body_hash": "blake3:5ebdb31c7dcf4a5169d30948f5d36f395c37abc9e5d437d201d5619349e456fc",
+  "promoted_at": "2026-11-09T14:37:56Z",
+  "entity_version": "0.10.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "7671ce36066c26355eae7e325d2638071c8e837a071c1e266aef76e221196762",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The monitor closes drift issues when a target is back in sync, gated by the `auto-close` config (default true). Unit and e2e tests cover both closing and the disabled case.",
+  "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 90,
+      "excerpt": "autoClose := m.cfg.Monitor.AutoClose == nil || *m.cfg.Monitor.AutoClose",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 180,
+      "excerpt": "if err := m.ghClient.Issues.Close(ctx, m.centralOwner, m.centralRepo, existing.Number); err != nil {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor_test.go",
+      "line": 307,
+      "excerpt": "func TestDriftResolved_IssueAutoClosed(t *testing.T) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor_test.go",
+      "line": 351,
+      "excerpt": "func TestAutoCloseDisabled_IssueStaysOpen(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}
