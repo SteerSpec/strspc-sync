@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCOP-007",
+  "revision": 0,
+  "body_hash": "blake3:0385cc2469bbe7b2843087cdd46303b2586295f6dd9bbdc294cb36d8f87023fe",
+  "promoted_at": "2026-11-09T10:23:48Z",
+  "entity_version": "0.4.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "21b750ec7b3d27abfa75a3d03497e67e41db6cdfd21944103a1b453b9f925bf9",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The rule is a permission (MAY) for a dry-run mode. Sync supports it through a CLI flag, a config option and an action input. In dry-run, sync returns before any branch, file or PR is created, and it does not save state.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 146,
+      "excerpt": "dryRun := opts.DryRun || s.cfg.Sync.DryRun",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 375,
+      "excerpt": "if dryRun {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 379,
+      "excerpt": "rr.Status = \"skipped\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync_test.go",
+      "line": 329,
+      "excerpt": "func TestDryRun(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}

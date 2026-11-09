@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.3.0",
-    "timestamp": "2026-11-09T07:05:55Z",
-    "hash": "blake3:d78dbf58c587212087c9a1d708ef721687359e5b4b20e359ead57314ea24cb1b"
+    "version": "0.4.0",
+    "timestamp": "2026-11-09T10:23:48Z",
+    "hash": "blake3:ae2377a9d3559925d7824a5c19ea6f0bd1f01a405060098be9be5f969a3d7b47"
   },
   "rules": [
     {
@@ -68,7 +68,7 @@
     {
       "id": "SYNCOP-007",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MAY operate in dry-run mode where no PRs are created or updated.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -94,9 +94,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.5.0",
-        "timestamp": "2026-11-09T07:05:55Z",
-        "hash": "blake3:1f3fd9947302e93514cafbee41d267f74ff8242809cedfcc6375767c9b29f9c3"
+        "version": "0.7.0",
+        "timestamp": "2026-11-09T10:23:48Z",
+        "hash": "blake3:2bb0adb530c45be2ee66e881777ebf827a8aeee5b9f5f059fe5901c463d0951d"
       },
       "rules": [
         {
@@ -111,7 +111,7 @@
         {
           "id": "SYNCPR-002",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "MUST use a branch name in the format `steerspec-sync/<template-id>/<version>`.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -120,7 +120,7 @@
         {
           "id": "SYNCPR-003",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "The PR body MUST include: previous version, new version, changelog, and diff link.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

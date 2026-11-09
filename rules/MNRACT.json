@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.6.0",
-    "timestamp": "2026-11-09T07:05:55Z",
-    "hash": "blake3:d2c82a1614418ca7108362f262e7476a6b3d3ec72b78bccb89979450c32df782"
+    "version": "0.8.0",
+    "timestamp": "2026-11-09T10:23:48Z",
+    "hash": "blake3:847201da4a95a4305ed1963a7312776bb8d9e539332349dce181015b08bcaac8"
   },
   "rules": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "MNRACT-005",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST verify actual file content in target repositories against expected versions using Blake3 hash comparison.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -113,7 +113,7 @@
     {
       "id": "MNRACT-012",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "HAS an input `target-filter` (string, optional) to limit monitoring to repositories whose `owner/repo` matches any of a comma-separated list of glob patterns, with the same semantics as the sync action; a malformed pattern fails the run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

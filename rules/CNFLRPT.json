@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.2.1",
-    "timestamp": "2026-11-09T07:05:55Z",
-    "hash": "blake3:7ab933d7c71e824855822469b06513ae7aaad209c6d39fd4a9ca58395ccc9247"
+    "version": "0.3.1",
+    "timestamp": "2026-11-09T10:23:48Z",
+    "hash": "blake3:224eff61ceb27ad46343eee2419482c37c6235633bb400728de506eaad63788b"
   },
   "rules": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "CNFLRPT-005",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS a severity summary containing counts per severity level (critical, warning, info).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -67,9 +67,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.2.0",
-        "timestamp": "2026-11-09T07:05:55Z",
-        "hash": "blake3:ab709a1f1c85e178d4e9660880f4f9adfd83f13bbdd4a04e56f1db2675487055"
+        "version": "0.3.0",
+        "timestamp": "2026-11-09T10:23:48Z",
+        "hash": "blake3:ae13ad4c84666e3dcb3cd590a66bf70f9cd5599004e602a5ddb3ee2b6dfe3022"
       },
       "rules": [
         {
@@ -84,7 +84,7 @@
         {
           "id": "CNFLENT-002",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "HAS a severity which MUST be one of: \"critical\", \"warning\", \"info\".",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

@@ -6,9 +6,9 @@
     "description": "A GitHub Action that detects conflicts and inconsistencies across target repositories."
   },
   "rule_set": {
-    "version": "0.4.0",
-    "timestamp": "2026-11-09T07:05:55Z",
-    "hash": "blake3:11fadf7a4ad9c7e2643970b2bdff4eca256da115291ff40a90d17994f3afed8b"
+    "version": "0.5.0",
+    "timestamp": "2026-11-09T10:23:48Z",
+    "hash": "blake3:a7e87167f5e146cbcbe0b751dbd455b7088ec5d159ecf9db3f45765395b9b0ff"
   },
   "rules": [
     {
@@ -86,7 +86,7 @@
     {
       "id": "CNFLACT-009",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "HAS an input `target-filter` (string, optional) to limit scanning to repositories whose `owner/repo` matches any of a comma-separated list of glob patterns, with the same semantics as the sync action; a malformed pattern fails the run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
