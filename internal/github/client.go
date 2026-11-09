@@ -116,11 +116,15 @@ type Issue struct {
 }
 
 // Trusted reports whether the issue can be taken for one strspc manages:
-// it carries label, or it was opened by a bot (the workflow token or an
-// installed App) or by an owner, member or collaborator. Only those can
-// apply or remove labels, so an unlabeled issue from anyone else (a title
-// or fingerprint is easy to copy) is never updated or closed in place of
-// the real one.
+// it carries label, or it was opened by a bot or by an owner, member or
+// collaborator. An unlabeled issue from anyone else (a title or fingerprint
+// is easy to copy) is never updated or closed in place of the real one.
+//
+// This trusts no one the label did not already trust. A Bot author is the
+// workflow token or an App installed on the repository, and opening an issue
+// takes the same issues:write permission as labeling one, so any bot that
+// could plant a look-alike issue could also have labeled it. Owners, members
+// and collaborators can apply labels too.
 func (i *Issue) Trusted(label string) bool {
 	if label != "" && slices.Contains(i.Labels, label) {
 		return true
