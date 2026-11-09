@@ -773,7 +773,7 @@ func TestCleanupKeepsIssuesOfTiersThatDidNotRun(t *testing.T) {
 	// close a tier-1 issue even though the file still drifts.
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
-		Number: 11, Title: fmt.Sprintf("[SteerSpec Conflict] %s: CLAUDE.md", TypeVersionDrift), State: "open",
+		Number: 11, Title: fmt.Sprintf("[SteerSpec Conflict] %s: CLAUDE.md", TypeVersionDrift), State: "open", Labels: []string{"steerspec-conflict"},
 	}}}}
 	ds := state.NewDeploymentState()
 	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
@@ -790,7 +790,7 @@ func TestCleanupSkipsWhenNoTargetsScanned(t *testing.T) {
 	// An empty target list (e.g. the deployment state failed to load) must
 	// not sweep the central repo's conflict issues.
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
-		Number: 12, Title: fmt.Sprintf("[SteerSpec Conflict] %s: skills/x.md", TypeDuplicateSkill), State: "open",
+		Number: 12, Title: fmt.Sprintf("[SteerSpec Conflict] %s: skills/x.md", TypeDuplicateSkill), State: "open", Labels: []string{"steerspec-conflict"},
 	}}}}
 	if _, err := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central").Run(context.Background(), state.NewDeploymentState(), nil, Options{Tiers: []int{1, 2}}); err != nil {
 		t.Fatal(err)
@@ -926,7 +926,7 @@ func TestCentralAggregateIssueNeedsFullCoverage(t *testing.T) {
 func TestCentralLocalIssueKeptWhenCentralNotScanned(t *testing.T) {
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# ok")}}
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
-		Number: 19, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+		Number: 19, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open", Labels: []string{"steerspec-conflict"},
 	}}}}
 	ds := state.NewDeploymentState()
 	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# ok")), Timestamp: time.Now()})
@@ -951,7 +951,7 @@ func TestAggregateUpdateKeepsUncheckedParticipants(t *testing.T) {
 	}
 	fp := hash.Fingerprint(string(TypeDuplicateSkill), "org/a, org/b", "test.md")
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
-		Number: 20, Title: "[SteerSpec Conflict] duplicate-skill: test.md", State: "open",
+		Number: 20, Title: "[SteerSpec Conflict] duplicate-skill: test.md", State: "open", Labels: []string{"steerspec-conflict"},
 		Body: fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix + "\n" + reposPrefix + "org/a, org/b, org/c" + fingerprintSuffix,
 	}}}}
 	targets := []string{"org/a", "org/b", "org/c"}
@@ -986,7 +986,7 @@ func TestLegacyAggregateIssueStaysWithoutMarker(t *testing.T) {
 	repos := &mockRepoService{files: map[string][]byte{skillA: []byte("v1"), skillB: []byte("v2")}}
 	fp := hash.Fingerprint(string(TypeDuplicateSkill), "org/a, org/b", "test.md")
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
-		Number: 21, Title: "[SteerSpec Conflict] duplicate-skill: test.md", State: "open",
+		Number: 21, Title: "[SteerSpec Conflict] duplicate-skill: test.md", State: "open", Labels: []string{"steerspec-conflict"},
 		Body: "legacy\n\n" + fingerprintPrefix + fp + fingerprintSuffix,
 	}}}}
 	targets := []string{"org/a", "org/b"}
@@ -1011,7 +1011,7 @@ func TestLegacyAggregateIssueStaysWithoutMarker(t *testing.T) {
 func TestAutoCloseOffKeepsResolvedIssues(t *testing.T) {
 	content := []byte("# In sync")
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
-	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{Number: 9, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open"}}}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{Number: 9, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open", Labels: []string{"steerspec-conflict"}}}}}
 	cfg := testConfig()
 	off := false
 	cfg.Conflicts.AutoClose = &off
