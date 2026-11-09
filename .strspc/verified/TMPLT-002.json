@@ -2,7 +2,7 @@
   "rule_id": "TMPLT-002",
   "revision": 1,
   "body_hash": "blake3:ff80e565f26ae787947d9fd4ac71d17fe49876e5db8605ad011f77c43bcdefff",
-  "promoted_at": "2026-11-09T22:03:30Z",
+  "promoted_at": "2026-11-09T22:08:08Z",
   "entity_version": "0.9.0",
   "scope": "all tracked files",
   "files": 148,
