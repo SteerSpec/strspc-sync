@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.1.3",
-    "timestamp": "2026-11-05T07:49:16Z",
-    "hash": "blake3:8b83756d3da683f5b97da6d4dd3f1e515ea2e9b0d84ce0089395d4d2aa56c7d1"
+    "version": "0.3.0",
+    "timestamp": "2026-11-09T07:05:55Z",
+    "hash": "blake3:d78dbf58c587212087c9a1d708ef721687359e5b4b20e359ead57314ea24cb1b"
   },
   "rules": [
     {
@@ -68,7 +68,7 @@
     {
       "id": "SYNCOP-007",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MAY operate in dry-run mode where no PRs are created or updated.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -77,7 +77,7 @@
     {
       "id": "SYNCOP-008",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST record results in the DeploymentState.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -94,9 +94,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.2.1",
-        "timestamp": "2026-11-05T07:49:16Z",
-        "hash": "blake3:0a602969d4b9b0e7b42a4fa9bc87a8713a4e4b5c3851bf7e78e41a2d9feee191"
+        "version": "0.5.0",
+        "timestamp": "2026-11-09T07:05:55Z",
+        "hash": "blake3:1f3fd9947302e93514cafbee41d267f74ff8242809cedfcc6375767c9b29f9c3"
       },
       "rules": [
         {
@@ -111,7 +111,7 @@
         {
           "id": "SYNCPR-002",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "MUST use a branch name in the format `steerspec-sync/<template-id>/<version>`.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -138,7 +138,7 @@
         {
           "id": "SYNCPR-005",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "MUST update an existing open PR for the same template rather than creating a duplicate.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -147,7 +147,7 @@
         {
           "id": "SYNCPR-006",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "MUST close stale version PRs for the same template when a newer version PR is created.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

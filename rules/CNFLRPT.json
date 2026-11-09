@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.1.2",
-    "timestamp": "2026-11-07T19:07:34Z",
-    "hash": "blake3:6d48e5d91b9f2b0f1c0831a1ffd808043742eef85f46bfbe648214771d1dc0ad"
+    "version": "0.2.1",
+    "timestamp": "2026-11-09T07:05:55Z",
+    "hash": "blake3:7ab933d7c71e824855822469b06513ae7aaad209c6d39fd4a9ca58395ccc9247"
   },
   "rules": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "CNFLRPT-005",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS a severity summary containing counts per severity level (critical, warning, info).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -67,9 +67,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.1.1",
-        "timestamp": "2026-11-05T07:49:16Z",
-        "hash": "blake3:45e299458f74b8a8705fd5ee5ebcb9d90aa2c2a7af4ba1ad4803d27e7ac319f4"
+        "version": "0.2.0",
+        "timestamp": "2026-11-09T07:05:55Z",
+        "hash": "blake3:ab709a1f1c85e178d4e9660880f4f9adfd83f13bbdd4a04e56f1db2675487055"
       },
       "rules": [
         {
@@ -84,7 +84,7 @@
         {
           "id": "CNFLENT-002",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "HAS a severity which MUST be one of: \"critical\", \"warning\", \"info\".",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.1.2",
-        "timestamp": "2026-11-07T19:07:34Z",
-        "hash": "blake3:ae07cb942d8b243288d78ca71f60f0b99faa51d4af7ea9c7719e74f702dd9ec7"
+        "version": "0.3.0",
+        "timestamp": "2026-11-09T07:05:55Z",
+        "hash": "blake3:2cc14a9720d424eefda68cdb671efee0f5e19c02da5dde9e54023300843c3f7b"
       },
       "rules": [
         {
@@ -273,7 +273,7 @@
         {
           "id": "CNFLDTS-007",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "Each tier MUST be independently enableable.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -282,7 +282,7 @@
         {
           "id": "CNFLDTS-008",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "Results from all enabled tiers MUST be combined into a single ConflictReport.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
