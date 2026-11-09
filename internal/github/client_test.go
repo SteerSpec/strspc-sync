@@ -1412,3 +1412,52 @@ func TestRateLimiterExhaustedKeepsMessage(t *testing.T) {
 		t.Fatalf("APIError = %+v, want 403 with GitHub's message", apiErr)
 	}
 }
+
+// SYNCACT-009: the App token exchange retries a rate-limited response
+// instead of failing authentication at once.
+func TestNewClient_GithubApp_RetriesRateLimit(t *testing.T) {
+	_, pemStr := generateTestRSAKey(t)
+	orig := newAuthRateLimiter
+	newAuthRateLimiter = func() *rateLimiter {
+		rl := newRateLimiter()
+		rl.baseDelay = 10 * time.Millisecond
+		return rl
+	}
+	t.Cleanup(func() { newAuthRateLimiter = orig })
+
+	var tokenCalls atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/app/installations/42/access_tokens", func(w http.ResponseWriter, r *http.Request) {
+		if tokenCalls.Add(1) == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			fmt.Fprint(w, `{"message":"You have exceeded a secondary rate limit."}`) //nolint:errcheck // test handler write
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
+			"token": "ghs_after_retry",
+			"permissions": map[string]string{
+				"contents": "write", "pull_requests": "write", "issues": "write", "metadata": "read",
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	t.Setenv("GITHUB_API_URL", srv.URL)
+
+	c, err := NewClient(AuthConfig{
+		Method:         "github-app",
+		AppID:          "12345",
+		PrivateKey:     pemStr,
+		InstallationID: "42",
+	})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if c.token != "ghs_after_retry" {
+		t.Fatalf("token = %q, want the one from the retried exchange", c.token)
+	}
+	if got := tokenCalls.Load(); got != 2 {
+		t.Fatalf("token exchange calls = %d, want 2", got)
+	}
+}
