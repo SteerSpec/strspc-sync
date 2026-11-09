@@ -1,6 +1,7 @@
 package github
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/rand"
@@ -15,6 +16,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,6 +108,35 @@ type Issue struct {
 	State  string
 	Labels []string
 	URL    string
+	// AuthorType is the author's account type ("User" or "Bot") and
+	// AuthorAssociation their association with the repository ("OWNER",
+	// "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "NONE", ...).
+	AuthorType        string
+	AuthorAssociation string
+}
+
+// Trusted reports whether the issue can be taken for one strspc manages:
+// it carries label, or it was opened by a bot or by an owner, member or
+// collaborator. An unlabeled issue from anyone else (a title or fingerprint
+// is easy to copy) is never updated or closed in place of the real one.
+//
+// This trusts no one the label did not already trust. A Bot author is the
+// workflow token or an App installed on the repository, and opening an issue
+// takes the same issues:write permission as labeling one, so any bot that
+// could plant a look-alike issue could also have labeled it. Owners, members
+// and collaborators can apply labels too.
+func (i *Issue) Trusted(label string) bool {
+	if label != "" && slices.Contains(i.Labels, label) {
+		return true
+	}
+	if i.AuthorType == "Bot" {
+		return true
+	}
+	switch i.AuthorAssociation {
+	case "OWNER", "MEMBER", "COLLABORATOR":
+		return true
+	}
+	return false
 }
 
 type IssueCreate struct {
@@ -457,8 +488,10 @@ func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)
 			return resp, nil
 		}
 
-		// Check if it's a rate limit response
-		if resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") != "0" {
+		// A 403 is retried only when it is a rate limit: the primary limit is
+		// spent, or a secondary limit hit (SYNCACT-009), which GitHub signals
+		// with Retry-After or in the message while requests remain.
+		if resp.StatusCode == http.StatusForbidden && !isRateLimit403(resp) {
 			return resp, nil
 		}
 
@@ -487,10 +520,39 @@ func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)
 	return resp, nil
 }
 
+// isRateLimit403 reports whether a 403 response is a primary or secondary
+// rate limit rather than a permission error. Reading the message consumes the
+// body, so it is put back for the caller of a non-rate-limit 403.
+func isRateLimit403(resp *http.Response) bool {
+	if resp.Header.Get("X-RateLimit-Remaining") == "0" || resp.Header.Get("Retry-After") != "" {
+		return true
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	resp.Body.Close() //nolint:errcheck // replaced below
+	resp.Body = io.NopCloser(bytes.NewReader(body))
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(body)), "secondary rate limit")
+}
+
 // doRequest performs an authenticated HTTP request through the rate limiter.
+// The body is read once up front and every attempt sends it from the start,
+// so a rate-limited POST or PATCH is retried with its full payload.
 func (c *Client) doRequest(ctx context.Context, method, url string, body io.Reader) (*http.Response, error) {
+	var payload []byte
+	if body != nil {
+		var err error
+		if payload, err = io.ReadAll(body); err != nil {
+			return nil, fmt.Errorf("reading request body: %w", err)
+		}
+	}
 	return c.rateLimiter.do(ctx, func() (*http.Response, error) {
-		req, err := http.NewRequestWithContext(ctx, method, url, body)
+		var reqBody io.Reader
+		if body != nil {
+			reqBody = bytes.NewReader(payload)
+		}
+		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 		if err != nil {
 			return nil, err
 		}

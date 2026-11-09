@@ -218,9 +218,9 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 	s.incomplete = make(map[string]bool)
 	s.missingTracked = make(map[string]map[string]bool)
 	ran := make(map[int]bool, len(tiers))
+	var tierErrs []error
 
 	for _, tier := range tiers {
-		ran[tier] = true
 		var entries []ConflictEntry
 		var err error
 
@@ -235,19 +235,25 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 			return nil, fmt.Errorf("unknown conflict tier: %d", tier)
 		}
 
+		// A failing tier does not discard the other tiers' results: the
+		// report still combines every tier that ran (CNFLDTS-008), and the
+		// failure is returned with it. The failed tier is left out of ran,
+		// so its open issues are not closed on missing evidence.
 		if err != nil {
-			return nil, fmt.Errorf("tier %d: %w", tier, err)
+			tierErrs = append(tierErrs, fmt.Errorf("tier %d: %w", tier, err))
+			continue
 		}
+		ran[tier] = true
 		report.Entries = append(report.Entries, entries...)
 	}
 
 	report.ComputeSummary()
 
 	if err := s.createIssuesForConflicts(ctx, report, targets, ran); err != nil {
-		return report, fmt.Errorf("creating issues: %w", err)
+		tierErrs = append(tierErrs, fmt.Errorf("creating issues: %w", err))
 	}
 
-	return report, nil
+	return report, errors.Join(tierErrs...)
 }
 
 func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport, targets []string, ran map[int]bool) error {
@@ -260,6 +266,13 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		}
 		current[repo][key] = true
 	}
+
+	// Open issues per repo, listed once. The label is not required: an issue
+	// whose label was removed or renamed is still found by its fingerprint or
+	// title, so it is updated rather than duplicated (CNFLACT-007/016). Both
+	// keys are specific to one conflict. An unlabeled issue counts only when a
+	// trusted author opened it, so a copied title cannot capture the update.
+	openIssues := make(map[string][]*gh.Issue)
 
 	// Only create issues for critical and warning entries
 	for _, entry := range report.Entries {
@@ -301,16 +314,20 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		body := renderBody(participants)
 
 		// Check if an issue already exists
-		existing, err := s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{
-			State:  "open",
-			Labels: []string{s.cfg.Conflicts.IssueLabel},
-		})
-		if err != nil {
-			return fmt.Errorf("listing issues for %s: %w", repo, err)
+		existing, listed := openIssues[repo]
+		if !listed {
+			existing, err = s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{State: "open"})
+			if err != nil {
+				return fmt.Errorf("listing issues for %s: %w", repo, err)
+			}
+			openIssues[repo] = existing
 		}
 
 		found := false
 		for _, issue := range existing {
+			if !issue.Trusted(s.cfg.Conflicts.IssueLabel) {
+				continue
+			}
 			if extractFingerprint(issue.Body) == fp || issue.Title == title {
 				found = true
 				if len(participants) > 0 {
@@ -334,13 +351,16 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		}
 
 		if !found {
-			_, err := s.ghClient.Issues.Create(ctx, owner, repoName, &gh.IssueCreate{
+			created, err := s.ghClient.Issues.Create(ctx, owner, repoName, &gh.IssueCreate{
 				Title:  title,
 				Body:   body,
 				Labels: []string{s.cfg.Conflicts.IssueLabel},
 			})
 			if err != nil {
 				return fmt.Errorf("creating issue for %s: %w", repo, err)
+			}
+			if created != nil {
+				openIssues[repo] = append(openIssues[repo], created)
 			}
 			report.IssuesCreated++
 		}

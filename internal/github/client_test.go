@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -415,6 +416,88 @@ func TestRateLimiterRetry(t *testing.T) {
 	}
 	if calls.Load() != 3 {
 		t.Fatalf("expected 3 calls, got %d", calls.Load())
+	}
+}
+
+// TestRateLimiterSecondary covers SYNCACT-009 for GitHub's secondary rate
+// limit: a 403 while requests remain, signalled by Retry-After or by the
+// message. A plain permission 403 is returned at once with its body intact.
+func TestRateLimiterSecondary(t *testing.T) {
+	cases := []struct {
+		name       string
+		retryAfter string
+		message    string
+		wantCalls  int32
+		wantStatus int
+	}{
+		{"retry-after header", "1", "forbidden", 2, http.StatusOK},
+		{"secondary message", "", "You have exceeded a secondary rate limit.", 2, http.StatusOK},
+		{"permission error", "", "Resource not accessible by integration", 1, http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls atomic.Int32
+			mux := http.NewServeMux()
+			mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+				if calls.Add(1) == 1 {
+					w.Header().Set("X-RateLimit-Remaining", "4000")
+					if tc.retryAfter != "" {
+						w.Header().Set("Retry-After", tc.retryAfter)
+					}
+					w.WriteHeader(http.StatusForbidden)
+					fmt.Fprintf(w, `{"message":%q}`, tc.message) //nolint:errcheck // test handler write
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `{"ok":true}`) //nolint:errcheck // test handler write
+			})
+
+			c := testClient(t, mux)
+			resp, err := c.doRequest(context.Background(), http.MethodGet, c.baseURL+"/test", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close() //nolint:errcheck // test cleanup
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("status = %d, want %d", resp.StatusCode, tc.wantStatus)
+			}
+			if got := calls.Load(); got != tc.wantCalls {
+				t.Fatalf("calls = %d, want %d", got, tc.wantCalls)
+			}
+			if tc.wantStatus == http.StatusForbidden {
+				body, _ := io.ReadAll(resp.Body)
+				if !strings.Contains(string(body), tc.message) {
+					t.Fatalf("body = %q, want the original message", body)
+				}
+			}
+		})
+	}
+}
+
+// A rate-limited POST is retried with its full body, not the drained reader
+// the first attempt left behind.
+func TestRateLimiterRetryResendsBody(t *testing.T) {
+	var bodies []string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(b))
+		if len(bodies) == 1 {
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	c := testClient(t, mux)
+	resp, err := c.doRequest(context.Background(), http.MethodPost, c.baseURL+"/test", strings.NewReader(`{"title":"x"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
+	if len(bodies) != 2 || bodies[0] != `{"title":"x"}` || bodies[1] != bodies[0] {
+		t.Fatalf("bodies = %q, want the payload twice", bodies)
 	}
 }
 
@@ -847,7 +930,7 @@ func TestIssueListFiltersPRs(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
 		issues := []map[string]any{
-			{"number": 1, "title": "Real issue", "state": "open"},
+			{"number": 1, "title": "Real issue", "state": "open", "user": map[string]string{"type": "Bot"}, "author_association": "NONE"},
 			{"number": 2, "title": "Actually a PR", "state": "open", "pull_request": map[string]string{"url": "https://api.github.com/repos/o/r/pulls/2"}},
 		}
 		json.NewEncoder(w).Encode(issues) //nolint:errcheck // test handler write
@@ -863,6 +946,9 @@ func TestIssueListFiltersPRs(t *testing.T) {
 	}
 	if issues[0].Number != 1 {
 		t.Fatalf("expected issue #1, got #%d", issues[0].Number)
+	}
+	if issues[0].AuthorType != "Bot" || issues[0].AuthorAssociation != "NONE" {
+		t.Fatalf("author = %q/%q, want Bot/NONE", issues[0].AuthorType, issues[0].AuthorAssociation)
 	}
 }
 
@@ -1278,5 +1364,29 @@ func TestRepoListByTopicRejectsEmptyOrg(t *testing.T) {
 	}
 	if called {
 		t.Error("an unscoped search was issued despite the empty org")
+	}
+}
+
+func TestIssueTrusted(t *testing.T) {
+	cases := []struct {
+		name string
+		iss  Issue
+		want bool
+	}{
+		{"labeled, outside author", Issue{Labels: []string{"steerspec-drift"}, AuthorType: "User", AuthorAssociation: "NONE"}, true},
+		{"bot", Issue{AuthorType: "Bot", AuthorAssociation: "NONE"}, true},
+		{"owner", Issue{AuthorType: "User", AuthorAssociation: "OWNER"}, true},
+		{"member", Issue{AuthorType: "User", AuthorAssociation: "MEMBER"}, true},
+		{"collaborator", Issue{AuthorType: "User", AuthorAssociation: "COLLABORATOR"}, true},
+		{"contributor", Issue{AuthorType: "User", AuthorAssociation: "CONTRIBUTOR"}, false},
+		{"outsider", Issue{AuthorType: "User", AuthorAssociation: "NONE"}, false},
+		{"other label", Issue{Labels: []string{"bug"}, AuthorType: "User", AuthorAssociation: "NONE"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.iss.Trusted("steerspec-drift"); got != tc.want {
+				t.Errorf("Trusted = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

@@ -25,6 +25,18 @@ type Result struct {
 	IssuesCreated int          `json:"issues_created"`
 	IssuesClosed  int          `json:"issues_closed"`
 	DriftEntries  []DriftEntry `json:"drift_entries,omitempty"`
+	// Errors counts the repo/template checks whose issue could not be
+	// created, updated or closed. Each failure is isolated: monitor goes on
+	// with the other targets and lists the failures in RepoErrors.
+	Errors     int         `json:"errors"`
+	RepoErrors []RepoError `json:"repo_errors,omitempty"`
+}
+
+// RepoError records a failure while managing the drift issue of one target.
+type RepoError struct {
+	Repo       string `json:"repo"`
+	TemplateID string `json:"template_id"`
+	Error      string `json:"error"`
 }
 
 // DriftEntry describes a single detected drift between expected and actual file content.
@@ -83,10 +95,14 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 		destByTemplate[t.ID] = t.Destination
 	}
 
-	// Fetch existing drift issues in the central repo.
+	// Fetch the open issues in the central repo. The label is not required: a
+	// drift issue whose label was removed or renamed is still found by its
+	// fingerprint or title, so it is updated or closed rather than duplicated
+	// (MNRACT-008/009/018). Both keys are specific to one repo/template drift.
+	// An unlabeled issue counts only when a trusted author opened it, so a
+	// copied title cannot capture or close the real drift issue.
 	existingIssues, err := m.ghClient.Issues.List(ctx, m.centralOwner, m.centralRepo, &gh.IssueListOptions{
-		State:  "open",
-		Labels: []string{label},
+		State: "open",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing drift issues: %w", err)
@@ -96,6 +112,9 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 	issueByFingerprint := make(map[string]*gh.Issue, len(existingIssues))
 	issueByTitle := make(map[string]*gh.Issue, len(existingIssues))
 	for _, iss := range existingIssues {
+		if !iss.Trusted(label) {
+			continue
+		}
 		issueByTitle[iss.Title] = iss
 		if fp := extractFingerprint(iss.Body); fp != "" {
 			issueByFingerprint[fp] = iss
@@ -106,6 +125,10 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 	result := &Result{}
 	driftedRepos := make(map[string]bool)
 	inSyncRepos := make(map[string]bool)
+	fail := func(repo, templateID string, err error) {
+		result.Errors++
+		result.RepoErrors = append(result.RepoErrors, RepoError{Repo: repo, TemplateID: templateID, Error: err.Error()})
+	}
 
 	for repoFullName, templates := range deployState.Repositories {
 		if !targetFilter.Match(repoFullName) {
@@ -141,7 +164,7 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 					FirstDetected:   firstDetected(existing, now),
 				}
 				if err := m.reportDrift(ctx, &entry, existing, issTitle, label, result); err != nil {
-					return nil, err
+					fail(repoFullName, templateID, err)
 				}
 				driftedRepos[repoFullName] = true
 				result.DriftEntries = append(result.DriftEntries, entry)
@@ -155,11 +178,12 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 				if autoClose {
 					if existing != nil {
 						if err := m.ghClient.Issues.Close(ctx, m.centralOwner, m.centralRepo, existing.Number); err != nil {
-							return nil, fmt.Errorf("closing resolved drift issue #%d: %w", existing.Number, err)
+							fail(repoFullName, templateID, fmt.Errorf("closing resolved drift issue #%d: %w", existing.Number, err))
+						} else {
+							result.IssuesClosed++
+							delete(issueByTitle, existing.Title)
+							delete(issueByFingerprint, fp)
 						}
-						result.IssuesClosed++
-						delete(issueByTitle, existing.Title)
-						delete(issueByFingerprint, fp)
 					}
 				}
 				inSyncRepos[repoFullName] = true
@@ -177,7 +201,7 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 				FirstDetected:   firstDetected(existing, now),
 			}
 			if err := m.reportDrift(ctx, &entry, existing, issTitle, label, result); err != nil {
-				return nil, err
+				fail(repoFullName, templateID, err)
 			}
 			driftedRepos[repoFullName] = true
 			result.DriftEntries = append(result.DriftEntries, entry)

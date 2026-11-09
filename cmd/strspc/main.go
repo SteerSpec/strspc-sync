@@ -341,6 +341,9 @@ func runMonitor(args []string, out, errOut io.Writer) error {
 	setOutput("issues-closed", strconv.Itoa(result.IssuesClosed))
 	summaryJSON, _ := json.Marshal(result)
 	setOutput("summary", string(summaryJSON))
+	if result.Errors > 0 {
+		return fmt.Errorf("monitor completed with %d error(s)", result.Errors)
+	}
 	return nil
 }
 
@@ -393,14 +396,16 @@ func runConflict(args []string, out, errOut io.Writer) error {
 		return fmt.Errorf("conflict detection error: %w", err)
 	}
 
-	report, err := scanner.Run(ctx, deployState, targets, conflict.Options{
+	report, runErr := scanner.Run(ctx, deployState, targets, conflict.Options{
 		ConfigPath: common.configPath,
 		Tiers:      tiers,
 	})
-	if err != nil {
-		return fmt.Errorf("conflict detection error: %w", err)
+	if report == nil {
+		return fmt.Errorf("conflict detection error: %w", runErr)
 	}
 
+	// A failed tier or issue update still yields the other tiers' report
+	// (CNFLDTS-008): print it and set the outputs, then fail the run.
 	printJSON(report, out)
 
 	setOutput("conflicts-found", strconv.Itoa(len(report.Entries)))
@@ -412,6 +417,9 @@ func runConflict(args []string, out, errOut io.Writer) error {
 	// The actions expose summary, like sync and monitor; report stays for direct callers of the binary (GH #172).
 	setOutput("summary", string(reportJSON))
 
+	if runErr != nil {
+		return fmt.Errorf("conflict detection error: %w", runErr)
+	}
 	if report.SeveritySummary.Critical > 0 {
 		return fmt.Errorf("conflict detection found %d critical conflict(s)", report.SeveritySummary.Critical)
 	}

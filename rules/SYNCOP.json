@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.4.0",
-    "timestamp": "2026-11-09T10:23:48Z",
-    "hash": "blake3:ae2377a9d3559925d7824a5c19ea6f0bd1f01a405060098be9be5f969a3d7b47"
+    "version": "0.4.1",
+    "timestamp": "2026-11-09T12:33:07Z",
+    "hash": "blake3:65ca5eaf37aa72c0fcd78cf6d774a2da108f982a0b48210572c168f484bbc0ab"
   },
   "rules": [
     {
@@ -82,6 +82,15 @@
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
+    },
+    {
+      "id": "SYNCOP-009",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST record results in the DeploymentState, except in dry-run mode, which MUST NOT write it.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-09",
+      "supersedes": "SYNCOP-008"
     }
   ],
   "sub_entities": [

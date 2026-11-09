@@ -144,6 +144,10 @@ type apiIssue struct {
 	Labels []struct {
 		Name string `json:"name"`
 	} `json:"labels"`
+	User struct {
+		Type string `json:"type"`
+	} `json:"user"`
+	AuthorAssociation string `json:"author_association"`
 }
 
 func (i *apiIssue) toDomain() *Issue {
@@ -158,5 +162,8 @@ func (i *apiIssue) toDomain() *Issue {
 		State:  i.State,
 		Labels: labels,
 		URL:    i.HTMLURL,
+
+		AuthorType:        i.User.Type,
+		AuthorAssociation: i.AuthorAssociation,
 	}
 }
