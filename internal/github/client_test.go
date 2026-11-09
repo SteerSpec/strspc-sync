@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -415,6 +416,61 @@ func TestRateLimiterRetry(t *testing.T) {
 	}
 	if calls.Load() != 3 {
 		t.Fatalf("expected 3 calls, got %d", calls.Load())
+	}
+}
+
+// TestRateLimiterSecondary covers SYNCACT-009 for GitHub's secondary rate
+// limit: a 403 while requests remain, signalled by Retry-After or by the
+// message. A plain permission 403 is returned at once with its body intact.
+func TestRateLimiterSecondary(t *testing.T) {
+	cases := []struct {
+		name       string
+		retryAfter string
+		message    string
+		wantCalls  int32
+		wantStatus int
+	}{
+		{"retry-after header", "1", "forbidden", 2, http.StatusOK},
+		{"secondary message", "", "You have exceeded a secondary rate limit.", 2, http.StatusOK},
+		{"permission error", "", "Resource not accessible by integration", 1, http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls atomic.Int32
+			mux := http.NewServeMux()
+			mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+				if calls.Add(1) == 1 {
+					w.Header().Set("X-RateLimit-Remaining", "4000")
+					if tc.retryAfter != "" {
+						w.Header().Set("Retry-After", tc.retryAfter)
+					}
+					w.WriteHeader(http.StatusForbidden)
+					fmt.Fprintf(w, `{"message":%q}`, tc.message) //nolint:errcheck // test handler write
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `{"ok":true}`) //nolint:errcheck // test handler write
+			})
+
+			c := testClient(t, mux)
+			resp, err := c.doRequest(context.Background(), http.MethodGet, c.baseURL+"/test", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close() //nolint:errcheck // test cleanup
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("status = %d, want %d", resp.StatusCode, tc.wantStatus)
+			}
+			if got := calls.Load(); got != tc.wantCalls {
+				t.Fatalf("calls = %d, want %d", got, tc.wantCalls)
+			}
+			if tc.wantStatus == http.StatusForbidden {
+				body, _ := io.ReadAll(resp.Body)
+				if !strings.Contains(string(body), tc.message) {
+					t.Fatalf("body = %q, want the original message", body)
+				}
+			}
+		})
 	}
 }
 

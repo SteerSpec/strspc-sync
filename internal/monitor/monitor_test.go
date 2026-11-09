@@ -58,6 +58,8 @@ type mockIssueService struct {
 	updated map[int]*gh.IssueUpdate
 	closed  []int
 	nextNum int
+	// createErr, when set, is returned by Create for an issue whose title contains its key.
+	createErr map[string]error
 }
 
 func newMockIssueService() *mockIssueService {
@@ -95,6 +97,11 @@ func (m *mockIssueService) List(_ context.Context, _, _ string, opts *gh.IssueLi
 }
 
 func (m *mockIssueService) Create(_ context.Context, _, _ string, ic *gh.IssueCreate) (*gh.Issue, error) {
+	for key, err := range m.createErr {
+		if strings.Contains(ic.Title, key) {
+			return nil, err
+		}
+	}
 	m.nextNum++
 	iss := &gh.Issue{
 		Number: m.nextNum,
@@ -703,5 +710,83 @@ func TestDriftIssue_LinksPRInTargetRepo(t *testing.T) {
 	body := driftIssueBody(DriftEntry{Repo: "org/app", TemplateID: "claude-md", PRNumber: 7, FirstDetected: time.Now()})
 	if !strings.Contains(body, "**PR:** org/app#7\n") {
 		t.Errorf("body does not link org/app#7:\n%s", body)
+	}
+}
+
+// MNRACT-008/009/018: a drift issue whose label was removed or renamed is
+// still found by its title or fingerprint. It is updated while the drift
+// lasts and closed once it is resolved, never duplicated.
+func TestUnlabeledDriftIssue(t *testing.T) {
+	expected := []byte("expected")
+	for _, tc := range []struct {
+		name      string
+		content   []byte
+		wantClose bool
+	}{
+		{"drift still detected", []byte("drifted"), false},
+		{"drift resolved", expected, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repoSvc := &mockRepoService{files: map[string][]byte{"org/app/CLAUDE.md": tc.content}}
+			issueSvc := newMockIssueService()
+			issueSvc.issues = []*gh.Issue{{
+				Number: 42,
+				Title:  "[SteerSpec Drift] org/app: claude-md",
+				Body:   "old body",
+				State:  "open",
+			}}
+			ds := makeState(map[string]map[string]state.TemplateState{
+				"org/app": {"claude-md": {Version: "1.0", Hash: hash.HashBytes(expected), Timestamp: time.Now()}},
+			})
+
+			res, err := New(testConfig(), makeClient(repoSvc, issueSvc), "test", "central").Run(context.Background(), ds, Options{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if res.IssuesCreated != 0 {
+				t.Errorf("MNRACT-008: created %d issue(s) next to the unlabeled one", res.IssuesCreated)
+			}
+			if tc.wantClose {
+				if len(issueSvc.closed) != 1 || issueSvc.closed[0] != 42 {
+					t.Errorf("MNRACT-009: closed %v, want [42]", issueSvc.closed)
+				}
+			} else if _, ok := issueSvc.updated[42]; !ok {
+				t.Error("MNRACT-018: the unlabeled issue #42 was not updated")
+			}
+		})
+	}
+}
+
+// Monitor isolates errors per target repository: when the drift issue of one
+// target cannot be created, the others are still checked and reported, and
+// the failure is counted and listed in the result.
+func TestPerRepoErrorIsolation(t *testing.T) {
+	expected := []byte("expected")
+	repoSvc := &mockRepoService{files: map[string][]byte{
+		"org/a/CLAUDE.md": []byte("drifted"),
+		"org/b/CLAUDE.md": []byte("drifted"),
+		"org/c/CLAUDE.md": []byte("drifted"),
+	}}
+	issueSvc := newMockIssueService()
+	issueSvc.createErr = map[string]error{"org/b:": fmt.Errorf("502 bad gateway")}
+	ts := state.TemplateState{Version: "1.0", Hash: hash.HashBytes(expected), Timestamp: time.Now()}
+	ds := makeState(map[string]map[string]state.TemplateState{
+		"org/a": {"claude-md": ts},
+		"org/b": {"claude-md": ts},
+		"org/c": {"claude-md": ts},
+	})
+
+	res, err := New(testConfig(), makeClient(repoSvc, issueSvc), "test", "central").Run(context.Background(), ds, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.IssuesCreated != 2 {
+		t.Errorf("IssuesCreated = %d, want 2 (org/a and org/c)", res.IssuesCreated)
+	}
+	if res.ReposDrifted != 3 || len(res.DriftEntries) != 3 {
+		t.Errorf("ReposDrifted = %d, entries = %d, want 3 and 3", res.ReposDrifted, len(res.DriftEntries))
+	}
+	if res.Errors != 1 || len(res.RepoErrors) != 1 || res.RepoErrors[0].Repo != "org/b" {
+		t.Errorf("Errors = %d, RepoErrors = %+v, want one error for org/b", res.Errors, res.RepoErrors)
 	}
 }

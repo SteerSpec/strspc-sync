@@ -433,10 +433,18 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	// Find existing PR by its exact head branch. The label is not part of the
 	// lookup: a PR whose label request failed must still be found on a retry.
 	prLabel := s.cfg.Sync.PRLabel
-	existingPRs, _ := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{
+	existingPRs, err := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{
 		State: "open",
 		Head:  owner + ":" + branchName,
 	})
+	if err != nil {
+		// Without the lookup an open PR cannot be told apart from none, and
+		// creating one could duplicate it (SYNCPR-005). The branch holds the
+		// commit, so the next run finds and updates the PR.
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("listing open PRs: %v", err)
+		return rr
+	}
 
 	prTitle := updateMessage(s.prTitlePrefix(), tmpl.ID, tmpl.Version)
 	prBody := s.prBody(tmpl, src, previousVersion, contentHash)
@@ -490,7 +498,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 
 	// Close stale PRs if configured
 	if s.cfg.Sync.CloseStalePRs != nil && *s.cfg.Sync.CloseStalePRs {
-		s.closeStalePRs(ctx, owner, repo, tmpl.ID, pr.Number, prLabel)
+		s.closeStalePRs(ctx, owner, repo, target.Repo, tmpl.ID, pr.Number)
 	}
 
 	// Update deployment state
@@ -768,12 +776,16 @@ func (s *Syncer) getBaseSHA(ctx context.Context, owner, repo, branch string) (st
 	return s.ghClient.Repos.GetBranchSHA(ctx, owner, repo, branch)
 }
 
-func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, templateID string, currentPR int, label string) {
+// closeStalePRs closes the other open sync PRs for templateID (SYNCPR-006).
+// They are found by head branch or generated title, not by label: a PR whose
+// label failed to apply or was removed is still a stale version PR.
+func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, fullName, templateID string, currentPR int) {
 	prs, err := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{
-		State:  "open",
-		Labels: []string{label},
+		State: "open",
 	})
 	if err != nil {
+		sslog.L().Warn("could not list open PRs to close stale ones",
+			"operation", "sync", "repo", fullName, "template_id", templateID, "err", err)
 		return
 	}
 	prefix := s.prTitlePrefix()
@@ -784,7 +796,10 @@ func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, templateID stri
 		// The head branch is stable across title-prefix changes; the title
 		// match keeps closing PRs whose branch was named by an older release.
 		if isSyncBranchForTemplate(pr.Head, templateID) || isSyncPRForTemplate(pr.Title, prefix, templateID) {
-			_ = s.ghClient.PullRequests.Close(ctx, owner, repo, pr.Number)
+			if err := s.ghClient.PullRequests.Close(ctx, owner, repo, pr.Number); err != nil {
+				sslog.L().Warn("could not close stale sync PR",
+					"operation", "sync", "repo", fullName, "pr_number", pr.Number, "err", err)
+			}
 		}
 	}
 }

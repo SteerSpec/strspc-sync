@@ -3,6 +3,7 @@ package conflict
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -76,11 +77,23 @@ type issueUpdateCall struct {
 	update      *gh.IssueUpdate
 }
 
-func (m *mockIssueService) List(_ context.Context, owner, repo string, _ *gh.IssueListOptions) ([]*gh.Issue, error) {
+func (m *mockIssueService) List(_ context.Context, owner, repo string, opts *gh.IssueListOptions) ([]*gh.Issue, error) {
+	all := m.issues
 	if m.repoIssues != nil {
-		return m.repoIssues[owner+"/"+repo], nil
+		all = m.repoIssues[owner+"/"+repo]
 	}
-	return m.issues, nil
+	if opts == nil || len(opts.Labels) == 0 {
+		return all, nil
+	}
+	// Like the API, a label filter returns only issues carrying every label.
+	var result []*gh.Issue
+	for _, iss := range all {
+		if slices.ContainsFunc(opts.Labels, func(l string) bool { return !slices.Contains(iss.Labels, l) }) {
+			continue
+		}
+		result = append(result, iss)
+	}
+	return result, nil
 }
 
 func (m *mockIssueService) Create(_ context.Context, _, _ string, issue *gh.IssueCreate) (*gh.Issue, error) {
@@ -796,7 +809,7 @@ func TestCleanupKeepsIssuesWhenAReadFailed(t *testing.T) {
 	}
 	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
-		Number: 13, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", Body: "<!-- steerspec-fingerprint: " + fp + " -->", State: "open",
+		Number: 13, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", Body: "<!-- steerspec-fingerprint: " + fp + " -->", State: "open", Labels: []string{"steerspec-conflict"},
 	}}}}
 	ds := state.NewDeploymentState()
 	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now()})
@@ -816,7 +829,7 @@ func TestRenamedIssueIsClosedByBodyType(t *testing.T) {
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content}}
 	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
-		Number: 14, Title: "please look at this", State: "open",
+		Number: 14, Title: "please look at this", State: "open", Labels: []string{"steerspec-conflict"},
 		Body: "drifted\n\n" + fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeVersionDrift) + fingerprintSuffix,
 	}}}}
 	ds := state.NewDeploymentState()
@@ -849,7 +862,7 @@ func TestDeletedTrackedFileKeepsDriftIssue(t *testing.T) {
 	repos := &mockRepoService{files: map[string][]byte{}}
 	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
-		Number: 15, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+		Number: 15, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open", Labels: []string{"steerspec-conflict"},
 		Body: fingerprintPrefix + fp + fingerprintSuffix,
 	}}}}
 	ds := state.NewDeploymentState()
@@ -870,8 +883,8 @@ func TestMissingFileOnlyProtectsItsOwnIssue(t *testing.T) {
 	fpMD := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
 	fpSkill := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", ".claude/skills/test.md")
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {
-		{Number: 16, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open", Body: fingerprintPrefix + fpMD + fingerprintSuffix},
-		{Number: 17, Title: "renamed by a human", State: "open", Body: fingerprintPrefix + fpSkill + fingerprintSuffix + "\n" + typePrefix + string(TypeVersionDrift) + fingerprintSuffix},
+		{Number: 16, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open", Labels: []string{"steerspec-conflict"}, Body: fingerprintPrefix + fpMD + fingerprintSuffix},
+		{Number: 17, Title: "renamed by a human", State: "open", Labels: []string{"steerspec-conflict"}, Body: fingerprintPrefix + fpSkill + fingerprintSuffix + "\n" + typePrefix + string(TypeVersionDrift) + fingerprintSuffix},
 	}}}
 	ds := state.NewDeploymentState()
 	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
@@ -890,7 +903,7 @@ func TestCentralAggregateIssueNeedsFullCoverage(t *testing.T) {
 	// repo1 cannot vouch for it, so it stays open.
 	repos := &mockRepoService{files: map[string][]byte{}}
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
-		Number: 18, Title: "[SteerSpec Conflict] duplicate-skill: .claude/skills/test.md", State: "open",
+		Number: 18, Title: "[SteerSpec Conflict] duplicate-skill: .claude/skills/test.md", State: "open", Labels: []string{"steerspec-conflict"},
 		Body: typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix + "\n" + reposPrefix + "org/repo1, org/repo2" + fingerprintSuffix,
 	}}}}
 	if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").Run(context.Background(), state.NewDeploymentState(), []string{"org/repo1"}, Options{Tiers: []int{2}}); err != nil {
@@ -1131,5 +1144,59 @@ func TestConflictEntrySeverityMapping(t *testing.T) {
 				t.Errorf("type %s: expected info=1, got %d", tt.entryType, report.SeveritySummary.Info)
 			}
 		}
+	}
+}
+
+// CNFLACT-007/016: a conflict issue whose label was removed or renamed is
+// still found by its fingerprint and updated, not duplicated.
+func TestUnlabeledConflictIssueUpdated(t *testing.T) {
+	originalContent := []byte("# Original")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{issues: []*gh.Issue{{
+		Number: 77,
+		Title:  "[SteerSpec Conflict] version_drift: CLAUDE.md",
+		Body:   "old body\n\n<!-- steerspec-fingerprint: " + fp + " -->",
+		State:  "open",
+	}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: hash.HashBytes(originalContent), Timestamp: time.Now(),
+	})
+
+	scanner := New(testConfig(), newTestClient(repos, issues), "org", "central")
+	if _, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.created) != 0 {
+		t.Errorf("CNFLACT-007: created %d issue(s) next to the unlabeled one", len(issues.created))
+	}
+	if len(issues.updated) != 1 {
+		t.Errorf("CNFLACT-016: updated %d issue(s), want the unlabeled #77", len(issues.updated))
+	}
+}
+
+// CNFLDTS-008: a failing tier (tier 3 is not implemented) does not discard
+// the other tiers' results. The report combines what ran, and the error is
+// returned with it.
+func TestFailedTierKeepsOtherResults(t *testing.T) {
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
+	issues := &mockIssueService{}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now(),
+	})
+
+	scanner := New(testConfig(), newTestClient(repos, issues), "org", "central")
+	report, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1, 3}})
+	if err == nil || !strings.Contains(err.Error(), "tier 3") {
+		t.Fatalf("err = %v, want the tier 3 failure", err)
+	}
+	if report == nil || len(report.Entries) == 0 {
+		t.Fatalf("report = %+v, want the tier 1 entries", report)
+	}
+	s := report.SeveritySummary
+	if s.Critical+s.Warning+s.Info != len(report.Entries) {
+		t.Errorf("summary %+v does not count the %d entries", s, len(report.Entries))
 	}
 }

@@ -36,6 +36,11 @@ Check target repositories for configuration drift and create issues.
 strspc monitor --config steerspec-sync.yml
 ```
 
+Monitor finds an open drift issue by its fingerprint or title, not by `monitor.issue-label`, so an issue
+whose label was removed is still updated or closed instead of duplicated. A failure to create, update or
+close one target's issue does not stop the others: it is counted in the summary's `errors` and listed in
+`repo_errors`, and the command then exits non-zero.
+
 **Action usage:**
 
 ```yaml
@@ -52,6 +57,10 @@ Detect conflicts across AI configuration files in target repositories.
 strspc conflict --config steerspec-sync.yml
 strspc conflict --config steerspec-sync.yml --tiers 1,2
 ```
+
+A tier that fails (tier 3 is not implemented yet) does not discard the others: the report of the tiers
+that ran is printed and the outputs are set, then the command exits non-zero. Open conflict issues are
+found by fingerprint or title, not by `conflicts.issue-label`.
 
 **Action usage:**
 

@@ -11,8 +11,8 @@ import (
 	"github.com/SteerSpec/strspc-sync/tests/e2e/harness"
 )
 
-// mcMonitor runs `strspc monitor` restricted to one repo (monitor matches --target-filter exactly, not as a glob)
-// and requires a parsed summary and a zero exit.
+// mcMonitor runs `strspc monitor` restricted to one repo and requires a parsed summary and a zero exit.
+// --target-filter is a comma-separated glob list, as for sync; a bare repo name matches only itself.
 func mcMonitor(t *testing.T, env *harness.Env, repo string) *harness.Result {
 	t.Helper()
 	r := env.Run(t, "monitor", "--target-filter", env.Org+"/"+repo)

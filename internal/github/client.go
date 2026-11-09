@@ -1,6 +1,7 @@
 package github
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/rand"
@@ -457,8 +458,10 @@ func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)
 			return resp, nil
 		}
 
-		// Check if it's a rate limit response
-		if resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") != "0" {
+		// A 403 is retried only when it is a rate limit: the primary limit is
+		// spent, or a secondary limit hit (SYNCACT-009), which GitHub signals
+		// with Retry-After or in the message while requests remain.
+		if resp.StatusCode == http.StatusForbidden && !isRateLimit403(resp) {
 			return resp, nil
 		}
 
@@ -485,6 +488,22 @@ func (rl *rateLimiter) do(ctx context.Context, fn func() (*http.Response, error)
 	}
 
 	return resp, nil
+}
+
+// isRateLimit403 reports whether a 403 response is a primary or secondary
+// rate limit rather than a permission error. Reading the message consumes the
+// body, so it is put back for the caller of a non-rate-limit 403.
+func isRateLimit403(resp *http.Response) bool {
+	if resp.Header.Get("X-RateLimit-Remaining") == "0" || resp.Header.Get("Retry-After") != "" {
+		return true
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	resp.Body.Close() //nolint:errcheck // replaced below
+	resp.Body = io.NopCloser(bytes.NewReader(body))
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(body)), "secondary rate limit")
 }
 
 // doRequest performs an authenticated HTTP request through the rate limiter.

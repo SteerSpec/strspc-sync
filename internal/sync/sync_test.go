@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -128,6 +129,8 @@ type mockPRService struct {
 	// branchBases records the baseSHA each branch was cut from.
 	branchBases []string
 
+	// listErr, when set, is returned by List instead of the PRs.
+	listErr error
 	// createBranchErr, when set, is returned by CreateBranch instead of nil.
 	createBranchErr error
 	// deleted records the branches DeleteBranch was called for.
@@ -164,6 +167,9 @@ func (m *mockPRService) List(_ context.Context, owner, repo string, opts *gh.Pul
 	key := owner + "/" + repo
 	if opts != nil && opts.Head != "" {
 		m.listedHeads = append(m.listedHeads, opts.Head)
+	}
+	if m.listErr != nil {
+		return nil, m.listErr
 	}
 	var result []*gh.PullRequest
 	for _, pr := range m.prs[key] {
@@ -1144,11 +1150,12 @@ func TestSYNCPR006_CloseStalePRs(t *testing.T) {
 			Labels: []string{"steerspec-sync"},
 		},
 		{
+			// No label: its label request failed or someone removed it. It is
+			// still a stale version PR and must be closed.
 			Number: 12,
 			Title:  "chore(steerspec-sync): update claude-md to 0.9.0",
 			State:  "open",
 			Head:   "steerspec-sync/claude-md/0.9.0",
-			Labels: []string{"steerspec-sync"},
 		},
 		{
 			Number: 13,
@@ -1179,6 +1186,33 @@ func TestSYNCPR006_CloseStalePRs(t *testing.T) {
 	for _, n := range prSvc.closed {
 		if n == 13 {
 			t.Errorf("SYNCPR-006: PR #13 belongs to template claude-md-extra and must not be closed")
+		}
+	}
+}
+
+// SYNCPR-005: when the lookup of open PRs fails, sync cannot tell an open PR
+// from none, so it reports an error for that target instead of opening a
+// possible duplicate.
+func TestSYNCPR005_ListErrorCreatesNoPR(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	setupMockRepos(repoSvc)
+	prSvc.listErr = errors.New("502 bad gateway")
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prSvc.created) != 0 {
+		t.Fatalf("SYNCPR-005: created %d PR(s) after a failed lookup", len(prSvc.created))
+	}
+	if result.Errors == 0 {
+		t.Fatal("SYNCPR-005: expected the failed lookup to be reported as an error")
+	}
+	for _, rr := range result.RepoResults {
+		if rr.Status != "error" || !strings.Contains(rr.Error, "listing open PRs") {
+			t.Errorf("%s: status %q error %q, want a listing error", rr.Repo, rr.Status, rr.Error)
 		}
 	}
 }
