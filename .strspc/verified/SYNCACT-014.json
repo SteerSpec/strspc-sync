@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCACT-014",
+  "revision": 0,
+  "body_hash": "blake3:d5cafb6f4ea55891346ad950567f5dbd43f9e52a445866405dea2336563eb3b4",
+  "promoted_at": "2026-11-09T07:10:20Z",
+  "entity_version": "0.9.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "21b750ec7b3d27abfa75a3d03497e67e41db6cdfd21944103a1b453b9f925bf9",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The sync action (and the root action) declares a `force` input with default 'false'. When true it passes --force, which makes sync skip the state hash comparison and proceed even if the deployed state is current.",
+  "evidence": [
+    {
+      "file": "sync/action.yml",
+      "line": 26,
+      "excerpt": "force:",
+      "line_confirmed": false
+    },
+    {
+      "file": "sync/action.yml",
+      "line": 29,
+      "excerpt": "default: 'false'",
+      "line_confirmed": true
+    },
+    {
+      "file": "sync/action.yml",
+      "line": 130,
+      "excerpt": "if [ \"$STRSPC_INPUT_FORCE\" = \"true\" ]; then",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 361,
+      "excerpt": "if !force && prev != nil && prev.Hash == contentHash {",
+      "line_confirmed": true
+    }
+  ]
+}

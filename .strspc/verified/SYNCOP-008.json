@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCOP-008",
+  "revision": 0,
+  "body_hash": "blake3:0f72d1c4464a9a27f8f8e5ca1af7b5708a85d898a2676307ab6e6d531d9ee8bc",
+  "promoted_at": "2026-11-09T07:09:22Z",
+  "entity_version": "0.5.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "21b750ec7b3d27abfa75a3d03497e67e41db6cdfd21944103a1b453b9f925bf9",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The sync operation records each target's version, hash, PR number and status in DeploymentState after PR create/update and when content is already current. It then persists the state to the central repo, skipping only dry runs and unchanged state. E2E tests assert these entries.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 498,
+      "excerpt": "s.state.SetTemplateState(target.Repo, tmpl.ID, state.TemplateState{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 355,
+      "excerpt": "s.recordInSync(target.Repo, tmpl, contentHash, managed)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 217,
+      "excerpt": "if err := s.saveState(ctx); err != nil {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 622,
+      "excerpt": "err = s.ghClient.Repos.CreateOrUpdateFile(ctx, s.centralOwner, s.centralRepo, \".steerspec/deployment-state.json\"",
+      "line_confirmed": true
+    }
+  ]
+}

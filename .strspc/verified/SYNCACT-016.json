@@ -1,0 +1,49 @@
+{
+  "rule_id": "SYNCACT-016",
+  "revision": 0,
+  "body_hash": "blake3:a419def4653122ce3b72e726b13acc9ac4ebcb939437f5791455b84e731bf4ea",
+  "promoted_at": "2026-11-09T07:10:33Z",
+  "entity_version": "0.10.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "21b750ec7b3d27abfa75a3d03497e67e41db6cdfd21944103a1b453b9f925bf9",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The root and sync actions declare a `prs-created` output described as the number of new PRs created. It is wired to the run step, and the CLI writes it as an integer string from the count of created results.",
+  "evidence": [
+    {
+      "file": "action.yml",
+      "line": 59,
+      "excerpt": "prs-created:",
+      "line_confirmed": true
+    },
+    {
+      "file": "action.yml",
+      "line": 61,
+      "excerpt": "value: ${{ steps.run.outputs.prs-created }}",
+      "line_confirmed": true
+    },
+    {
+      "file": "sync/action.yml",
+      "line": 51,
+      "excerpt": "prs-created:",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 286,
+      "excerpt": "setOutput(\"prs-created\", strconv.Itoa(result.PRsCreated))",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 194,
+      "excerpt": "result.PRsCreated++",
+      "line_confirmed": true
+    }
+  ]
+}

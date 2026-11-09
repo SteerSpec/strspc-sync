@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.6.0",
-    "timestamp": "2026-11-09T07:05:55Z",
-    "hash": "blake3:d2c82a1614418ca7108362f262e7476a6b3d3ec72b78bccb89979450c32df782"
+    "version": "0.7.0",
+    "timestamp": "2026-11-09T07:10:48Z",
+    "hash": "blake3:56398127363d14b17e1d86daa466cc8721a7d65ef21b0222a5982291292d2eff"
   },
   "rules": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "MNRACT-005",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST verify actual file content in target repositories against expected versions using Blake3 hash comparison.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

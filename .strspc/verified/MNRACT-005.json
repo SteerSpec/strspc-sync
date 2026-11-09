@@ -1,0 +1,49 @@
+{
+  "rule_id": "MNRACT-005",
+  "revision": 0,
+  "body_hash": "blake3:f32dda138591e24ed9f39fe64971af4e4276233d9b56e3ec6ad6059d8368b555",
+  "promoted_at": "2026-11-09T07:10:48Z",
+  "entity_version": "0.7.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "21b750ec7b3d27abfa75a3d03497e67e41db6cdfd21944103a1b453b9f925bf9",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "Monitor and conflict tier1 fetch the actual file content from target repos and compare its BLAKE3 hash (hash.HashBytes, or the sections hash) against the recorded expected hash via state.Drift, rather than comparing version strings. A test confirms that same-version but different content is detected as drift.",
+  "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 151,
+      "excerpt": "drifted, expectedHash, actualHash := ts.Drift(content)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 132,
+      "excerpt": "content, _, err := m.ghClient.Repos.GetFileContent(ctx, owner, repo, destPath, \"\")",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/state/state.go",
+      "line": 111,
+      "excerpt": "actual = hash.HashBytes(content)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 70,
+      "excerpt": "drifted, expected, actual := ts.Drift(content)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor_test.go",
+      "line": 443,
+      "excerpt": "func TestMNRACT005_HashBasedDriftDetection(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}
