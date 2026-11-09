@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCCFG-006",
+  "revision": 0,
+  "body_hash": "blake3:888cd0c8536cc8a7b9009cc3260a89909ee9722761bd3f0b76ca8f9bced782b0",
+  "promoted_at": "2026-11-09T22:03:29Z",
+  "entity_version": "0.9.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The config schema has a templates field and validation rejects configs with no templates. The fixture configs and the quickstart config all define a templates section.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 224,
+      "excerpt": "if len(cfg.Templates) == 0 {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 225,
+      "excerpt": "return fmt.Errorf(\"at least one template is required\")",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/fixtures/steerspec-sync.yml",
+      "line": 6,
+      "excerpt": "templates:",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/e2e/fixtures/steerspec-sync.yml",
+      "line": 14,
+      "excerpt": "templates:",
+      "line_confirmed": true
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "rule_id": "TMPLT-002",
+  "revision": 1,
+  "body_hash": "blake3:ff80e565f26ae787947d9fd4ac71d17fe49876e5db8605ad011f77c43bcdefff",
+  "promoted_at": "2026-11-09T22:03:30Z",
+  "entity_version": "0.9.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.95,
+  "explanation": "Each template has an id field that is required and checked for uniqueness during config validation, with a test for duplicate ids.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 231,
+      "excerpt": "return fmt.Errorf(\"templates[%d].id is required\", i)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 234,
+      "excerpt": "return fmt.Errorf(\"duplicate template id: %s\", tmpl.ID)",
+      "line_confirmed": true
+    }
+  ]
+}

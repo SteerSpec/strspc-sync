@@ -1,0 +1,37 @@
+{
+  "rule_id": "CMPREG-004",
+  "revision": 0,
+  "body_hash": "blake3:d7b5c2a4436bcabd70d46badd9620c103fedc02d2d0bf36fd3c5cd6045b44f7d",
+  "promoted_at": "2026-11-09T22:03:30Z",
+  "entity_version": "0.3.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The rule is a permissive MAY about glob matching of repository names. The code uses glob patterns for include, exclude and target filters through path.Match, which is allowed and consistent with the rule.",
+  "evidence": [
+    {
+      "file": "internal/registry/filter.go",
+      "line": 41,
+      "excerpt": "if ok, _ := path.Match(p, name); ok {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/registry/registry.go",
+      "line": 75,
+      "excerpt": "path.Match(globPat, repo.Name)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/registry/registry.go",
+      "line": 125,
+      "excerpt": "path.Match(globPat, repo.Name)",
+      "line_confirmed": true
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "rule_id": "CMPTGT-005",
+  "revision": 0,
+  "body_hash": "blake3:da3cec50eb8ee7543126e250ac2d3b99663c70e027d36fec5e306f3cb4eebe71",
+  "promoted_at": "2026-11-09T22:03:30Z",
+  "entity_version": "0.3.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Targets may define per-target variable overrides (TargetOverride.Variables), which the registry merges over global variables and sync uses when rendering templates. This is an optional capability that is supported and used, consistent with the MAY rule.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 56,
+      "excerpt": "Variables        map[string]string `yaml:\"variables,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/registry/registry.go",
+      "line": 161,
+      "excerpt": "for k, v := range override.Variables {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 282,
+      "excerpt": "for k, v := range target.Variables {",
+      "line_confirmed": true
+    }
+  ]
+}

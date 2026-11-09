@@ -1,0 +1,31 @@
+{
+  "rule_id": "TMPLT-007",
+  "revision": 0,
+  "body_hash": "blake3:003de7a8cd05cbdea404b991e0ed175312749acff93b9b4b0d401de98378bcf0",
+  "promoted_at": "2026-11-09T22:03:30Z",
+  "entity_version": "0.12.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The marker renderer parses managed sections using the BEGIN:name and END:name delimiters, and rejects nested, unmatched or mismatched markers. The e2e test constant with a different delimiter form is used for the conflict test and not the marker renderer, so it does not break the rule.",
+  "evidence": [
+    {
+      "file": "internal/template/marker.go",
+      "line": 11,
+      "excerpt": "markerBeginRe = regexp.MustCompile(`<!--\\s*STEERSPEC:BEGIN:(\\S+)\\s*--&gt;`)",
+      "line_confirmed": false
+    },
+    {
+      "file": "internal/template/marker.go",
+      "line": 12,
+      "excerpt": "markerEndRe   = regexp.MustCompile(`<!--\\s*STEERSPEC:END:(\\S+)\\s*-->`)",
+      "line_confirmed": true
+    }
+  ]
+}
