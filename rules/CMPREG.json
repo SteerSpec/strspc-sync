@@ -6,9 +6,9 @@
     "description": "The registry of target repositories for synchronization."
   },
   "rule_set": {
-    "version": "0.1.1",
-    "timestamp": "2026-11-05T07:49:16Z",
-    "hash": "blake3:8e362f52e5caf561286ce159bd2d90642960c4061d3c70a138d9be9aef5db719"
+    "version": "0.2.1",
+    "timestamp": "2026-11-09T21:46:21Z",
+    "hash": "blake3:7db336a68e8b3758ea0b60f5ddf2dc69c9c8b9fccb7b8bd736c44a9507fb174c"
   },
   "rules": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "CMPREG-004",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MAY use glob patterns for repository name matching.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -67,9 +67,9 @@
         "parent": "CMPREG"
       },
       "rule_set": {
-        "version": "0.1.1",
-        "timestamp": "2026-11-05T07:49:16Z",
-        "hash": "blake3:b4a8d74670d2cccaa57e68225f6e912a7a77496ab58b041e7ccd1eddfe842b7f"
+        "version": "0.2.0",
+        "timestamp": "2026-11-09T21:46:21Z",
+        "hash": "blake3:36c80f81a7eb713b095a049f713a592b9887cfd9af40485b84eb36196337de9f"
       },
       "rules": [
         {
@@ -111,7 +111,7 @@
         {
           "id": "CMPTGT-005",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "MAY define variable overrides for template rendering.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

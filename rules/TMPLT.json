@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.1.8",
-    "timestamp": "2026-11-07T21:26:12Z",
-    "hash": "blake3:a49d9f26d44ea28715dbccd49008cb87326624d9fefc29bdd0b3245e05204053"
+    "version": "0.7.1",
+    "timestamp": "2026-11-09T21:52:18Z",
+    "hash": "blake3:76b411b6153c72313c964693c581cb68e9c154a246d1aff7afaec0a32cf570d7"
   },
   "rules": [
     {
@@ -23,7 +23,7 @@
     {
       "id": "TMPLT-002",
       "revision": 1,
-      "state": "D",
+      "state": "P",
       "body": "HAS a unique template identifier.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -32,7 +32,7 @@
     {
       "id": "TMPLT-003",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS a type which MUST be one of: \"claude-md\", \"skill\", \"agent\", \"config\", \"custom\".",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -59,7 +59,7 @@
     {
       "id": "TMPLT-006",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST support a rendering strategy which MUST be one of: \"mustache\", \"marker\", \"full-replace\".",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -68,7 +68,7 @@
     {
       "id": "TMPLT-007",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "When using the marker strategy, managed sections MUST be delimited by `<!-- STEERSPEC:BEGIN:section_name -->` and `<!-- STEERSPEC:END:section_name -->`.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -85,9 +85,9 @@
     },
     {
       "id": "TMPLT-009",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "When using the marker strategy, content outside the template's own managed sections belongs to the target repository, and drift detection MUST compare only the template's own sections.",
+      "body": "When using the marker strategy, content outside the template's own managed sections belongs to the target repository, and once the deployment state records the template's sections, drift detection MUST compare only those sections.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
       "supersedes": null
@@ -95,7 +95,7 @@
     {
       "id": "TMPLT-010",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MAY declare a source per target visibility (public, internal, private), with the plain source as the fallback.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
@@ -104,7 +104,7 @@
     {
       "id": "TMPLT-011",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST have at least one source, plain or per target visibility.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
@@ -121,15 +121,15 @@
         "parent": "TMPLT"
       },
       "rule_set": {
-        "version": "0.1.1",
-        "timestamp": "2026-11-05T07:49:16Z",
-        "hash": "blake3:6d4904ca5380caad148a1897fd3a3d66a3e72352cb1ec11e1e518d2400a1a26b"
+        "version": "0.2.0",
+        "timestamp": "2026-11-09T21:52:18Z",
+        "hash": "blake3:c021df1e0886917790595732c9d0b440ce20816baff6578cf61486916a609090"
       },
       "rules": [
         {
           "id": "TMPLTVRS-001",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "HAS a version in semver format (MAJOR.MINOR.PATCH).",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

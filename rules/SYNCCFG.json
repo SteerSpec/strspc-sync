@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.1.6",
-    "timestamp": "2026-11-07T19:07:34Z",
-    "hash": "blake3:efcb994d6c0958993a71c77a204189a8b404555878b65a7e67b1aa94f0431d20"
+    "version": "0.8.0",
+    "timestamp": "2026-11-09T21:46:21Z",
+    "hash": "blake3:fe7bf7bb90c24df8b2141e3be264253be27cd45bb065ce01baffff2430f0d993"
   },
   "rules": [
     {
@@ -59,7 +59,7 @@
     {
       "id": "SYNCCFG-006",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST contain a `templates` section defining one or more templates.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -104,7 +104,7 @@
     {
       "id": "SYNCCFG-011",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "The `auth` section MUST specify a `method` which MUST be one of: \"github-app\", \"pat\", \"github-token\".",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -140,7 +140,7 @@
     {
       "id": "SYNCCFG-015",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "The `sync` section MAY define `concurrency` as an integer (default: 5) controlling parallel PR creation.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -149,7 +149,7 @@
     {
       "id": "SYNCCFG-016",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "The `sync` section MAY define `pr-label` as a string (default: \"steerspec-sync\").",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -158,7 +158,7 @@
     {
       "id": "SYNCCFG-017",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "The `sync` section MAY define `close-stale-prs` as a boolean (default: true).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -194,7 +194,7 @@
     {
       "id": "SYNCCFG-021",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "The `monitor` section MAY define `auto-close` as a boolean (default: true) controlling whether resolved drift issues are auto-closed.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -212,7 +212,7 @@
     {
       "id": "SYNCCFG-023",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "The `conflicts` section MAY define `tiers` as a list of enabled detection tiers (default: [1, 2]).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
