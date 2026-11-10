@@ -401,6 +401,7 @@ func TestTMPLTVRS001_TemplateVersionSemver(t *testing.T) {
 		{"1.00.0", false},
 		{"1.0.01", false},
 		{"1.0.0-beta", false},
+		{"1.0.0+build", false},
 	} {
 		cfg := `
 version: "1.0.0"
