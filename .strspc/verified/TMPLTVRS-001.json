@@ -1,0 +1,43 @@
+{
+  "rule_id": "TMPLTVRS-001",
+  "revision": 0,
+  "body_hash": "blake3:12403d3e907b23cea05e138615114844c6a8e7f6cf940ea701e0176ab3993dd7",
+  "promoted_at": "2026-11-10T21:46:40Z",
+  "entity_version": "0.3.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "559814c530c3c38fe3eeacad1e9193931a6a0428ae6a0dc9de41f3c872319e2e",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.88,
+  "explanation": "Config validation requires every template to have a version and enforces MAJOR.MINOR.PATCH semver, and the real fixtures use semver versions. Test data that bypasses Validate or uses \"1.0\" does not change this.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 106,
+      "excerpt": "semverRE     = regexp.MustCompile(`^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$`)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 240,
+      "excerpt": "return fmt.Errorf(\"templates[%d].version is required\", i)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 242,
+      "excerpt": "if !semverRE.MatchString(tmpl.Version) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/fixtures/steerspec-sync.yml",
+      "line": 8,
+      "excerpt": "version: \"1.0.0\"",
+      "line_confirmed": true
+    }
+  ]
+}

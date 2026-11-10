@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.14.0",
-    "timestamp": "2026-11-09T22:08:26Z",
-    "hash": "blake3:0f6d42b050741e1c3d8bf3c7b3d0091cb4af3ad74b3b17b7fd25f3cc3cb8d4b1"
+    "version": "0.14.1",
+    "timestamp": "2026-11-10T21:46:40Z",
+    "hash": "blake3:7d62d0f6e918d9b9b67a48ee7423bcf20a5c15e81dcc152ae2515755b6617beb"
   },
   "rules": [
     {
@@ -121,15 +121,15 @@
         "parent": "TMPLT"
       },
       "rule_set": {
-        "version": "0.2.0",
-        "timestamp": "2026-11-09T21:52:18Z",
-        "hash": "blake3:c021df1e0886917790595732c9d0b440ce20816baff6578cf61486916a609090"
+        "version": "0.3.0",
+        "timestamp": "2026-11-10T21:46:40Z",
+        "hash": "blake3:89f13bcc58ca3fbc69d18efa3b7744d048363061a67e133ebbbe6d3733e73794"
       },
       "rules": [
         {
           "id": "TMPLTVRS-001",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "HAS a version in semver format (MAJOR.MINOR.PATCH).",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
