@@ -8,6 +8,8 @@ of every key.
 
 The top-level `version` is the config schema version and must be a full semver such as
 `"1.0.0"`; `"1.0"` or `"v1"` fail validation. Template `version`s follow the same format.
+`MAJOR.MINOR.PATCH` only: no leading zeros (`"01.0.0"`), pre-release (`"1.0.0-rc.1"`) or build
+(`"1.0.0+build"`) suffix.
 
 ## Authentication
 
