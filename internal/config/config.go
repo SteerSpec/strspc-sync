@@ -102,8 +102,9 @@ var (
 	validStrategies    = map[string]bool{"mustache": true, "marker": true, "full-replace": true}
 	validConflictTiers = map[int]bool{1: true, 2: true, 3: true}
 	validVisibilities  = map[string]bool{"public": true, "internal": true, "private": true}
-	semverRE           = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
-	sourceRepoRE       = regexp.MustCompile(`^([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+):(.+)$`)
+	// MAJOR.MINOR.PATCH with no leading zeros (SemVer 2.0.0 §2) and no pre-release or build suffix.
+	semverRE     = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+	sourceRepoRE = regexp.MustCompile(`^([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+):(.+)$`)
 )
 
 // ParseSource splits a template source into its repository ("owner/repo") and

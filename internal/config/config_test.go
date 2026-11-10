@@ -154,10 +154,19 @@ func TestValidationVersionSemver(t *testing.T) {
 	}{
 		{"1.0.0", true},
 		{"2.10.3", true},
+		{"0.0.0", true},
+		{"10.20.30", true},
 		{"1.0", false},
 		{"1", false},
 		{"v1.0.0", false},
 		{"latest", false},
+		// SemVer 2.0.0 §2: version numbers MUST NOT contain leading zeroes (GH #210).
+		{"01.0.0", false},
+		{"1.02.0", false},
+		{"1.0.00", false},
+		// The rules say MAJOR.MINOR.PATCH, so pre-release and build suffixes are rejected.
+		{"1.0.0-rc.1", false},
+		{"1.0.0+build", false},
 	} {
 		cfg := `
 version: "` + tt.version + `"
@@ -377,6 +386,41 @@ targets:
 	_, err := Load(path)
 	if err == nil {
 		t.Fatal("expected error for invalid template version format")
+	}
+}
+
+// TestTMPLTVRS001_TemplateVersionSemver: a template version is MAJOR.MINOR.PATCH without leading zeros (GH #210).
+func TestTMPLTVRS001_TemplateVersionSemver(t *testing.T) {
+	for _, tt := range []struct {
+		version string
+		ok      bool
+	}{
+		{"1.0.0", true},
+		{"0.10.0", true},
+		{"01.0.0", false},
+		{"1.00.0", false},
+		{"1.0.01", false},
+		{"1.0.0-beta", false},
+		{"1.0.0+build", false},
+	} {
+		cfg := `
+version: "1.0.0"
+auth:
+  method: github-token
+templates:
+  - id: t1
+    version: "` + tt.version + `"
+    type: claude-md
+    source: s
+    destination: d
+    strategy: mustache
+targets:
+  include: ["org/*"]
+`
+		_, err := Load(writeConfig(t, cfg))
+		if (err == nil) != tt.ok {
+			t.Errorf("template version %q: err = %v, want ok=%v", tt.version, err, tt.ok)
+		}
 	}
 }
 
