@@ -1,0 +1,37 @@
+{
+  "rule_id": "SYNCCFG-023",
+  "revision": 0,
+  "body_hash": "blake3:0a2ad73ffe1c9b3ee79d404435fb1526c96853ec5eadac09e7d910b9e3a7ab00",
+  "promoted_at": "2026-11-09T22:03:30Z",
+  "entity_version": "0.15.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The `conflicts.tiers` field is optional, defaults to [1, 2], and is used by the scanner when no tiers are passed on the command line.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 92,
+      "excerpt": "Tiers      []int  `yaml:\"tiers,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 177,
+      "excerpt": "cfg.Conflicts.Tiers = []int{1, 2}",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 216,
+      "excerpt": "tiers = s.cfg.Conflicts.Tiers",
+      "line_confirmed": true
+    }
+  ]
+}

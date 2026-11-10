@@ -1,0 +1,37 @@
+{
+  "rule_id": "SYNCCFG-015",
+  "revision": 0,
+  "body_hash": "blake3:3b7bf976835481b24ce6a57beabb9afbdbd3d2ac3cd4f78fea30b7566cf3b45e",
+  "promoted_at": "2026-11-09T22:03:29Z",
+  "entity_version": "0.11.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Sync concurrency is an optional integer defaulting to 5 and used to bound parallel work via a semaphore.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 62,
+      "excerpt": "Concurrency   int    `yaml:\"concurrency,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 146,
+      "excerpt": "cfg.Sync.Concurrency = 5",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 168,
+      "excerpt": "sem := make(chan struct{}, concurrency)",
+      "line_confirmed": true
+    }
+  ]
+}

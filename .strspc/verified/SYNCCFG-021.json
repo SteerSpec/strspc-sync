@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCCFG-021",
+  "revision": 0,
+  "body_hash": "blake3:fc3cd1e5bae815ccc8601a84b170821253414e999d128b8f68d9e165b2104ca1",
+  "promoted_at": "2026-11-09T22:03:30Z",
+  "entity_version": "0.14.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The monitor section defines an optional boolean `auto-close` that defaults to true, and the monitor closes resolved drift issues only when it is enabled. Tests cover both the disabled case and the default-closing case.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 87,
+      "excerpt": "AutoClose  *bool  `yaml:\"auto-close,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 170,
+      "excerpt": "cfg.Monitor.AutoClose = &t",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 90,
+      "excerpt": "autoClose := m.cfg.Monitor.AutoClose == nil || *m.cfg.Monitor.AutoClose",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 178,
+      "excerpt": "if autoClose {",
+      "line_confirmed": true
+    }
+  ]
+}

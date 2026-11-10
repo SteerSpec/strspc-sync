@@ -1,0 +1,43 @@
+{
+  "rule_id": "TMPLT-007",
+  "revision": 0,
+  "body_hash": "blake3:003de7a8cd05cbdea404b991e0ed175312749acff93b9b4b0d401de98378bcf0",
+  "promoted_at": "2026-11-09T22:08:26Z",
+  "entity_version": "0.14.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The marker strategy implementation parses managed sections using STEERSPEC:BEGIN:name and STEERSPEC:END:name delimiters, rejecting mismatched or unmatched markers. The shipped templates and tests use the same delimiters. The e2e conflict test's different format is only used as conflict-detection test data.",
+  "evidence": [
+    {
+      "file": "internal/template/marker.go",
+      "line": 11,
+      "excerpt": "markerBeginRe = regexp.MustCompile(`<!--\\s*STEERSPEC:BEGIN:(\\S+)\\s*--&gt;`)",
+      "line_confirmed": false
+    },
+    {
+      "file": "internal/template/marker.go",
+      "line": 12,
+      "excerpt": "markerEndRe   = regexp.MustCompile(`<!--\\s*STEERSPEC:END:(\\S+)\\s*-->`)",
+      "line_confirmed": true
+    },
+    {
+      "file": "docs/quickstart/templates/CLAUDE.md.mustache",
+      "line": 3,
+      "excerpt": "<!-- STEERSPEC:BEGIN:project-standards -->",
+      "line_confirmed": true
+    },
+    {
+      "file": "docs/quickstart/templates/CLAUDE.md.mustache",
+      "line": 10,
+      "excerpt": "<!-- STEERSPEC:END:project-standards -->",
+      "line_confirmed": true
+    }
+  ]
+}

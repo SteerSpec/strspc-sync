@@ -1,0 +1,37 @@
+{
+  "rule_id": "SYNCCFG-011",
+  "revision": 0,
+  "body_hash": "blake3:fbc06084ab8d33e33a20e2c853c6d176cd2d40187f4e54f0789519a71d4af474",
+  "promoted_at": "2026-11-09T22:03:29Z",
+  "entity_version": "0.10.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Config validation restricts auth.method to exactly github-app, pat, github-token and rejects others, with a test covering invalid methods.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 100,
+      "excerpt": "validAuthMethods   = map[string]bool{\"github-app\": true, \"pat\": true, \"github-token\": true}",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 197,
+      "excerpt": "if !validAuthMethods[cfg.Auth.Method] {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config_test.go",
+      "line": 104,
+      "excerpt": "func TestValidationInvalidAuthMethod(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}

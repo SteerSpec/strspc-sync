@@ -1,0 +1,31 @@
+{
+  "rule_id": "TMPLT-011",
+  "revision": 0,
+  "body_hash": "blake3:43d5d66ad323a354c6ab307787311f3346acd36b5135a08b385bc75b40103231",
+  "promoted_at": "2026-11-09T22:08:08Z",
+  "entity_version": "0.13.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "a2f17b7fc8675dd23cc35674884b0c89d7a4828ee90a79b6871b4e240a68a579",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "Config validation rejects templates that have neither a plain source nor per-visibility sources.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 245,
+      "excerpt": "if tmpl.Source == \"\" && len(tmpl.Sources) == 0 {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/sources_test.go",
+      "line": 54,
+      "excerpt": "{name: \"neither\", extra: \"\", wantErr: \"needs source or sources\"},",
+      "line_confirmed": true
+    }
+  ]
+}
