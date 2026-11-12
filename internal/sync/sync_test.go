@@ -1123,7 +1123,7 @@ func TestSyncPRLookupKeepsTemplatesSeparate(t *testing.T) {
 	}
 }
 
-func TestSYNCPR006_CloseStalePRs(t *testing.T) {
+func TestSYNCPR007_CloseStalePRs(t *testing.T) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()
 
@@ -1178,17 +1178,54 @@ func TestSYNCPR006_CloseStalePRs(t *testing.T) {
 	}
 
 	if result.PRsCreated != 1 {
-		t.Errorf("SYNCPR-006: expected 1 new PR created, got %d", result.PRsCreated)
+		t.Errorf("SYNCPR-007: expected 1 new PR created, got %d", result.PRsCreated)
 	}
 
 	// The 3 stale PRs for claude-md should be closed, in both title formats.
 	if len(prSvc.closed) != 3 {
-		t.Errorf("SYNCPR-006: expected 3 stale PRs closed, got %d: %v", len(prSvc.closed), prSvc.closed)
+		t.Errorf("SYNCPR-007: expected 3 stale PRs closed, got %d: %v", len(prSvc.closed), prSvc.closed)
 	}
 	for _, n := range prSvc.closed {
 		if n == 13 {
-			t.Errorf("SYNCPR-006: PR #13 belongs to template claude-md-extra and must not be closed")
+			t.Errorf("SYNCPR-007: PR #13 belongs to template claude-md-extra and must not be closed")
 		}
+	}
+}
+
+// SYNCPR-007: closing stale PRs is configurable; with close-stale-prs: false
+// the older version PRs stay open.
+func TestSYNCPR007_CloseStalePRsDisabled(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+
+	repoSvc.repos["testorg"] = []*gh.Repository{
+		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
+	}
+	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	prSvc.prs["testorg/repo-a"] = []*gh.PullRequest{
+		{
+			Number: 12,
+			Title:  "chore(steerspec-sync): update claude-md to 0.9.0",
+			State:  "open",
+			Head:   "steerspec-sync/claude-md/0.9.0",
+			Labels: []string{"steerspec-sync"},
+		},
+	}
+
+	cfg := makeTestConfig()
+	off := false
+	cfg.Sync.CloseStalePRs = &off
+	client := makeTestClient(repoSvc, prSvc)
+
+	result, err := New(cfg, client, "testorg", "central").Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.PRsCreated != 1 {
+		t.Errorf("SYNCPR-007: expected 1 new PR created, got %d", result.PRsCreated)
+	}
+	if len(prSvc.closed) != 0 {
+		t.Errorf("SYNCPR-007: close-stale-prs is false, expected no PR closed, got %v", prSvc.closed)
 	}
 }
 
@@ -1711,7 +1748,7 @@ func TestIsAlreadyExists(t *testing.T) {
 	}
 }
 
-// A sync that cannot record its results has violated SYNCOP-008. It used to be
+// A sync that cannot record its results has violated SYNCOP-009. It used to be
 // logged and dropped, so the run reported errors:0 while writing nothing.
 func TestSaveStateFailureIsCounted(t *testing.T) {
 	repoSvc := newMockRepoService()
@@ -1826,9 +1863,9 @@ func TestPRBody_EscapesSourcePath(t *testing.T) {
 	}
 }
 
-// SYNCPR-006: a PR opened under an earlier pr-title-prefix is still stale
+// SYNCPR-007: a PR opened under an earlier pr-title-prefix is still stale
 // once a newer version supersedes it; the head branch identifies it.
-func TestSYNCPR006_CloseStalePRs_AcrossPrefixChange(t *testing.T) {
+func TestSYNCPR007_CloseStalePRs_AcrossPrefixChange(t *testing.T) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()
 
@@ -1860,14 +1897,14 @@ func TestSYNCPR006_CloseStalePRs_AcrossPrefixChange(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(prSvc.closed) != 1 || prSvc.closed[0] != 20 {
-		t.Errorf("SYNCPR-006: expected only PR #20 closed, got %v", prSvc.closed)
+		t.Errorf("SYNCPR-007: expected only PR #20 closed, got %v", prSvc.closed)
 	}
 }
 
-// SYNCPR-006: template IDs may contain "/", so "guide" must not close the
+// SYNCPR-007: template IDs may contain "/", so "guide" must not close the
 // open PR of template "guide/team" even though its branch starts with
 // "steerspec-sync/guide/".
-func TestSYNCPR006_CloseStalePRs_SlashInTemplateID(t *testing.T) {
+func TestSYNCPR007_CloseStalePRs_SlashInTemplateID(t *testing.T) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()
 
@@ -1899,7 +1936,7 @@ func TestSYNCPR006_CloseStalePRs_SlashInTemplateID(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(prSvc.closed) != 1 || prSvc.closed[0] != 30 {
-		t.Errorf("SYNCPR-006: expected only PR #30 closed, got %v", prSvc.closed)
+		t.Errorf("SYNCPR-007: expected only PR #30 closed, got %v", prSvc.closed)
 	}
 }
 

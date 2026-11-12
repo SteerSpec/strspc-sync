@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.5.2",
-    "timestamp": "2026-11-09T16:25:30Z",
-    "hash": "blake3:4e00d855f462f717d4d260047bce0918dae8a3c27139f0728eb3c8fca0472b90"
+    "version": "0.7.1",
+    "timestamp": "2026-11-12T12:09:59Z",
+    "hash": "blake3:5947ebac3f0c117431553401dcf1ba28d9143083efeefb02ec7f94d48a5a418d"
   },
   "rules": [
     {
@@ -77,7 +77,7 @@
     {
       "id": "SYNCOP-008",
       "revision": 0,
-      "state": "P",
+      "state": "T",
       "body": "MUST record results in the DeploymentState.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -86,7 +86,7 @@
     {
       "id": "SYNCOP-009",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST record results in the DeploymentState, except in dry-run mode, which MUST NOT write it.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-09",
@@ -103,9 +103,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.9.0",
-        "timestamp": "2026-11-09T16:25:30Z",
-        "hash": "blake3:cb773bb0faa2cf16f921052630aa5dec6f5e6e318ad7c0bc9a4674adbc00898d"
+        "version": "0.11.0",
+        "timestamp": "2026-11-12T12:09:59Z",
+        "hash": "blake3:5b78a8fcdbaf10b07168f730741547cb1db5bb7667cb9ac2aa4d3f7d0d25d78b"
       },
       "rules": [
         {
@@ -156,7 +156,7 @@
         {
           "id": "SYNCPR-006",
           "revision": 0,
-          "state": "P",
+          "state": "T",
           "body": "MUST close stale version PRs for the same template when a newer version PR is created.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -165,7 +165,7 @@
         {
           "id": "SYNCPR-007",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "MUST close stale version PRs for the same template when a newer version PR is created (configurable via `close-stale-prs`).",
           "added_by": "github:pleberre",
           "added_at": "2026-11-09",
