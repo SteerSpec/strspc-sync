@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.15.0",
-    "timestamp": "2026-11-09T22:03:30Z",
-    "hash": "blake3:210fc8ea578f3ed40fabd3f3fc61d45f4d24e2fd64f8665e9eaec2ecebc27e86"
+    "version": "0.16.0",
+    "timestamp": "2026-11-10T21:46:24Z",
+    "hash": "blake3:2661c864b2981b3a3d476e1758c9557fb49c2cfbd964f34ec08761063579b179"
   },
   "rules": [
     {
@@ -32,7 +32,7 @@
     {
       "id": "SYNCCFG-003",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST contain a `version` field specifying the config schema version in semver format.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
