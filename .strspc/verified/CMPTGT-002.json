@@ -1,0 +1,37 @@
+{
+  "rule_id": "CMPTGT-002",
+  "revision": 0,
+  "body_hash": "blake3:4ba7367b3a3472ba85f4b52cdca08804a6008bea95043048c0892232d589afc0",
+  "promoted_at": "2026-11-13T19:42:24Z",
+  "entity_version": "0.9.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "2ed2fcfc02b3226e267820c38504dd45e99c6510492f11aa59a06ac34ee13792",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "ResolvedTarget has a DefaultBranch field populated from the repo or override, and sync uses it as the PR base.",
+  "evidence": [
+    {
+      "file": "internal/registry/registry.go",
+      "line": 33,
+      "excerpt": "DefaultBranch    string",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/registry/registry.go",
+      "line": 151,
+      "excerpt": "DefaultBranch: repo.DefaultBranch,",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 479,
+      "excerpt": "Base:   target.DefaultBranch,",
+      "line_confirmed": true
+    }
+  ]
+}
