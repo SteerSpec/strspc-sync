@@ -1,0 +1,37 @@
+{
+  "rule_id": "SYNCCFG-005",
+  "revision": 0,
+  "body_hash": "blake3:99b84f5bcb232c7927f064ba64bd22395e57ac3f56233bf7471e38aefc3003b4",
+  "promoted_at": "2026-11-13T15:46:36Z",
+  "entity_version": "0.27.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "2ed2fcfc02b3226e267820c38504dd45e99c6510492f11aa59a06ac34ee13792",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The variables section is optional (omitempty). Configs that omit it are accepted, and configs that provide it have it merged into the template variables.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 16,
+      "excerpt": "Variables   map[string]string `yaml:\"variables,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/fixtures/steerspec-sync.yml",
+      "line": 1,
+      "excerpt": "version: \"1.0.0\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 279,
+      "excerpt": "for k, v := range s.cfg.Variables {",
+      "line_confirmed": true
+    }
+  ]
+}

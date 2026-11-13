@@ -1,0 +1,31 @@
+{
+  "rule_id": "SYNCCFG-010",
+  "revision": 0,
+  "body_hash": "blake3:7fe5e809cfc938a21fb5c86db1f47471731e1b36ae2367f6db8a7c2e2dc8d595",
+  "promoted_at": "2026-11-13T15:46:36Z",
+  "entity_version": "0.31.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "2ed2fcfc02b3226e267820c38504dd45e99c6510492f11aa59a06ac34ee13792",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The config schema declares an optional `conflicts` section with defaults and validation of its fields.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 21,
+      "excerpt": "Conflicts   ConflictBehavior  `yaml:\"conflicts,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 174,
+      "excerpt": "if cfg.Conflicts.Schedule == \"\" {",
+      "line_confirmed": true
+    }
+  ]
+}

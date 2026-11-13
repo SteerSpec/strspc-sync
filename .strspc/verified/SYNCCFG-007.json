@@ -1,0 +1,37 @@
+{
+  "rule_id": "SYNCCFG-007",
+  "revision": 0,
+  "body_hash": "blake3:23996677957f25c78eae86f636a6dfc8747a9299a3081fc7a554459c281198b6",
+  "promoted_at": "2026-11-13T15:46:36Z",
+  "entity_version": "0.28.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "2ed2fcfc02b3226e267820c38504dd45e99c6510492f11aa59a06ac34ee13792",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.92,
+  "explanation": "The config has a required targets section, and validation fails when targets.include is empty. The registry resolves targets from it, and all sample configs include it.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 18,
+      "excerpt": "Targets     TargetsConfig     `yaml:\"targets\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 271,
+      "excerpt": "if len(cfg.Targets.Include) == 0 {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 113,
+      "excerpt": "targets, err := s.reg.Resolve(ctx, s.cfg.Targets, s.cfg.Variables)",
+      "line_confirmed": true
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "rule_id": "SYNCCFG-025",
+  "revision": 0,
+  "body_hash": "blake3:31a6ba02d0e73dc4d25011da85c40ddeacaa56e9f6feb8a9e8b340ca63ccd766",
+  "promoted_at": "2026-11-13T15:46:36Z",
+  "entity_version": "0.33.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "2ed2fcfc02b3226e267820c38504dd45e99c6510492f11aa59a06ac34ee13792",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The conflicts section defines issue-label as an optional string with the default \"steerspec-conflict\", applied when empty and tested.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 93,
+      "excerpt": "IssueLabel string `yaml:\"issue-label,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 181,
+      "excerpt": "cfg.Conflicts.IssueLabel = \"steerspec-conflict\"",
+      "line_confirmed": true
+    }
+  ]
+}
