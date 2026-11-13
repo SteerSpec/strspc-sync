@@ -208,7 +208,7 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 
 	// Save state back (skip on dry run).
 	//
-	// A sync that cannot record its results has violated SYNCOP-008 ("MUST
+	// A sync that cannot record its results has violated SYNCOP-009 ("MUST
 	// record results in the DeploymentState"), and every later run depends on
 	// that state: without it the hash check never skips, and monitor and
 	// conflict have nothing to compare against. This used to be logged at WARN
@@ -656,7 +656,7 @@ func (s *Syncer) deleteEmptyBranch(ctx context.Context, owner, repo, fullName, b
 // legacyTitlePrefix is the title prefix earlier releases generated
 // ("[SteerSpec] Update <template-id>"). closeStalePRs still recognises it so
 // PRs opened by an older release are closed when a newer version PR
-// supersedes them (SYNCPR-006).
+// supersedes them (SYNCPR-007).
 const legacyTitlePrefix = "[SteerSpec] Update "
 
 func (s *Syncer) commitPrefix() string {
@@ -781,7 +781,7 @@ func (s *Syncer) getBaseSHA(ctx context.Context, owner, repo, branch string) (st
 	return s.ghClient.Repos.GetBranchSHA(ctx, owner, repo, branch)
 }
 
-// closeStalePRs closes the other open sync PRs for templateID (SYNCPR-006).
+// closeStalePRs closes the other open sync PRs for templateID (SYNCPR-007).
 // They are found by head branch or generated title, not by label: a PR whose
 // label failed to apply or was removed is still a stale version PR.
 func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, fullName, templateID string, currentPR int) {

@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCPR-007",
+  "revision": 0,
+  "body_hash": "blake3:8a435bed1e0a30c854d451f97c18a04385911175969ed5ba542aa628429b1ecd",
+  "promoted_at": "2026-11-12T12:09:59Z",
+  "entity_version": "0.11.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "2ed2fcfc02b3226e267820c38504dd45e99c6510492f11aa59a06ac34ee13792",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "After a PR is created or updated, the syncer closes other open sync PRs for the same template when `close-stale-prs` is enabled, and that option defaults to true. Unit and e2e tests cover closing, keeping PRs when the option is disabled, prefix changes, and slash-containing template IDs.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 500,
+      "excerpt": "if s.cfg.Sync.CloseStalePRs != nil && *s.cfg.Sync.CloseStalePRs {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 501,
+      "excerpt": "s.closeStalePRs(ctx, owner, repo, target.Repo, tmpl.ID, pr.Number)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 804,
+      "excerpt": "if err := s.ghClient.PullRequests.Close(ctx, owner, repo, pr.Number); err != nil {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 152,
+      "excerpt": "if cfg.Sync.CloseStalePRs == nil {",
+      "line_confirmed": true
+    }
+  ]
+}
