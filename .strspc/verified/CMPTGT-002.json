@@ -2,7 +2,7 @@
   "rule_id": "CMPTGT-002",
   "revision": 0,
   "body_hash": "blake3:4ba7367b3a3472ba85f4b52cdca08804a6008bea95043048c0892232d589afc0",
-  "promoted_at": "2026-11-13T19:42:24Z",
+  "promoted_at": "2026-11-13T19:57:49Z",
   "entity_version": "0.9.0",
   "scope": "all tracked files",
   "files": 148,

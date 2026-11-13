@@ -6,9 +6,9 @@
     "description": "The registry of target repositories for synchronization."
   },
   "rule_set": {
-    "version": "0.9.4",
-    "timestamp": "2026-11-13T19:42:24Z",
-    "hash": "blake3:20336fb2951c62047f03c5bca2bcdf1ecdd0ad3bb4741d6b0698fa59be7f4bf2"
+    "version": "0.8.4",
+    "timestamp": "2026-11-13T19:57:49Z",
+    "hash": "blake3:4cc1dd8636479f303f0f3f73076d5ce4d77d74f7f90fc55aa415faaa745e9a74"
   },
   "rules": [
     {
@@ -32,7 +32,7 @@
     {
       "id": "CMPREG-003",
       "revision": 0,
-      "state": "I",
+      "state": "P",
       "body": "HAS one or more ComponentTargets.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -68,8 +68,8 @@
       },
       "rule_set": {
         "version": "0.11.0",
-        "timestamp": "2026-11-13T19:42:24Z",
-        "hash": "blake3:da90f40d021c3410f686b31536c9a77a0959ff0fbfff1442f714f8ee80eebdfa"
+        "timestamp": "2026-11-13T19:57:49Z",
+        "hash": "blake3:2be73f1f389bfc30386b11d996cce0963a001269fdace56cf2e80ef2dbdd0a05"
       },
       "rules": [
         {

@@ -2,7 +2,7 @@
   "rule_id": "CMPREG-001",
   "revision": 0,
   "body_hash": "blake3:c43bbc8a737cfc3afd66ce0a7ed1eb5564b170e09e46b189054ebd6b8a37f430",
-  "promoted_at": "2026-11-13T19:42:23Z",
+  "promoted_at": "2026-11-13T19:57:49Z",
   "entity_version": "0.7.0",
   "scope": "all tracked files",
   "files": 148,
