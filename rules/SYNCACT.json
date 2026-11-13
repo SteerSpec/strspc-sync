@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.18.0",
-    "timestamp": "2026-11-13T19:44:39Z",
-    "hash": "blake3:c1684f65ac65f19899278f4b8a2cc0d0f484848df0e86ed86b21730df7badf1c"
+    "version": "0.16.2",
+    "timestamp": "2026-11-13T20:02:45Z",
+    "hash": "blake3:630e3e1ae66172ca144672de220b9ede16eaaf600fc0e4fadd33e2053858cd3a"
   },
   "rules": [
     {
@@ -166,18 +166,18 @@
     },
     {
       "id": "SYNCACT-018",
-      "revision": 0,
-      "state": "P",
-      "body": "HAS an output `repos-skipped` (integer) counting repositories that were already up to date.",
+      "revision": 1,
+      "state": "D",
+      "body": "HAS an output `repos-skipped` (integer) counting the repository and template pairs that sync left unchanged without an error: already up to date, a symlinked destination, or a dry run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
     {
       "id": "SYNCACT-019",
-      "revision": 0,
-      "state": "P",
-      "body": "HAS an output `errors` (integer) counting repositories that encountered errors.",
+      "revision": 1,
+      "state": "D",
+      "body": "HAS an output `errors` (integer) counting the repository and template pairs that failed, plus one when the DeploymentState could not be saved.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
