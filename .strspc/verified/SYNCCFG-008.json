@@ -1,0 +1,31 @@
+{
+  "rule_id": "SYNCCFG-008",
+  "revision": 0,
+  "body_hash": "blake3:4ec205202be9de565a6df2b9808931ba8188438c1e56d1a0cecb0234aa4f3d16",
+  "promoted_at": "2026-11-13T15:46:36Z",
+  "entity_version": "0.29.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "2ed2fcfc02b3226e267820c38504dd45e99c6510492f11aa59a06ac34ee13792",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The config schema declares an optional `sync` section (omitempty) with defaults applied when absent, and the code reads it. This matches the MAY requirement.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 19,
+      "excerpt": "Sync        SyncBehavior      `yaml:\"sync,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 146,
+      "excerpt": "if cfg.Sync.Concurrency == 0 {",
+      "line_confirmed": true
+    }
+  ]
+}

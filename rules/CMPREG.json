@@ -6,15 +6,15 @@
     "description": "The registry of target repositories for synchronization."
   },
   "rule_set": {
-    "version": "0.3.1",
-    "timestamp": "2026-11-09T22:03:30Z",
-    "hash": "blake3:ef97ff53f104b7746cebdcab6e53a3ccea3df37feb38628db9829bdccd96c658"
+    "version": "0.6.4",
+    "timestamp": "2026-11-13T15:47:38Z",
+    "hash": "blake3:7f71fbe65cf6bfc30274cc539c8602d272aae0b4a16e26cc3828806b112a103f"
   },
   "rules": [
     {
       "id": "CMPREG-001",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "IS the registry of target repositories for synchronization.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -32,7 +32,7 @@
     {
       "id": "CMPREG-003",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS one or more ComponentTargets.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -50,7 +50,7 @@
     {
       "id": "CMPREG-005",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MAY use GitHub topics for dynamic repository resolution.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -67,15 +67,15 @@
         "parent": "CMPREG"
       },
       "rule_set": {
-        "version": "0.3.0",
-        "timestamp": "2026-11-09T22:03:30Z",
-        "hash": "blake3:db450f690832157155f393ca594c2ae56710a9babe26b73203f2dd785d82b29e"
+        "version": "0.7.0",
+        "timestamp": "2026-11-13T15:47:38Z",
+        "hash": "blake3:a7cf882a3d81f22f667188f4637d2cc529472db60f7813ddb3527fe1809ce567"
       },
       "rules": [
         {
           "id": "CMPTGT-001",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "HAS a repository identifier in `owner/repo` format.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -84,7 +84,7 @@
         {
           "id": "CMPTGT-002",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "HAS a default branch name.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -93,7 +93,7 @@
         {
           "id": "CMPTGT-003",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "MAY include specific templates by identifier.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -102,7 +102,7 @@
         {
           "id": "CMPTGT-004",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "MAY exclude specific templates by identifier.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

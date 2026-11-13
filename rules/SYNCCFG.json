@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.25.0",
-    "timestamp": "2026-11-13T15:41:29Z",
-    "hash": "blake3:7d9e03917609e945d9b4f50f0c15792ccd03f02d3f890821dfad78f17197e0b5"
+    "version": "0.33.0",
+    "timestamp": "2026-11-13T15:46:36Z",
+    "hash": "blake3:db5f8743273a7582b78a7823ac9e7af5e3edf95aa2219c98d70fd350ba5c60b2"
   },
   "rules": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "SYNCCFG-004",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST contain an `auth` section specifying the authentication method.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -50,7 +50,7 @@
     {
       "id": "SYNCCFG-005",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MAY contain a `variables` section for global template variables.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -68,7 +68,7 @@
     {
       "id": "SYNCCFG-007",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST contain a `targets` section defining the ComponentRegistry.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -77,7 +77,7 @@
     {
       "id": "SYNCCFG-008",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MAY contain a `sync` section for sync behavior configuration.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -86,7 +86,7 @@
     {
       "id": "SYNCCFG-009",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MAY contain a `monitor` section for monitoring behavior configuration.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -95,7 +95,7 @@
     {
       "id": "SYNCCFG-010",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MAY contain a `conflicts` section for conflict detection configuration.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -185,7 +185,7 @@
     {
       "id": "SYNCCFG-020",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "The `monitor` section MAY define `issue-label` as a string (default: \"steerspec-drift\").",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -230,7 +230,7 @@
     {
       "id": "SYNCCFG-025",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "The `conflicts` section MAY define `issue-label` as a string (default: \"steerspec-conflict\").",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
