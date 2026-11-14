@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.30.0",
-    "timestamp": "2026-11-14T10:37:48Z",
-    "hash": "blake3:19b2e487ad024b8fee1114d6ed1ffe8248428f8736d4fd9ee9cf61696b4b74f1"
+    "version": "0.28.2",
+    "timestamp": "2026-11-14T10:41:28Z",
+    "hash": "blake3:ab45ea5af83e83f836afaf12883abee404c8f740433e2112eab5338ce2545c90"
   },
   "rules": [
     {
@@ -67,18 +67,18 @@
     },
     {
       "id": "SYNCACT-007",
-      "revision": 0,
-      "state": "P",
-      "body": "For each out-of-date target, MUST render the template using the configured strategy and create or update a SyncPullRequest.",
+      "revision": 1,
+      "state": "D",
+      "body": "For each out-of-date target, MUST render the template using the configured strategy and, unless the run is a dry run, create or update a SyncPullRequest.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
     {
       "id": "SYNCACT-008",
-      "revision": 1,
-      "state": "P",
-      "body": "MUST NOT fail the entire workflow when a single target repository fails.",
+      "revision": 2,
+      "state": "D",
+      "body": "MUST continue processing the remaining target repositories when a single target repository fails, counting the failure in the `errors` output.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null

@@ -7,8 +7,8 @@
   },
   "rule_set": {
     "version": "0.7.2",
-    "timestamp": "2026-11-14T10:37:48Z",
-    "hash": "blake3:2348115db2a9999bd56ec90aa7bdd40a9627ada3859da8e2c46981c5e9605dc2"
+    "timestamp": "2026-11-14T10:41:28Z",
+    "hash": "blake3:afe084a77ce9c307a28d6b4c34bd3b967f24b90430b77ed92dc2d81bf6e68ea0"
   },
   "rules": [
     {
@@ -103,9 +103,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.12.0",
-        "timestamp": "2026-11-14T10:37:48Z",
-        "hash": "blake3:e0d520fdbb55a044fa4a9860b9544685b48f0ccaaecbc7bfce3827fe95cf2e8d"
+        "version": "0.11.1",
+        "timestamp": "2026-11-14T10:41:28Z",
+        "hash": "blake3:87a648124d6eb01bfbc0726c5b4e693c8601f9472e94548c85cb7ab0801f1f83"
       },
       "rules": [
         {
@@ -137,9 +137,9 @@
         },
         {
           "id": "SYNCPR-004",
-          "revision": 0,
-          "state": "P",
-          "body": "MUST be labeled with a configurable label (default: `steerspec-sync`).",
+          "revision": 1,
+          "state": "D",
+          "body": "MUST be labeled with a configurable label (default: `steerspec-sync`) when it is created.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
