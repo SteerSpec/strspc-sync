@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.35.0",
-    "timestamp": "2026-11-14T19:53:45Z",
-    "hash": "blake3:f7198deadc99008722cd0d9bafdb7627f96fbf8eb1f6a1aa7bd9e8bdb1fb4985"
+    "version": "0.34.0",
+    "timestamp": "2026-11-14T20:02:53Z",
+    "hash": "blake3:ca442e339638425d32abb65b9241c2e6d46713827faa07866ed590d8546690fa"
   },
   "rules": [
     {
@@ -68,7 +68,7 @@
     {
       "id": "SYNCACT-007",
       "revision": 1,
-      "state": "I",
+      "state": "P",
       "body": "For each out-of-date target, MUST render the template using the configured strategy and, unless the run is a dry run, create or update a SyncPullRequest.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

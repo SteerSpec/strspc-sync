@@ -6,9 +6,9 @@
     "description": "The record of what template versions are deployed to which repositories."
   },
   "rule_set": {
-    "version": "0.9.0",
-    "timestamp": "2026-11-14T19:53:45Z",
-    "hash": "blake3:b03b52518af39af512343a92d2950c6e96a0f6c0d0cb96a21b08d9b299c4df5e"
+    "version": "0.8.0",
+    "timestamp": "2026-11-14T20:02:53Z",
+    "hash": "blake3:d2b57e94f1dabfd43d2ef384947a3ca1366663711c19f39aedac23a45913527a"
   },
   "rules": [
     {
@@ -32,7 +32,7 @@
     {
       "id": "DPLYST-003",
       "revision": 0,
-      "state": "I",
+      "state": "P",
       "body": "HAS per-repository records containing: deployed version, timestamp, PR number, and PR status.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
