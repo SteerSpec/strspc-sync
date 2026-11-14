@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.11.0",
-    "timestamp": "2026-11-09T16:25:30Z",
-    "hash": "blake3:06b7030aba9840aacfabfbbedd8089786e768ccd19ef860f171752b02f672883"
+    "version": "0.16.2",
+    "timestamp": "2026-11-13T20:02:45Z",
+    "hash": "blake3:630e3e1ae66172ca144672de220b9ede16eaaf600fc0e4fadd33e2053858cd3a"
   },
   "rules": [
     {
@@ -104,7 +104,7 @@
     {
       "id": "SYNCACT-011",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS an input `dry-run` (boolean, default: false) which when true prevents any PRs from being created or updated.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -122,7 +122,7 @@
     {
       "id": "SYNCACT-013",
       "revision": 1,
-      "state": "D",
+      "state": "P",
       "body": "HAS an input `template-filter` (string, optional) to limit sync to templates whose identifier matches any of a comma-separated list of glob patterns; a malformed pattern fails the run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -140,7 +140,7 @@
     {
       "id": "SYNCACT-015",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS an input `config-path` (string, default: \"steerspec-sync.yml\") to specify an alternate config file path.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -158,7 +158,7 @@
     {
       "id": "SYNCACT-017",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS an output `prs-updated` (integer) counting the number of existing PRs updated.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -166,18 +166,18 @@
     },
     {
       "id": "SYNCACT-018",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "HAS an output `repos-skipped` (integer) counting repositories that were already up to date.",
+      "body": "HAS an output `repos-skipped` (integer) counting the repository and template pairs that sync left unchanged without an error: already up to date, a symlinked destination, or a dry run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
     {
       "id": "SYNCACT-019",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "HAS an output `errors` (integer) counting repositories that encountered errors.",
+      "body": "HAS an output `errors` (integer) counting the repository and template pairs that failed, plus one when the DeploymentState could not be saved.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -185,7 +185,7 @@
     {
       "id": "SYNCACT-020",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS an output `summary` (JSON string) containing a detailed summary of the sync operation including per-repo results.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

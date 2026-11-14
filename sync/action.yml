@@ -55,10 +55,10 @@ outputs:
     description: 'Number of existing PRs updated'
     value: ${{ steps.run.outputs.prs-updated }}
   repos-skipped:
-    description: 'Number of repositories already up to date'
+    description: 'Repo and template pairs left unchanged without error (up to date, symlink, dry run)'
     value: ${{ steps.run.outputs.repos-skipped }}
   errors:
-    description: 'Number of repositories that encountered errors'
+    description: 'Repo and template pairs that failed, plus one if the deployment state was not saved'
     value: ${{ steps.run.outputs.errors }}
   summary:
     description: 'JSON summary of the operation'

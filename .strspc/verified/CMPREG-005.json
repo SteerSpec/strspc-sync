@@ -1,0 +1,38 @@
+{
+  "rule_id": "CMPREG-005",
+  "revision": 0,
+  "body_hash": "blake3:cfe8230fba1f4c2fef7924c058c9190be8cae995bdcc84b38c1f28c9b3087a4a",
+  "promoted_at": "2026-11-13T19:57:49Z",
+  "entity_version": "0.8.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "2ed2fcfc02b3226e267820c38504dd45e99c6510492f11aa59a06ac34ee13792",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The registry optionally resolves repositories by GitHub topic through an omitempty topics config key and a ListByTopic call, and e2e tests exercise it.",
+  "evidence": [
+    {
+      "file": "internal/registry/registry.go",
+      "line": 99,
+      "excerpt": "for _, topic := range targets.Topics {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 49,
+      "excerpt": "Topics    []string         `yaml:\"topics,omitempty\"`",
+      "line_confirmed": true,
+      "reported_line": 48
+    },
+    {
+      "file": "internal/github/repos.go",
+      "line": 55,
+      "excerpt": "func (s *repoService) ListByTopic(ctx context.Context, topic, org string) ([]*Repository, error) {",
+      "line_confirmed": true
+    }
+  ]
+}
