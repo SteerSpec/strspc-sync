@@ -1,0 +1,37 @@
+{
+  "rule_id": "CNFLACT-014",
+  "revision": 0,
+  "body_hash": "blake3:23ccb5afc6e718f4c651d47eaa3349af2b7db885600619fe32acd94d478a9557",
+  "promoted_at": "2026-11-14T10:04:24Z",
+  "entity_version": "0.20.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The conflict action declares an `info-count` output mapped from the run step. The CLI writes it as an integer string (via strconv.Itoa) from the info-severity summary count. GitHub outputs are strings, so the integer type cannot be expressed more strictly.",
+  "evidence": [
+    {
+      "file": "conflict/action.yml",
+      "line": 52,
+      "excerpt": "info-count:",
+      "line_confirmed": true
+    },
+    {
+      "file": "conflict/action.yml",
+      "line": 54,
+      "excerpt": "value: ${{ steps.run.outputs.info-count }}",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 414,
+      "excerpt": "setOutput(\"info-count\", strconv.Itoa(report.SeveritySummary.Info))",
+      "line_confirmed": true
+    }
+  ]
+}

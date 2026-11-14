@@ -1,0 +1,49 @@
+{
+  "rule_id": "CNFLACT-015",
+  "revision": 0,
+  "body_hash": "blake3:e58cd6cf7ad254e1a8434e70d7111e26ab3b4a3a682d1a1567c5dac99e281699",
+  "promoted_at": "2026-11-14T10:04:31Z",
+  "entity_version": "0.21.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The conflict action declares a `report` output described as the full ConflictReport JSON. It maps it to the step output, and the CLI marshals the entire report and writes it to GITHUB_OUTPUT. The root action exposes the same output, and a test asserts it.",
+  "evidence": [
+    {
+      "file": "conflict/action.yml",
+      "line": 55,
+      "excerpt": "report:",
+      "line_confirmed": false
+    },
+    {
+      "file": "conflict/action.yml",
+      "line": 56,
+      "excerpt": "description: 'Full ConflictReport as JSON'",
+      "line_confirmed": true
+    },
+    {
+      "file": "conflict/action.yml",
+      "line": 57,
+      "excerpt": "value: ${{ steps.run.outputs.report }}",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 416,
+      "excerpt": "setOutput(\"report\", string(reportJSON))",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 415,
+      "excerpt": "reportJSON, _ := json.Marshal(report)",
+      "line_confirmed": true
+    }
+  ]
+}

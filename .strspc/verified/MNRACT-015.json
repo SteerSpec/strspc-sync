@@ -1,0 +1,37 @@
+{
+  "rule_id": "MNRACT-015",
+  "revision": 0,
+  "body_hash": "blake3:55d23d8258f8231930d479905abcf6f5a292bf96aeaf1799c89951ee97cfb5da",
+  "promoted_at": "2026-11-14T10:03:22Z",
+  "entity_version": "0.23.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.8,
+  "explanation": "The monitor action (and the root action) declare an `issues-created` output, described as a count of new drift issues. It is set as an integer by strconv.Itoa(result.IssuesCreated), which is incremented per new issue. The sync action has no such output, but it creates PRs, not issues, so the rule's subject is the monitor.",
+  "evidence": [
+    {
+      "file": "monitor/action.yml",
+      "line": 45,
+      "excerpt": "issues-created:",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 340,
+      "excerpt": "setOutput(\"issues-created\", strconv.Itoa(result.IssuesCreated))",
+      "line_confirmed": true
+    },
+    {
+      "file": "monitor/action.yml",
+      "line": 46,
+      "excerpt": "description: 'Number of new drift issues created'",
+      "line_confirmed": true
+    }
+  ]
+}

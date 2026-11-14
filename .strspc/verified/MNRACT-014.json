@@ -1,0 +1,43 @@
+{
+  "rule_id": "MNRACT-014",
+  "revision": 0,
+  "body_hash": "blake3:afccb3b2d8c03d96aa3568fc0cea4217d9333e99ec78b7ffabdc42af8c133c2f",
+  "promoted_at": "2026-11-14T10:03:15Z",
+  "entity_version": "0.22.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The monitor action declares a `repos-drifted` output described as a count of drifted repos. The binary sets it as an integer via strconv.Itoa from len(driftedRepos). Action outputs are strings, so the integer type is satisfied by the numeric value.",
+  "evidence": [
+    {
+      "file": "monitor/action.yml",
+      "line": 42,
+      "excerpt": "repos-drifted:",
+      "line_confirmed": true
+    },
+    {
+      "file": "monitor/action.yml",
+      "line": 43,
+      "excerpt": "description: 'Number of repositories with detected drift'",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 339,
+      "excerpt": "setOutput(\"repos-drifted\", strconv.Itoa(result.ReposDrifted))",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 211,
+      "excerpt": "result.ReposDrifted = len(driftedRepos)",
+      "line_confirmed": true
+    }
+  ]
+}

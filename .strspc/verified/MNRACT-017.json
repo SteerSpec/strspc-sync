@@ -1,0 +1,43 @@
+{
+  "rule_id": "MNRACT-017",
+  "revision": 0,
+  "body_hash": "blake3:11975b175e7049366f4eaf1d10a52ff891023edc2b234f3306508b2a3abf45e4",
+  "promoted_at": "2026-11-14T10:03:37Z",
+  "entity_version": "0.25.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.8,
+  "explanation": "The monitor action declares a `summary` output wired to the run step, and the monitor command sets it to the JSON-serialized monitor Result, which lists drift entries and per-repo errors.",
+  "evidence": [
+    {
+      "file": "monitor/action.yml",
+      "line": 51,
+      "excerpt": "summary:",
+      "line_confirmed": true
+    },
+    {
+      "file": "monitor/action.yml",
+      "line": 53,
+      "excerpt": "value: ${{ steps.run.outputs.summary }}",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 343,
+      "excerpt": "setOutput(\"summary\", string(summaryJSON))",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 27,
+      "excerpt": "DriftEntries  []DriftEntry `json:\"drift_entries,omitempty\"`",
+      "line_confirmed": true
+    }
+  ]
+}

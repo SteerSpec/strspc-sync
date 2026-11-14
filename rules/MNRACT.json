@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.19.0",
-    "timestamp": "2026-11-13T19:44:39Z",
-    "hash": "blake3:7e2dba3211e568df4e261bdd0c2e24b23e7d8a88576de769ce74cbde998f7d5b"
+    "version": "0.25.0",
+    "timestamp": "2026-11-14T10:03:37Z",
+    "hash": "blake3:3a4ad37b9983776863a75563805fef57aea24fa4de5c45a542d6d4ffd18dabe1"
   },
   "rules": [
     {
@@ -104,7 +104,7 @@
     {
       "id": "MNRACT-011",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an input `config-path` (string, default: \"steerspec-sync.yml\") to specify an alternate config file path.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -122,7 +122,7 @@
     {
       "id": "MNRACT-013",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `repos-in-sync` (integer) counting repositories with current versions.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -131,7 +131,7 @@
     {
       "id": "MNRACT-014",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `repos-drifted` (integer) counting repositories with detected drift.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -140,7 +140,7 @@
     {
       "id": "MNRACT-015",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `issues-created` (integer) counting new issues created.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -149,7 +149,7 @@
     {
       "id": "MNRACT-016",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `issues-closed` (integer) counting drift issues auto-closed.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -158,7 +158,7 @@
     {
       "id": "MNRACT-017",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `summary` (JSON string) containing a detailed monitoring report.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

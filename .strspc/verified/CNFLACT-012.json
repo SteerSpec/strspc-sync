@@ -1,0 +1,37 @@
+{
+  "rule_id": "CNFLACT-012",
+  "revision": 0,
+  "body_hash": "blake3:3b0a01966e7403fa288f2166b89140d308a91f6084d7df32835fe99a4e1324ce",
+  "promoted_at": "2026-11-14T10:04:09Z",
+  "entity_version": "0.18.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The conflict action declares a `critical-count` output mapped from the step. The CLI sets it to an integer string from the critical severity count (strconv.Itoa), so the output exists and counts critical conflicts. GitHub action outputs are always strings, so the lack of an explicit integer type does not matter.",
+  "evidence": [
+    {
+      "file": "conflict/action.yml",
+      "line": 46,
+      "excerpt": "critical-count:",
+      "line_confirmed": true
+    },
+    {
+      "file": "conflict/action.yml",
+      "line": 48,
+      "excerpt": "value: ${{ steps.run.outputs.critical-count }}",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 412,
+      "excerpt": "setOutput(\"critical-count\", strconv.Itoa(report.SeveritySummary.Critical))",
+      "line_confirmed": true
+    }
+  ]
+}
