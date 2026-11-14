@@ -1,0 +1,37 @@
+{
+  "rule_id": "CNFLACT-005",
+  "revision": 0,
+  "body_hash": "blake3:76d4068c54ba5e7193bb52b974cd4125a94f2f8283878b5562a79dad3f21e8cb",
+  "promoted_at": "2026-11-14T10:36:17Z",
+  "entity_version": "0.23.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.95,
+  "explanation": "The conflict action runs the scanner, which returns a ConflictReport. The command prints it as JSON and exposes it as an action output.",
+  "evidence": [
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 208,
+      "excerpt": "func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, targets []string, opts Options) (*ConflictReport, error) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 409,
+      "excerpt": "printJSON(report, out)",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 416,
+      "excerpt": "setOutput(\"report\", string(reportJSON))",
+      "line_confirmed": true
+    }
+  ]
+}

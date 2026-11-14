@@ -1,0 +1,37 @@
+{
+  "rule_id": "CNFLENT-007",
+  "revision": 0,
+  "body_hash": "blake3:ef79c460a1b3e462115e7969381864b014968af2294bfc0fb0250f1fad3a9c84",
+  "promoted_at": "2026-11-14T10:36:17Z",
+  "entity_version": "0.7.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "SuggestedResolution is an optional omitempty field. Some entries set it and others, such as unmanaged files, do not, which matches MAY.",
+  "evidence": [
+    {
+      "file": "internal/conflict/report.go",
+      "line": 45,
+      "excerpt": "SuggestedResolution string       `json:\"suggested_resolution,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 304,
+      "excerpt": "if entry.SuggestedResolution != \"\" {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 198,
+      "excerpt": "Description: fmt.Sprintf(\"file %q exists but is not tracked in the deployment state for this repo\", p),",
+      "line_confirmed": true
+    }
+  ]
+}
