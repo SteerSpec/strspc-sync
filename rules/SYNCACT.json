@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.25.0",
-    "timestamp": "2026-11-14T10:13:14Z",
-    "hash": "blake3:9fcf7c74e197dbd46f799c4551b46252894b221133973ca152e0e299dc8620c5"
+    "version": "0.28.2",
+    "timestamp": "2026-11-14T10:41:28Z",
+    "hash": "blake3:ab45ea5af83e83f836afaf12883abee404c8f740433e2112eab5338ce2545c90"
   },
   "rules": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "SYNCACT-004",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST read the SyncManifest to determine templates and targets.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -50,7 +50,7 @@
     {
       "id": "SYNCACT-005",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST resolve target repositories via the GitHub API using the ComponentRegistry.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -59,7 +59,7 @@
     {
       "id": "SYNCACT-006",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "For each target repository, MUST check the DeploymentState to determine if an update is needed.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -67,18 +67,18 @@
     },
     {
       "id": "SYNCACT-007",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "For each out-of-date target, MUST render the template using the configured strategy and create or update a SyncPullRequest.",
+      "body": "For each out-of-date target, MUST render the template using the configured strategy and, unless the run is a dry run, create or update a SyncPullRequest.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
     },
     {
       "id": "SYNCACT-008",
-      "revision": 1,
+      "revision": 2,
       "state": "D",
-      "body": "MUST NOT fail the entire workflow when a single target repository fails.",
+      "body": "MUST continue processing the remaining target repositories when a single target repository fails, counting the failure in the `errors` output.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
