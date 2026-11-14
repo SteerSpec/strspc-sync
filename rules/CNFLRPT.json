@@ -7,8 +7,8 @@
   },
   "rule_set": {
     "version": "0.6.3",
-    "timestamp": "2026-11-14T10:14:40Z",
-    "hash": "blake3:00ebfa2885a390deb2e6c16b2c0f4c1c97a2f922d02c868abe5d5e084df8163d"
+    "timestamp": "2026-11-14T10:18:30Z",
+    "hash": "blake3:e97adb608848de892ebfb0a0b082389ae90c2a38549cb43090379569026eb6e8"
   },
   "rules": [
     {
@@ -68,8 +68,8 @@
       },
       "rule_set": {
         "version": "0.5.0",
-        "timestamp": "2026-11-14T10:14:40Z",
-        "hash": "blake3:bff946881f1bdb1809c75bc13d09deca200444d7b4b40ac32431412678d3bd05"
+        "timestamp": "2026-11-14T10:18:30Z",
+        "hash": "blake3:b2e0784d3ffa21869291cabcafd6a75b347e0c70b23c4314bdf1b7b0a4c7a70f"
       },
       "rules": [
         {
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.5.0",
-        "timestamp": "2026-11-14T10:14:40Z",
-        "hash": "blake3:f8c6231f37b6430bdda61410b317fcfa438437b634d4301d0e409c2e1c0189d0"
+        "version": "0.4.1",
+        "timestamp": "2026-11-14T10:18:30Z",
+        "hash": "blake3:3aabf6ac4a16105b87fd5f16819e0012675151412b33c98ce48b61402dadbc0f"
       },
       "rules": [
         {
@@ -254,9 +254,9 @@
         },
         {
           "id": "CNFLDTS-005",
-          "revision": 1,
-          "state": "P",
-          "body": "Tier 3 MUST NOT run unless the configuration explicitly opts into it.",
+          "revision": 2,
+          "state": "D",
+          "body": "Tier 3 MUST NOT run unless it is requested explicitly, either in the `conflicts.tiers` configuration or through the `tiers` action input (`--tiers`).",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
