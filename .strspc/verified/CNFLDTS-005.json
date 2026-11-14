@@ -1,0 +1,43 @@
+{
+  "rule_id": "CNFLDTS-005",
+  "revision": 2,
+  "body_hash": "blake3:6744cac7d1f068772e0e16399d74ec812bb5c8d7cbee92ec676c76b12f88d0a2",
+  "promoted_at": "2026-11-14T19:23:58Z",
+  "entity_version": "0.6.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Tier 3 runs only when it appears in the tiers list, which comes from `--tiers` or config. The default is [1,2] and the action input defaults to empty, so tier 3 is never run implicitly.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 178,
+      "excerpt": "cfg.Conflicts.Tiers = []int{1, 2}",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 216,
+      "excerpt": "tiers = s.cfg.Conflicts.Tiers",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 232,
+      "excerpt": "case 3:",
+      "line_confirmed": false
+    },
+    {
+      "file": "action.yml",
+      "line": 36,
+      "excerpt": "default: ''",
+      "line_confirmed": true
+    }
+  ]
+}

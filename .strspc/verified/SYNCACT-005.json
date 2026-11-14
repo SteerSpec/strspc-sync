@@ -1,0 +1,37 @@
+{
+  "rule_id": "SYNCACT-005",
+  "revision": 0,
+  "body_hash": "blake3:589904f9bba012ec9f7187703f1a19e190570409b893d34ec5f129927fb90ed0",
+  "promoted_at": "2026-11-14T19:23:59Z",
+  "entity_version": "0.30.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.92,
+  "explanation": "Targets are resolved through the registry backed by a GitHub lister that calls the GitHub API (org listing and topic search).",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 86,
+      "excerpt": "reg: registry.New(&registry.GitHubLister{Repos: ghClient.Repos}),",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 113,
+      "excerpt": "targets, err := s.reg.Resolve(ctx, s.cfg.Targets, s.cfg.Variables)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/registry/registry.go",
+      "line": 67,
+      "excerpt": "repos, err := r.lister.ListByOrg(ctx, org)",
+      "line_confirmed": true
+    }
+  ]
+}

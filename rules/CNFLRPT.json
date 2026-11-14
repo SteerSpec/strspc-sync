@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.9.3",
-    "timestamp": "2026-11-14T10:36:17Z",
-    "hash": "blake3:acebedac839e1664c7259604d3834db742b31ba7a6a689c081b677b43cde9f98"
+    "version": "0.9.4",
+    "timestamp": "2026-11-14T19:23:58Z",
+    "hash": "blake3:b1d62b37812977f1459fed31751a528dac1d2b13192bf7063f70ef1201683f0d"
   },
   "rules": [
     {
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.5.0",
-        "timestamp": "2026-11-14T10:36:17Z",
-        "hash": "blake3:193bd4b387a91d4d313f145f5b3a5abcbffe24a1594446cb4a85420dab30fd47"
+        "version": "0.6.0",
+        "timestamp": "2026-11-14T19:23:58Z",
+        "hash": "blake3:496fc151a68d79a3b1e79b8d44e5b0c85874f3d122e54d90279f6299268a59a4"
       },
       "rules": [
         {
@@ -255,7 +255,7 @@
         {
           "id": "CNFLDTS-005",
           "revision": 2,
-          "state": "P",
+          "state": "I",
           "body": "Tier 3 MUST NOT run unless it is requested explicitly, either in the `conflicts.tiers` configuration or through the `tiers` action input (`--tiers`).",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
