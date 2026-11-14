@@ -6,9 +6,9 @@
     "description": "A GitHub Action that detects conflicts and inconsistencies across target repositories."
   },
   "rule_set": {
-    "version": "0.21.0",
-    "timestamp": "2026-11-14T10:04:31Z",
-    "hash": "blake3:b4055c43d750fd822fa61897c577355271550b5a034913597d0170ad40006453"
+    "version": "0.22.0",
+    "timestamp": "2026-11-14T10:14:40Z",
+    "hash": "blake3:08ab8f36bf68b2dafdac39bd73e59234622c429a1856a340f23c1803b51986d9"
   },
   "rules": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "CNFLACT-005",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST produce a ConflictReport as output.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

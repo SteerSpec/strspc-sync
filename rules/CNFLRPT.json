@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.3.2",
-    "timestamp": "2026-11-09T14:37:56Z",
-    "hash": "blake3:6b9b5dbe620a4951d69542cdcdd40acad985136e1bdc567793b3d97350f66cdd"
+    "version": "0.6.3",
+    "timestamp": "2026-11-14T10:14:40Z",
+    "hash": "blake3:00ebfa2885a390deb2e6c16b2c0f4c1c97a2f922d02c868abe5d5e084df8163d"
   },
   "rules": [
     {
@@ -23,7 +23,7 @@
     {
       "id": "CNFLRPT-002",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS a UUID.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -32,7 +32,7 @@
     {
       "id": "CNFLRPT-003",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS a UTC timestamp.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -41,7 +41,7 @@
     {
       "id": "CNFLRPT-004",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS zero or more ConflictEntries.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -67,9 +67,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.3.0",
-        "timestamp": "2026-11-09T10:23:48Z",
-        "hash": "blake3:ae13ad4c84666e3dcb3cd590a66bf70f9cd5599004e602a5ddb3ee2b6dfe3022"
+        "version": "0.5.0",
+        "timestamp": "2026-11-14T10:14:40Z",
+        "hash": "blake3:bff946881f1bdb1809c75bc13d09deca200444d7b4b40ac32431412678d3bd05"
       },
       "rules": [
         {
@@ -120,7 +120,7 @@
         {
           "id": "CNFLENT-006",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "HAS a human-readable description of the conflict.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -129,7 +129,7 @@
         {
           "id": "CNFLENT-007",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "MAY have a suggested resolution.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.4.0",
-        "timestamp": "2026-11-09T14:37:56Z",
-        "hash": "blake3:9bc41d7a0ae1210e280576e4371800cfacd0addc85a17bf92c8530d83cccdbf0"
+        "version": "0.5.0",
+        "timestamp": "2026-11-14T10:14:40Z",
+        "hash": "blake3:f8c6231f37b6430bdda61410b317fcfa438437b634d4301d0e409c2e1c0189d0"
       },
       "rules": [
         {
@@ -255,7 +255,7 @@
         {
           "id": "CNFLDTS-005",
           "revision": 1,
-          "state": "D",
+          "state": "P",
           "body": "Tier 3 MUST NOT run unless the configuration explicitly opts into it.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

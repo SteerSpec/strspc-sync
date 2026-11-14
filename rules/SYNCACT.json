@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.23.0",
-    "timestamp": "2026-11-14T10:05:02Z",
-    "hash": "blake3:5795da4c39fec78686ea34eb1035a64407f13238d3c66186bad7c5bdbab5f69c"
+    "version": "0.25.0",
+    "timestamp": "2026-11-14T10:13:14Z",
+    "hash": "blake3:9fcf7c74e197dbd46f799c4551b46252894b221133973ca152e0e299dc8620c5"
   },
   "rules": [
     {
@@ -167,7 +167,7 @@
     {
       "id": "SYNCACT-018",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `repos-skipped` (integer) counting the repository and template pairs that sync left unchanged without an error: already up to date, a symlinked destination, or a dry run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -176,7 +176,7 @@
     {
       "id": "SYNCACT-019",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `errors` (integer) counting the repository and template pairs that failed, plus one when the DeploymentState could not be saved.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

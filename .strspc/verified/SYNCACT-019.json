@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCACT-019",
+  "revision": 1,
+  "body_hash": "blake3:7a3c26d1562e1cda5b0426c53057adc1cd9040be0b6cd4cde5e015347f49cf1f",
+  "promoted_at": "2026-11-14T10:13:14Z",
+  "entity_version": "0.25.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The root and sync actions declare an `errors` output. It is set from an integer count that rises once per failed repo/template pair and once more when saving the deployment state fails. Action outputs are strings in GitHub Actions, so the integer type is satisfied by the numeric value.",
+  "evidence": [
+    {
+      "file": "action.yml",
+      "line": 68,
+      "excerpt": "errors:",
+      "line_confirmed": false
+    },
+    {
+      "file": "sync/action.yml",
+      "line": 61,
+      "excerpt": "description: 'Repo and template pairs that failed, plus one if the deployment state was not saved'",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 289,
+      "excerpt": "setOutput(\"errors\", strconv.Itoa(result.Errors))",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 220,
+      "excerpt": "result.Errors++",
+      "line_confirmed": true
+    }
+  ]
+}

@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.33.0",
-    "timestamp": "2026-11-13T15:46:36Z",
-    "hash": "blake3:db5f8743273a7582b78a7823ac9e7af5e3edf95aa2219c98d70fd350ba5c60b2"
+    "version": "0.34.0",
+    "timestamp": "2026-11-14T10:14:40Z",
+    "hash": "blake3:20d7b6fb106e3b98f066b29449581ecbf8d2a7c41d0c40475addb289413c0071"
   },
   "rules": [
     {
@@ -221,7 +221,7 @@
     {
       "id": "SYNCCFG-024",
       "revision": 1,
-      "state": "D",
+      "state": "P",
       "body": "Tier 3 (LLM-assisted) MUST stay disabled unless the configuration explicitly enables it.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
