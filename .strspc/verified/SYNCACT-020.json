@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCACT-020",
+  "revision": 0,
+  "body_hash": "blake3:62093a78632812697ca5c769a6346f8a631e388eacb4fa1d6672dc8b7d186276",
+  "promoted_at": "2026-11-14T10:02:53Z",
+  "entity_version": "0.21.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The sync action and root action declare a `summary` output mapped from the run step. The binary writes the sync result JSON to that output, and the result includes per-repo results (`repo_results`), as the tests confirm.",
+  "evidence": [
+    {
+      "file": "sync/action.yml",
+      "line": 63,
+      "excerpt": "summary:",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 291,
+      "excerpt": "setOutput(\"summary\", string(summaryJSON))",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 42,
+      "excerpt": "RepoResults []RepoResult `json:\"repo_results\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/e2e/harness/harness_test.go",
+      "line": 56,
+      "excerpt": "\"repo_results\":[{\"repo\":\"o/strspc-e2e-public\",\"status\":\"pr_created\"",
+      "line_confirmed": true
+    }
+  ]
+}

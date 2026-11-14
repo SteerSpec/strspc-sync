@@ -1,0 +1,50 @@
+{
+  "rule_id": "SYNCACT-017",
+  "revision": 0,
+  "body_hash": "blake3:df94741bb15757013e1c53fc9cafcaff4b76a9dfc463d4bf26f457b5b22d9bd7",
+  "promoted_at": "2026-11-14T10:02:45Z",
+  "entity_version": "0.20.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The root action and the sync sub-action both declare a `prs-updated` output described as the number of existing PRs updated. The CLI sets it from an integer count, written as a string, which is the only form action outputs allow. The count is tallied in sync.go.",
+  "evidence": [
+    {
+      "file": "action.yml",
+      "line": 62,
+      "excerpt": "prs-updated:",
+      "line_confirmed": true
+    },
+    {
+      "file": "action.yml",
+      "line": 63,
+      "excerpt": "description: 'Number of existing PRs updated'",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 287,
+      "excerpt": "setOutput(\"prs-updated\", strconv.Itoa(result.PRsUpdated))",
+      "line_confirmed": true
+    },
+    {
+      "file": "sync/action.yml",
+      "line": 54,
+      "excerpt": "prs-updated:",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 196,
+      "excerpt": "result.PRsUpdated++",
+      "line_confirmed": true,
+      "reported_line": 195
+    }
+  ]
+}

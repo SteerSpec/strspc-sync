@@ -6,9 +6,9 @@
     "description": "A GitHub Action that detects conflicts and inconsistencies across target repositories."
   },
   "rule_set": {
-    "version": "0.14.0",
-    "timestamp": "2026-11-13T19:44:39Z",
-    "hash": "blake3:d56bcf05180efd56a657d10e1625ca1372bae6092f30fcfb26ff46f71261e127"
+    "version": "0.21.0",
+    "timestamp": "2026-11-14T10:04:31Z",
+    "hash": "blake3:b4055c43d750fd822fa61897c577355271550b5a034913597d0170ad40006453"
   },
   "rules": [
     {
@@ -77,7 +77,7 @@
     {
       "id": "CNFLACT-008",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an input `config-path` (string, default: \"steerspec-sync.yml\") to specify an alternate config file path.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -95,7 +95,7 @@
     {
       "id": "CNFLACT-010",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "HAS an input `tiers` (string, optional) to override the configured detection tiers.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -104,7 +104,7 @@
     {
       "id": "CNFLACT-011",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `conflicts-found` (integer) counting total conflicts detected.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -113,7 +113,7 @@
     {
       "id": "CNFLACT-012",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `critical-count` (integer) counting critical-severity conflicts.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -122,7 +122,7 @@
     {
       "id": "CNFLACT-013",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `warning-count` (integer) counting warning-severity conflicts.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -131,7 +131,7 @@
     {
       "id": "CNFLACT-014",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `info-count` (integer) counting info-severity conflicts.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -140,7 +140,7 @@
     {
       "id": "CNFLACT-015",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS an output `report` (JSON string) containing the full ConflictReport.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

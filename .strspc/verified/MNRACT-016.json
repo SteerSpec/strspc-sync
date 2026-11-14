@@ -1,0 +1,43 @@
+{
+  "rule_id": "MNRACT-016",
+  "revision": 0,
+  "body_hash": "blake3:ffd5b40e035746b4a4e2f0a93f0ee37e5aa05c723aea176ef7142fe294f9792d",
+  "promoted_at": "2026-11-14T10:03:28Z",
+  "entity_version": "0.24.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The monitor action declares an `issues-closed` output described as the number of auto-closed drift issues. The binary sets it as an integer from a counter incremented on each auto-close, and the root action passes it through.",
+  "evidence": [
+    {
+      "file": "monitor/action.yml",
+      "line": 48,
+      "excerpt": "issues-closed:",
+      "line_confirmed": true
+    },
+    {
+      "file": "monitor/action.yml",
+      "line": 49,
+      "excerpt": "description: 'Number of drift issues auto-closed'",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 341,
+      "excerpt": "setOutput(\"issues-closed\", strconv.Itoa(result.IssuesClosed))",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 183,
+      "excerpt": "result.IssuesClosed++",
+      "line_confirmed": true
+    }
+  ]
+}

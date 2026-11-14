@@ -1,0 +1,37 @@
+{
+  "rule_id": "CNFLACT-008",
+  "revision": 0,
+  "body_hash": "blake3:7574e0da983e63c97729546af9737711e8dc32ba2ccb07b77633e60420aaef0d",
+  "promoted_at": "2026-11-14T10:03:46Z",
+  "entity_version": "0.15.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.95,
+  "explanation": "The conflict action declares a `config-path` input with default 'steerspec-sync.yml' and passes it to the CLI via --config.",
+  "evidence": [
+    {
+      "file": "conflict/action.yml",
+      "line": 10,
+      "excerpt": "config-path:",
+      "line_confirmed": true
+    },
+    {
+      "file": "conflict/action.yml",
+      "line": 13,
+      "excerpt": "default: 'steerspec-sync.yml'",
+      "line_confirmed": true
+    },
+    {
+      "file": "conflict/action.yml",
+      "line": 113,
+      "excerpt": "args=(conflict --config \"$STRSPC_INPUT_CONFIG_PATH\")",
+      "line_confirmed": true
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "rule_id": "MNRACT-013",
+  "revision": 0,
+  "body_hash": "blake3:56f7a536a375ca701d3e17a7bfc14288ad56cb41098ba70bcdf427cddfb4b23c",
+  "promoted_at": "2026-11-14T10:03:08Z",
+  "entity_version": "0.21.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.8,
+  "explanation": "The root action and the monitor sub-action both declare a `repos-in-sync` output. The binary sets it as an integer count of repos with current versions, and action outputs are strings by platform design. The sync sub-action lacks it, but sync is a different command with no such count.",
+  "evidence": [
+    {
+      "file": "action.yml",
+      "line": 72,
+      "excerpt": "repos-in-sync:",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 338,
+      "excerpt": "setOutput(\"repos-in-sync\", strconv.Itoa(result.ReposInSync))",
+      "line_confirmed": true
+    },
+    {
+      "file": "monitor/action.yml",
+      "line": 39,
+      "excerpt": "repos-in-sync:",
+      "line_confirmed": true
+    }
+  ]
+}
