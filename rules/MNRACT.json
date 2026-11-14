@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.25.0",
-    "timestamp": "2026-11-14T10:03:37Z",
-    "hash": "blake3:3a4ad37b9983776863a75563805fef57aea24fa4de5c45a542d6d4ffd18dabe1"
+    "version": "0.26.2",
+    "timestamp": "2026-11-14T19:25:17Z",
+    "hash": "blake3:e49f854c281e3265c1125a7a243b9ab9079c96e0934ad85eb868a3a199e5d7fe"
   },
   "rules": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "MNRACT-004",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST read the DeploymentState to determine expected template versions per repository.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -58,9 +58,9 @@
     },
     {
       "id": "MNRACT-006",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "MUST create a GitHub issue in the central repository for each out-of-sync target repository.",
+      "body": "MUST keep one open GitHub issue in the central repository for each drifted repository and template pair, creating it when none is open and updating it otherwise.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
@@ -94,9 +94,9 @@
     },
     {
       "id": "MNRACT-010",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "Each drift issue MUST include: repository name, template identifier, expected version, actual version (or hash), link to related PR, and time since drift was first detected.",
+      "body": "Each drift issue MUST include: repository name, template identifier, expected version, actual version (or hash), a link to the related PR when one is recorded, and when the drift was first detected.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null

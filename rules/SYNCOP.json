@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.7.2",
-    "timestamp": "2026-11-14T10:41:28Z",
-    "hash": "blake3:afe084a77ce9c307a28d6b4c34bd3b967f24b90430b77ed92dc2d81bf6e68ea0"
+    "version": "0.7.3",
+    "timestamp": "2026-11-14T19:23:59Z",
+    "hash": "blake3:83267d62dc09a9ff07e1c40af8aa21a5802c53413c6221c5ef3b96d1f0caebaa"
   },
   "rules": [
     {
@@ -103,9 +103,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.11.1",
-        "timestamp": "2026-11-14T10:41:28Z",
-        "hash": "blake3:87a648124d6eb01bfbc0726c5b4e693c8601f9472e94548c85cb7ab0801f1f83"
+        "version": "0.12.0",
+        "timestamp": "2026-11-14T19:23:59Z",
+        "hash": "blake3:0561d0fd1793bfb40903af2d003b302a64a85a33b9e83ba0acfa2208806d93d5"
       },
       "rules": [
         {
@@ -138,7 +138,7 @@
         {
           "id": "SYNCPR-004",
           "revision": 1,
-          "state": "D",
+          "state": "P",
           "body": "MUST be labeled with a configurable label (default: `steerspec-sync`) when it is created.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
