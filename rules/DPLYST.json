@@ -6,9 +6,9 @@
     "description": "The record of what template versions are deployed to which repositories."
   },
   "rule_set": {
-    "version": "0.8.0",
-    "timestamp": "2026-11-14T20:02:53Z",
-    "hash": "blake3:d2b57e94f1dabfd43d2ef384947a3ca1366663711c19f39aedac23a45913527a"
+    "version": "0.7.0",
+    "timestamp": "2026-11-14T20:06:29Z",
+    "hash": "blake3:884bba0a45bcef96595e5ebd1669d9b11f6e00d669aaeccb3cfa9421ea436d1f"
   },
   "rules": [
     {
@@ -59,7 +59,7 @@
     {
       "id": "DPLYST-006",
       "revision": 0,
-      "state": "I",
+      "state": "P",
       "body": "For a template using the marker strategy, a per-repository record HAS the names of the sections the template manages and the Blake3 hash of those sections in the deployed file.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",

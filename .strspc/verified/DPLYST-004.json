@@ -2,7 +2,7 @@
   "rule_id": "DPLYST-004",
   "revision": 1,
   "body_hash": "blake3:7b84ccaf20e6b8c5cd3549470464f1f22724cfb80bf1cb52debe1eee3f95ec66",
-  "promoted_at": "2026-11-14T20:02:53Z",
+  "promoted_at": "2026-11-14T20:06:29Z",
   "entity_version": "0.7.0",
   "scope": "all tracked files",
   "files": 148,
