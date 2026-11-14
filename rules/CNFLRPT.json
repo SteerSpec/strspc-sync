@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.9.4",
-    "timestamp": "2026-11-14T19:23:58Z",
-    "hash": "blake3:b1d62b37812977f1459fed31751a528dac1d2b13192bf7063f70ef1201683f0d"
+    "version": "0.9.6",
+    "timestamp": "2026-11-14T19:55:21Z",
+    "hash": "blake3:f08457085496effc4356233c17a0ec16164ca33324919440443730c80d53d473"
   },
   "rules": [
     {
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.6.0",
-        "timestamp": "2026-11-14T19:23:58Z",
-        "hash": "blake3:496fc151a68d79a3b1e79b8d44e5b0c85874f3d122e54d90279f6299268a59a4"
+        "version": "0.8.0",
+        "timestamp": "2026-11-14T19:55:21Z",
+        "hash": "blake3:7507a7a293b7288e5213fcc54fbc0813f387e6ace48d21524d9b13183536f877"
       },
       "rules": [
         {
@@ -228,7 +228,7 @@
         {
           "id": "CNFLDTS-002",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "Tier 1 (deterministic) MUST include: version drift detection via hash comparison, missing file references, and unmanaged file detection.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -237,7 +237,7 @@
         {
           "id": "CNFLDTS-003",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "Tier 2 (heuristic) MUST include: duplicate skill detection via filename and content hash comparison, and section overlap detection between managed files.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

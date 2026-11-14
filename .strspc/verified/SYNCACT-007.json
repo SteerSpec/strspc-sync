@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCACT-007",
+  "revision": 1,
+  "body_hash": "blake3:addcb5dc73e26ea68ad928ebf7f8ed86070c669a201d3008bb0be58a36b5ac7b",
+  "promoted_at": "2026-11-14T19:53:45Z",
+  "entity_version": "0.34.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Sync renders each target with the configured strategy, skips up-to-date targets, and either skips PRs on dry run or creates or updates a PR.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 322,
+      "excerpt": "rendered, err := template.Render(template.Strategy(tmpl.Strategy), templateContent, existingContent, vars)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 375,
+      "excerpt": "if dryRun {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 475,
+      "excerpt": "pr, err = s.ghClient.PullRequests.Create(ctx, owner, repo, &gh.PullRequestCreate{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 461,
+      "excerpt": "err = s.ghClient.PullRequests.Update(ctx, owner, repo, pr.Number, &gh.PullRequestUpdate{",
+      "line_confirmed": true
+    }
+  ]
+}

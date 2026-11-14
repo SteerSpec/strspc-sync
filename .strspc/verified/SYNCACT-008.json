@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCACT-008",
+  "revision": 2,
+  "body_hash": "blake3:da753752f9d0920a3bb2c15145be77f68d3cd18b9e9dc585d09e047bd2f74ad2",
+  "promoted_at": "2026-11-14T19:53:45Z",
+  "entity_version": "0.35.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.88,
+  "explanation": "Per-target failures are recorded as an error status without aborting the run, counted in result.Errors, and exposed in the errors output. A test covers per-repo isolation.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 266,
+      "excerpt": "rr.Status = \"error\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 199,
+      "excerpt": "case \"error\":",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 289,
+      "excerpt": "setOutput(\"errors\", strconv.Itoa(result.Errors))",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync_test.go",
+      "line": 517,
+      "excerpt": "func TestPerRepoErrorIsolation(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}

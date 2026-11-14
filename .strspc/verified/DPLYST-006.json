@@ -1,0 +1,49 @@
+{
+  "rule_id": "DPLYST-006",
+  "revision": 0,
+  "body_hash": "blake3:b4ed1b870bc2f83520cd2ecd412dd63eceb3dd8a9c2dc84fb9ba9cb70e92d93e",
+  "promoted_at": "2026-11-14T19:53:45Z",
+  "entity_version": "0.9.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.92,
+  "explanation": "Marker-strategy records store the managed section names and a Blake3 hash of those sections, computed via hash.HashBytes and recorded by sync.",
+  "evidence": [
+    {
+      "file": "internal/state/state.go",
+      "line": 34,
+      "excerpt": "Sections     []string `json:\"sections,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/state/state.go",
+      "line": 35,
+      "excerpt": "SectionsHash string   `json:\"sections_hash,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 513,
+      "excerpt": "Sections:        managed.names,",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 514,
+      "excerpt": "SectionsHash:    managed.hash,",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/template/sections.go",
+      "line": 46,
+      "excerpt": "return hash.HashBytes(bytes.Join(parts, []byte(\"\\n\"))), true",
+      "line_confirmed": true
+    }
+  ]
+}
