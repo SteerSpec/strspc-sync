@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.33.0",
-    "timestamp": "2026-11-13T15:46:36Z",
-    "hash": "blake3:db5f8743273a7582b78a7823ac9e7af5e3edf95aa2219c98d70fd350ba5c60b2"
+    "version": "0.33.1",
+    "timestamp": "2026-11-14T10:18:30Z",
+    "hash": "blake3:e9cddb7d7acab545fbd295b52b0058295af59810ffb4f2328e3a84bf8b30009f"
   },
   "rules": [
     {
@@ -220,9 +220,9 @@
     },
     {
       "id": "SYNCCFG-024",
-      "revision": 1,
+      "revision": 2,
       "state": "D",
-      "body": "Tier 3 (LLM-assisted) MUST stay disabled unless the configuration explicitly enables it.",
+      "body": "The default `conflicts.tiers` value MUST NOT include tier 3 (LLM-assisted), so tier 3 runs only when the configuration or the `tiers` action input requests it explicitly.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
