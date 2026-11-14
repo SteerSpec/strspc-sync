@@ -1,0 +1,37 @@
+{
+  "rule_id": "CNFLENT-006",
+  "revision": 0,
+  "body_hash": "blake3:57b44727fc047ac8b389b1492c19d0f272ad388caf9991bb8e96c1ab5d7ebf4b",
+  "promoted_at": "2026-11-14T10:36:17Z",
+  "entity_version": "0.6.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.95,
+  "explanation": "ConflictEntry has an always-serialized Description field. Every tier populates it with a human-readable message.",
+  "evidence": [
+    {
+      "file": "internal/conflict/report.go",
+      "line": 44,
+      "excerpt": "Description         string       `json:\"description\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 79,
+      "excerpt": "Description:         fmt.Sprintf(\"template %q has drifted: expected hash %s, got %s\", templateID, expected, actual),",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 127,
+      "excerpt": "Description:         fmt.Sprintf(\"STEERSPEC section %q appears in both %s and %s\", sectionID, existing, tmpl.Destination),",
+      "line_confirmed": true
+    }
+  ]
+}

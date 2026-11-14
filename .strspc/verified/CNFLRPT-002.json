@@ -1,0 +1,31 @@
+{
+  "rule_id": "CNFLRPT-002",
+  "revision": 0,
+  "body_hash": "blake3:f0d3e45ab03a6063c0803653c248322f80ee7eb4f1a9972f03f1292010e0088a",
+  "promoted_at": "2026-11-14T10:36:16Z",
+  "entity_version": "0.7.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The ConflictReport has an ID field, and Run assigns it a freshly generated UUID. The harness fixture's \"c1\" is only test input and does not affect production behavior.",
+  "evidence": [
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 210,
+      "excerpt": "ID:        uuid.New().String(),",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 28,
+      "excerpt": "ID              string          `json:\"id\"`",
+      "line_confirmed": true
+    }
+  ]
+}

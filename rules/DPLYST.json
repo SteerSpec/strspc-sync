@@ -6,9 +6,9 @@
     "description": "The record of what template versions are deployed to which repositories."
   },
   "rule_set": {
-    "version": "0.1.2",
-    "timestamp": "2026-11-07T19:04:52Z",
-    "hash": "blake3:3790e5e86f633caaf69ceca8b81ae47acfdad5124e28c6ee45687bab25a8ba5c"
+    "version": "0.2.1",
+    "timestamp": "2026-11-14T10:41:28Z",
+    "hash": "blake3:7aa2137f1a3665c3b81e827afe84259371d158923fc70378722ef1b1c6cab5bd"
   },
   "rules": [
     {
@@ -23,7 +23,7 @@
     {
       "id": "DPLYST-002",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST be stored as JSON at `.steerspec/deployment-state.json` in the central repository.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -40,9 +40,9 @@
     },
     {
       "id": "DPLYST-004",
-      "revision": 0,
+      "revision": 1,
       "state": "D",
-      "body": "MUST be updated after each SyncOperation.",
+      "body": "MUST be updated after each SyncOperation that is not a dry run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null

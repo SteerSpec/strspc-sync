@@ -1,0 +1,37 @@
+{
+  "rule_id": "CNFLRPT-004",
+  "revision": 0,
+  "body_hash": "blake3:45a806990bc8e31b8d0d15d3cb35ff68c7f53eeff61d15c3c78c0abff3164134",
+  "promoted_at": "2026-11-14T10:36:17Z",
+  "entity_version": "0.9.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The report holds a slice of ConflictEntry that can be empty or hold one or more entries. Tests exercise both the zero-entry and the one-entry cases.",
+  "evidence": [
+    {
+      "file": "internal/conflict/report.go",
+      "line": 30,
+      "excerpt": "Entries         []ConflictEntry `json:\"entries\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 247,
+      "excerpt": "report.Entries = append(report.Entries, entries...)",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/e2e/monitor_conflict_test.go",
+      "line": 263,
+      "excerpt": "len(rep.Entries) != 0",
+      "line_confirmed": true
+    }
+  ]
+}
