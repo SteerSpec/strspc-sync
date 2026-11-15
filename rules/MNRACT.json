@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.33.0",
-    "timestamp": "2026-11-15T18:41:12Z",
-    "hash": "blake3:20bc0cc00d9a90bc09fb75b0548b033ab4eb8a2598e394ccdedc3d5bd6b5c556"
+    "version": "0.32.0",
+    "timestamp": "2026-11-15T18:47:10Z",
+    "hash": "blake3:c7fd72538c1526a100f4e0b44156eda9057434afd269c4fef3554d8050408697"
   },
   "rules": [
     {
@@ -59,7 +59,7 @@
     {
       "id": "MNRACT-006",
       "revision": 1,
-      "state": "I",
+      "state": "P",
       "body": "MUST keep one open GitHub issue in the central repository for each drifted repository and template pair, creating it when none is open and updating it otherwise.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
