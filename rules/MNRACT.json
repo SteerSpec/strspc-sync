@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.30.0",
-    "timestamp": "2026-11-14T19:55:21Z",
-    "hash": "blake3:791b01d6d42f6ec1c3d53d9fc7818aaa0be56e329b0dd129c185994d8fd7c434"
+    "version": "0.33.0",
+    "timestamp": "2026-11-15T18:41:12Z",
+    "hash": "blake3:20bc0cc00d9a90bc09fb75b0548b033ab4eb8a2598e394ccdedc3d5bd6b5c556"
   },
   "rules": [
     {
@@ -59,7 +59,7 @@
     {
       "id": "MNRACT-006",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "MUST keep one open GitHub issue in the central repository for each drifted repository and template pair, creating it when none is open and updating it otherwise.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -68,7 +68,7 @@
     {
       "id": "MNRACT-007",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST link created issues to existing SyncPullRequests when applicable.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -95,7 +95,7 @@
     {
       "id": "MNRACT-010",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "Each drift issue MUST include: repository name, template identifier, expected version, actual version (or hash), a link to the related PR when one is recorded, and when the drift was first detected.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

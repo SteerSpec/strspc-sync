@@ -1,0 +1,37 @@
+{
+  "rule_id": "CNFLDTS-003",
+  "revision": 0,
+  "body_hash": "blake3:803406f57ba03b8259e008b013c7face0cec8a9d3a772576feef07535beff761",
+  "promoted_at": "2026-11-15T18:41:12Z",
+  "entity_version": "0.10.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.92,
+  "explanation": "Tier 2 implements duplicate skill detection using filename and content hash, plus section overlap detection between managed files, with e2e coverage.",
+  "evidence": [
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 39,
+      "excerpt": "func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([]ConflictEntry, error) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 63,
+      "excerpt": "hash: hash.HashBytes(content),",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 96,
+      "excerpt": "func (s *Scanner) checkSectionOverlap(ctx context.Context, targets []string) ([]ConflictEntry, error) {",
+      "line_confirmed": true
+    }
+  ]
+}

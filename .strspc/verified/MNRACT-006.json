@@ -1,0 +1,43 @@
+{
+  "rule_id": "MNRACT-006",
+  "revision": 1,
+  "body_hash": "blake3:71786b60d009659954a133173748fffce1da0180990536db279f5fe4ad39a129",
+  "promoted_at": "2026-11-15T18:41:11Z",
+  "entity_version": "0.31.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The monitor lists open issues in the central repo and looks up an existing one by a fingerprint keyed on repo+template pair. It updates the issue if found and creates one otherwise, with tests and e2e coverage showing no duplicates.",
+  "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 153,
+      "excerpt": "existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 226,
+      "excerpt": "m.ghClient.Issues.Update(ctx, m.centralOwner, m.centralRepo, existing.Number, &gh.IssueUpdate{Body: &body})",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 233,
+      "excerpt": "iss, err := m.ghClient.Issues.Create(ctx, m.centralOwner, m.centralRepo, &gh.IssueCreate{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 295,
+      "excerpt": "func driftFingerprint(repo, templateID string) string {",
+      "line_confirmed": true
+    }
+  ]
+}

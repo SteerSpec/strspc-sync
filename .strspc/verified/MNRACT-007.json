@@ -1,0 +1,37 @@
+{
+  "rule_id": "MNRACT-007",
+  "revision": 0,
+  "body_hash": "blake3:85e8177b632f63c58bf33dcd39df1a27cfaa5d4f02fbeaab8a4558a8a83fb02c",
+  "promoted_at": "2026-11-15T18:41:11Z",
+  "entity_version": "0.32.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "Drift issues created by the monitor include a link to the sync PR when a PR number exists in state, and a unit test covers this.",
+  "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 283,
+      "excerpt": "fmt.Fprintf(&b, \"**PR:** %s#%d\\n\", e.Repo, e.PRNumber)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 163,
+      "excerpt": "PRNumber        ts.PRNumber,",
+      "line_confirmed": false
+    },
+    {
+      "file": "internal/monitor/monitor_test.go",
+      "line": 709,
+      "excerpt": "func TestDriftIssue_LinksPRInTargetRepo(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}
