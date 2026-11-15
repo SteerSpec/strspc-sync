@@ -6,9 +6,9 @@
     "description": "The central configuration for synchronizing AI configuration files across a GitHub organization."
   },
   "rule_set": {
-    "version": "0.1.5",
-    "timestamp": "2026-11-12T12:07:50Z",
-    "hash": "blake3:b0699551dcc74c7c5132a77502cc82515d62159bcd4473381d71a4accb623281"
+    "version": "0.4.0",
+    "timestamp": "2026-11-14T19:55:21Z",
+    "hash": "blake3:949e184f9400bf594792ec3eb5448723fd9243e003902590ce29afe4def18325"
   },
   "rules": [
     {
@@ -32,7 +32,7 @@
     {
       "id": "SYNCMFST-003",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST define at least one Template.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -41,7 +41,7 @@
     {
       "id": "SYNCMFST-004",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MUST define a ComponentRegistry.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -68,7 +68,7 @@
     {
       "id": "SYNCMFST-007",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "MAY define global template variables.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

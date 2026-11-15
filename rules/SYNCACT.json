@@ -6,9 +6,9 @@
     "description": "A GitHub Action that synchronizes templates from the central repository to target repositories."
   },
   "rule_set": {
-    "version": "0.33.0",
-    "timestamp": "2026-11-14T19:23:59Z",
-    "hash": "blake3:797d433b6d169e6ad4c85976efa878e422f5cab68bc6fa0c596f5b249efcb9d1"
+    "version": "0.34.0",
+    "timestamp": "2026-11-14T20:02:53Z",
+    "hash": "blake3:ca442e339638425d32abb65b9241c2e6d46713827faa07866ed590d8546690fa"
   },
   "rules": [
     {
@@ -77,7 +77,7 @@
     {
       "id": "SYNCACT-008",
       "revision": 2,
-      "state": "P",
+      "state": "I",
       "body": "MUST continue processing the remaining target repositories when a single target repository fails, counting the failure in the `errors` output.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

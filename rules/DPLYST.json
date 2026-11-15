@@ -6,9 +6,9 @@
     "description": "The record of what template versions are deployed to which repositories."
   },
   "rule_set": {
-    "version": "0.6.0",
-    "timestamp": "2026-11-14T19:25:17Z",
-    "hash": "blake3:d7f45b9bf8f8fd3e5b074d87328df075351d6fed01515ffc1a4aa12045dcb29b"
+    "version": "0.7.0",
+    "timestamp": "2026-11-14T20:06:29Z",
+    "hash": "blake3:884bba0a45bcef96595e5ebd1669d9b11f6e00d669aaeccb3cfa9421ea436d1f"
   },
   "rules": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "DPLYST-004",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "MUST be updated after each SyncOperation that is not a dry run.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
