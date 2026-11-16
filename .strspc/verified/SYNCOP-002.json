@@ -1,0 +1,31 @@
+{
+  "rule_id": "SYNCOP-002",
+  "revision": 0,
+  "body_hash": "blake3:f0d3e45ab03a6063c0803653c248322f80ee7eb4f1a9972f03f1292010e0088a",
+  "promoted_at": "2026-11-16T16:15:00Z",
+  "entity_version": "0.11.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Each sync Result carries an ID field populated with a freshly generated UUID in Run.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 95,
+      "excerpt": "ID:        uuid.New().String(),",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 29,
+      "excerpt": "ID        string    `json:\"id\"`",
+      "line_confirmed": true
+    }
+  ]
+}
