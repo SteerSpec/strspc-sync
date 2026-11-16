@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.37.0",
-    "timestamp": "2026-11-14T19:23:59Z",
-    "hash": "blake3:8d4c449897f1c5e6f43d56b31c38996c596c7bce680319d0455542f40a63b6b2"
+    "version": "0.39.0",
+    "timestamp": "2026-11-15T18:42:26Z",
+    "hash": "blake3:44545f7890165362ddb148d19ccbf5dd6ef5891be51bd75932c5efffe6c34e14"
   },
   "rules": [
     {
@@ -176,7 +176,7 @@
     {
       "id": "SYNCCFG-019",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "The `monitor` section MAY define `schedule` as a cron expression (default: \"0 8 * * 1\" -- weekly Monday 08:00 UTC).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -203,7 +203,7 @@
     {
       "id": "SYNCCFG-022",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "The `conflicts` section MAY define `schedule` as a cron expression (default: \"0 9 * * 1\" -- weekly Monday 09:00 UTC).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

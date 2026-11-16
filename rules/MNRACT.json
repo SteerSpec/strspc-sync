@@ -6,9 +6,9 @@
     "description": "A GitHub Action that monitors target repositories for synchronization drift."
   },
   "rule_set": {
-    "version": "0.30.0",
-    "timestamp": "2026-11-14T19:55:21Z",
-    "hash": "blake3:791b01d6d42f6ec1c3d53d9fc7818aaa0be56e329b0dd129c185994d8fd7c434"
+    "version": "0.32.0",
+    "timestamp": "2026-11-16T15:54:13Z",
+    "hash": "blake3:0770cc6d49ef027010e5d91bf21e6cf82fab78196628c15a70d957f392dc064c"
   },
   "rules": [
     {
@@ -68,7 +68,7 @@
     {
       "id": "MNRACT-007",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "MUST link created issues to existing SyncPullRequests when applicable.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -95,7 +95,7 @@
     {
       "id": "MNRACT-010",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "Each drift issue MUST include: repository name, template identifier, expected version, actual version (or hash), a link to the related PR when one is recorded, and when the drift was first detected.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

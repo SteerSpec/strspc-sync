@@ -1,0 +1,55 @@
+{
+  "rule_id": "MNRACT-010",
+  "revision": 1,
+  "body_hash": "blake3:177f34559b2bd9765b5d723049adfe649110625109de7b1c456212a920bb5248",
+  "promoted_at": "2026-11-16T15:54:13Z",
+  "entity_version": "0.32.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "977044a08ea52b5a109425aaddd86e7975d81cbd62de370efcd0a3e4de9de492",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "driftIssueBody always writes repository, template id, expected version, and the actual hash (with a placeholder when empty). It adds a PR link when a PR is recorded and includes the first-detected timestamp. The rule is met.",
+  "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 272,
+      "excerpt": "fmt.Fprintf(&b, \"**Repository:** `%s`\\n\", e.Repo)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 273,
+      "excerpt": "fmt.Fprintf(&b, \"**Template:** `%s`\\n\", e.TemplateID)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 274,
+      "excerpt": "fmt.Fprintf(&b, \"**Expected Version:** `%s`\\n\", e.ExpectedVersion)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 277,
+      "excerpt": "fmt.Fprintf(&b, \"**Actual Hash:** `%s`\\n\", e.ActualHash)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 283,
+      "excerpt": "fmt.Fprintf(&b, \"**PR:** %s#%d\\n\", e.Repo, e.PRNumber)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 285,
+      "excerpt": "fmt.Fprintf(&b, \"%s%s\\n\", firstDetectedPrefix, e.FirstDetected.UTC().Format(time.RFC3339))",
+      "line_confirmed": true
+    }
+  ]
+}
