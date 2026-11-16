@@ -2,7 +2,7 @@
   "rule_id": "MNRACT-007",
   "revision": 0,
   "body_hash": "blake3:85e8177b632f63c58bf33dcd39df1a27cfaa5d4f02fbeaab8a4558a8a83fb02c",
-  "promoted_at": "2026-11-15T18:47:10Z",
+  "promoted_at": "2026-11-16T15:53:58Z",
   "entity_version": "0.31.0",
   "scope": "all tracked files",
   "files": 148,
@@ -13,19 +13,19 @@
   "min_confidence": 0.8,
   "verdict": "compliant",
   "confidence": 0.85,
-  "explanation": "Drift issues created by the monitor include a link to the sync PR when a PR number exists in state, and a unit test covers this.",
+  "explanation": "Drift issues carry the sync PR number from state and the body links it as owner/repo#N when a PR exists, and a unit test covers this. When no PR exists the link is omitted, which fits \"when applicable\".",
   "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 281,
+      "excerpt": "if e.PRNumber > 0 {",
+      "line_confirmed": true
+    },
     {
       "file": "internal/monitor/monitor.go",
       "line": 283,
       "excerpt": "fmt.Fprintf(&b, \"**PR:** %s#%d\\n\", e.Repo, e.PRNumber)",
       "line_confirmed": true
-    },
-    {
-      "file": "internal/monitor/monitor.go",
-      "line": 163,
-      "excerpt": "PRNumber        ts.PRNumber,",
-      "line_confirmed": false
     },
     {
       "file": "internal/monitor/monitor_test.go",
