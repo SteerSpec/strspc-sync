@@ -66,9 +66,6 @@ func TestDefaultsApplied(t *testing.T) {
 	if cfg.Sync.CloseStalePRs == nil || !*cfg.Sync.CloseStalePRs {
 		t.Error("expected close-stale-prs to default to true")
 	}
-	if cfg.Monitor.Schedule != "0 8 * * 1" {
-		t.Errorf("expected monitor schedule '0 8 * * 1', got %s", cfg.Monitor.Schedule)
-	}
 	if cfg.Monitor.IssueLabel != "steerspec-drift" {
 		t.Errorf("expected monitor issue-label steerspec-drift, got %s", cfg.Monitor.IssueLabel)
 	}
@@ -77,6 +74,29 @@ func TestDefaultsApplied(t *testing.T) {
 	}
 	if len(cfg.Conflicts.Tiers) != 2 || cfg.Conflicts.Tiers[0] != 1 || cfg.Conflicts.Tiers[1] != 2 {
 		t.Errorf("expected default tiers [1,2], got %v", cfg.Conflicts.Tiers)
+	}
+}
+
+// A `schedule` key in the monitor or conflicts section has no effect (SYNCCFG-019 and -022 were
+// terminated): configs that still set it load, and the other settings of those sections apply.
+func TestScheduleKeyIgnored(t *testing.T) {
+	cfg := validConfig + `
+monitor:
+  schedule: "0 8 * * 1"
+  issue-label: drift
+conflicts:
+  schedule: "not a cron expression"
+  tiers: [1]
+`
+	got, err := Load(writeConfig(t, cfg))
+	if err != nil {
+		t.Fatalf("config with schedule keys must load: %v", err)
+	}
+	if got.Monitor.IssueLabel != "drift" {
+		t.Errorf("expected monitor issue-label drift, got %s", got.Monitor.IssueLabel)
+	}
+	if len(got.Conflicts.Tiers) != 1 || got.Conflicts.Tiers[0] != 1 {
+		t.Errorf("expected conflicts tiers [1], got %v", got.Conflicts.Tiers)
 	}
 }
 
