@@ -77,8 +77,8 @@ func TestDefaultsApplied(t *testing.T) {
 	}
 }
 
-// A `schedule` key in the monitor or conflicts section has no effect (SYNCCFG-019 and -022 were
-// terminated): configs that still set it load, and the other settings of those sections apply.
+// A `schedule` key in the monitor or conflicts section is ignored (SYNCCFG-028 and -029, which supersede
+// SYNCCFG-019 and -022): configs that still set it load, and the other settings of those sections apply.
 func TestScheduleKeyIgnored(t *testing.T) {
 	cfg := validConfig + `
 monitor:
