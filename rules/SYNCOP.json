@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.10.0",
-    "timestamp": "2026-11-15T18:42:26Z",
-    "hash": "blake3:b36df590aa297efda2507cee01478f27aa4f6f5be93285e7aac7b1e678090f52"
+    "version": "0.12.0",
+    "timestamp": "2026-11-16T16:15:00Z",
+    "hash": "blake3:e87701ffcf05a2d23e77c24261fdf0cdf5d9b6858854cde86725729a85439078"
   },
   "rules": [
     {
@@ -23,7 +23,7 @@
     {
       "id": "SYNCOP-002",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS a UUID.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -41,7 +41,7 @@
     {
       "id": "SYNCOP-004",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS a UTC timestamp.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",

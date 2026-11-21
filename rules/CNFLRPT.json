@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.9.6",
-    "timestamp": "2026-11-14T19:55:21Z",
-    "hash": "blake3:f08457085496effc4356233c17a0ec16164ca33324919440443730c80d53d473"
+    "version": "0.9.7",
+    "timestamp": "2026-11-16T16:15:28Z",
+    "hash": "blake3:0428b9abc0b9beff9b7e6202226d3332c888c986e47a9d0485d302560c2c2f52"
   },
   "rules": [
     {
@@ -67,9 +67,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.7.0",
-        "timestamp": "2026-11-14T10:36:17Z",
-        "hash": "blake3:193152343a054778dbcecaa36a32d429e8f11e468a82d8797998b3630e35c620"
+        "version": "0.8.0",
+        "timestamp": "2026-11-16T16:15:28Z",
+        "hash": "blake3:f550ecb66a54163c4d327fb5020663b493d93dc7688242aeaadd84cbb89b0ad7"
       },
       "rules": [
         {
@@ -156,7 +156,7 @@
         {
           "id": "CNFLENT-010",
           "revision": 0,
-          "state": "D",
+          "state": "P",
           "body": "`cross-reference-broken` IS a reference in CLAUDE.md to a skill or agent file that does not exist in the repository; severity: critical.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
