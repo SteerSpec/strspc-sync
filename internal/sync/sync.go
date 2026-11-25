@@ -350,8 +350,10 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	if destExists && bytes.Equal(rendered, existingContent) {
 		rr.Status = "skipped"
 		if !dryRun {
-			// Bring the recorded PR status up to date first (GH #56), then the version and hash.
-			_, _ = s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
+			// Bring the recorded PR status up to date first (GH #56), then the version and hash. A recorded PR
+			// still open gets its label back if it lacks it.
+			status, pr := s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
+			s.repairPRLabel(ctx, owner, repo, status, pr, &rr)
 			s.recordInSync(target.Repo, tmpl, contentHash, managed)
 		}
 		return rr
@@ -361,16 +363,8 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	if !force && prev != nil && prev.Hash == contentHash {
 		rr.Status = "skipped"
 		status, pr := s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
-		if !dryRun && status == "open" && pr != nil && !hasLabel(pr.Labels, s.cfg.Sync.PRLabel) {
-			// The sync PR is still open but lacks its label (SYNCPR-004): its label call failed when it was
-			// created, or the label was removed. Add it, even though there is nothing new to propose. A dry run
-			// writes nothing.
-			rr.PRNumber = pr.Number
-			rr.PRURL = pr.URL
-			if err := s.ghClient.PullRequests.AddLabels(ctx, owner, repo, pr.Number, []string{s.cfg.Sync.PRLabel}); err != nil {
-				rr.Status = "error"
-				rr.Error = fmt.Sprintf("PR #%d not labeled %q: %v", pr.Number, s.cfg.Sync.PRLabel, err)
-			}
+		if !dryRun { // a dry run writes nothing
+			s.repairPRLabel(ctx, owner, repo, status, pr, &rr)
 		}
 		if status == "closed" {
 			// The recorded PR was closed without merging, so the repo does not have this content. Retrying on
@@ -571,6 +565,22 @@ func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, tem
 	sslog.L().Info("deployment state: pull request status updated",
 		"operation", "sync", "repo", fullName, "template_id", templateID, "pr", prev.PRNumber, "pr_status", status)
 	return status, pr
+}
+
+// repairPRLabel gives a recorded sync PR that is still open its label back when it lacks it (SYNCPR-004): its label
+// call failed when it was created, or the label was removed. There may be nothing new to propose. A failure makes
+// rr an error. status and pr are what refreshPRStatus returned; pr is nil when it looked none up.
+func (s *Syncer) repairPRLabel(ctx context.Context, owner, repo, status string, pr *gh.PullRequest, rr *RepoResult) {
+	label := s.cfg.Sync.PRLabel
+	if status != "open" || pr == nil || hasLabel(pr.Labels, label) {
+		return
+	}
+	rr.PRNumber = pr.Number
+	rr.PRURL = pr.URL
+	if err := s.ghClient.PullRequests.AddLabels(ctx, owner, repo, pr.Number, []string{label}); err != nil {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("PR #%d not labeled %q: %v", pr.Number, label, err)
+	}
 }
 
 // recordInSync records that the default branch already carries the rendered content, so the hash gate and the

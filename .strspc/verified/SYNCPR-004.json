@@ -2,25 +2,19 @@
   "rule_id": "SYNCPR-004",
   "revision": 1,
   "body_hash": "blake3:bd8b23ca90f844d3543cfb7bc4311d7f777d4d13569ea31bc4bc1a049cbe7512",
-  "promoted_at": "2026-11-25T13:07:38Z",
+  "promoted_at": "2026-11-25T13:12:58Z",
   "entity_version": "0.13.0",
   "scope": "all tracked files",
   "files": 148,
-  "files_hash": "a625c514356a420d8bfe0caa9af9bc119506ad1c1921ddc042aedaaf3d6f9834",
+  "files_hash": "165dbef01e6d2b8cb127b6c08c8a95fa34a15ae33c09e987a6e9a58ffdd75810",
   "provider": "claude",
   "model": "claude-sonnet-5-5",
   "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
   "min_confidence": 0.8,
   "verdict": "compliant",
-  "confidence": 0.9,
-  "explanation": "Sync PRs are created with a label read from the configurable pr-label setting, which defaults to steerspec-sync. The label is applied immediately after creation, and a failure to label is reported as an error.",
+  "confidence": 0.93,
+  "explanation": "Sync PRs are created with the label from the configurable `pr-label` setting, which defaults to `steerspec-sync`. The label is applied right after creation, and failures are reported. Missing labels on existing PRs are repaired.",
   "evidence": [
-    {
-      "file": "internal/config/config.go",
-      "line": 63,
-      "excerpt": "PRLabel       string `yaml:\"pr-label,omitempty\"`",
-      "line_confirmed": true
-    },
     {
       "file": "internal/config/config.go",
       "line": 152,
@@ -28,15 +22,21 @@
       "line_confirmed": true
     },
     {
+      "file": "internal/config/config.go",
+      "line": 63,
+      "excerpt": "PRLabel       string `yaml:\"pr-label,omitempty\"`",
+      "line_confirmed": true
+    },
+    {
       "file": "internal/sync/sync.go",
-      "line": 500,
+      "line": 494,
       "excerpt": "Labels: []string{prLabel},",
       "line_confirmed": true
     },
     {
       "file": "internal/github/pulls.go",
-      "line": 99,
-      "excerpt": "if err := s.AddLabels(ctx, owner, repo, created.Number, pr.Labels); err != nil {",
+      "line": 98,
+      "excerpt": "if len(pr.Labels) > 0 {",
       "line_confirmed": true
     }
   ]

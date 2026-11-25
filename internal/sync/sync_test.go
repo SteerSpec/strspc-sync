@@ -997,8 +997,8 @@ func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
 	}
 }
 
-// labelTestSyncer returns a syncer for one target repo, and its PR mock, with every label call failing.
-func labelTestSyncer() (*Syncer, *mockPRService) {
+// labelTestSyncer returns a syncer for one target repo, and its PR and repo mocks, with every label call failing.
+func labelTestSyncer() (*Syncer, *mockPRService, *mockRepoService) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()
 	labelErr := &gh.APIError{StatusCode: http.StatusForbidden, Message: "Resource not accessible"}
@@ -1008,13 +1008,13 @@ func labelTestSyncer() (*Syncer, *mockPRService) {
 		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
 	}
 	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
-	return New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central"), prSvc
+	return New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central"), prSvc, repoSvc
 }
 
 // A sync PR MUST be labeled when it is created (SYNCPR-004). When the label call fails, the repo result is an error,
 // so the run fails, but the PR is still recorded, or the next run could not find it and would create another.
 func TestSyncReportsPRLabelFailure(t *testing.T) {
-	syncer, prSvc := labelTestSyncer()
+	syncer, prSvc, _ := labelTestSyncer()
 	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1035,7 +1035,7 @@ func TestSyncReportsPRLabelFailure(t *testing.T) {
 // Once labeling works again, a plain repeat, which the hash gate skips, labels the recorded open PR without
 // creating another (SYNCPR-004, SYNCPR-005).
 func TestSyncLabelsUnlabeledPRWhenSkipped(t *testing.T) {
-	syncer, prSvc := labelTestSyncer()
+	syncer, prSvc, _ := labelTestSyncer()
 	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1065,9 +1065,36 @@ func TestSyncLabelsUnlabeledPRWhenSkipped(t *testing.T) {
 	}
 }
 
+// The recorded unlabeled PR is still open while the default branch already holds the rendered content (merged
+// through another change): that run records the target in sync and still labels the PR (SYNCPR-004).
+func TestSyncLabelsUnlabeledPRWhenTargetInSync(t *testing.T) {
+	syncer, prSvc, repoSvc := labelTestSyncer()
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prSvc.addLabelsErr = nil
+	branch := "testorg/repo-a/CLAUDE.md/" + prSvc.created[0].Head
+	rendered, ok := repoSvc.files[branch]
+	if !ok {
+		t.Fatalf("no rendered file on %s", branch)
+	}
+	repoSvc.files["testorg/repo-a/CLAUDE.md/main"] = rendered
+
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Errors != 0 || result.ReposSkipped != 1 || len(prSvc.created) != 1 {
+		t.Fatalf("an in-sync target must be skipped without a new PR, got %+v", result)
+	}
+	if !slices.Equal(prSvc.labeled, []int{1}) {
+		t.Errorf("the in-sync run must label PR #1, labeled %v", prSvc.labeled)
+	}
+}
+
 // A dry run writes nothing, so it does not label the recorded unlabeled PR either.
 func TestSyncDryRunDoesNotLabel(t *testing.T) {
-	syncer, prSvc := labelTestSyncer()
+	syncer, prSvc, _ := labelTestSyncer()
 	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1085,7 +1112,7 @@ func TestSyncDryRunDoesNotLabel(t *testing.T) {
 // A forced repeat updates the recorded PR by its head branch and labels it there; a label failure on that path is
 // an error too.
 func TestSyncLabelsUnlabeledPROnUpdate(t *testing.T) {
-	syncer, prSvc := labelTestSyncer()
+	syncer, prSvc, _ := labelTestSyncer()
 	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
