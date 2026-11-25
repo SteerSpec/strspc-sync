@@ -1,0 +1,37 @@
+{
+  "rule_id": "SYNCCFG-028",
+  "revision": 0,
+  "body_hash": "blake3:97ea06c3729e1e76453be534df8dc0c5919283a552b410a9b8c43e4d400e7ad7",
+  "promoted_at": "2026-11-25T11:05:56Z",
+  "entity_version": "0.44.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "b3cca1dae7852b93a7996b1eb42f4f4ffa74bf9073c670186d72f3928ce533f2",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "MonitorBehavior has no schedule field, validation has no schedule check, and a test confirms that a monitor `schedule` key loads without error and is ignored. Monitor runs start only through CLI/action invocation, and scheduling is left to the workflow trigger.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 86,
+      "excerpt": "type MonitorBehavior struct {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config_test.go",
+      "line": 82,
+      "excerpt": "func TestScheduleKeyIgnored(t *testing.T) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 436,
+      "excerpt": "if os.Getenv(\"GITHUB_EVENT_NAME\") == \"schedule\" {",
+      "line_confirmed": true
+    }
+  ]
+}
