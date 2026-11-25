@@ -795,6 +795,37 @@ func TestPRCreateLabelFailure(t *testing.T) {
 	}
 }
 
+// AddLabels posts {"labels": [...]} to the issues labels endpoint of the PR, and reports a failed request.
+func TestPRAddLabels(t *testing.T) {
+	var got map[string][]string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues/7/labels", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		fmt.Fprint(w, `[{"name":"steerspec-sync"}]`) //nolint:errcheck // test handler write
+	})
+	mux.HandleFunc("/repos/o/r/issues/8/labels", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"message":"Resource not accessible"}`)) //nolint:errcheck // test handler write
+	})
+
+	c := testClient(t, mux)
+	if err := c.PullRequests.AddLabels(context.Background(), "o", "r", 7, []string{"steerspec-sync"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(got["labels"]) != 1 || got["labels"][0] != "steerspec-sync" {
+		t.Errorf(`expected body {"labels":["steerspec-sync"]}, got %v`, got)
+	}
+	err := c.PullRequests.AddLabels(context.Background(), "o", "r", 8, []string{"steerspec-sync"})
+	if err == nil || !strings.Contains(err.Error(), "label PR o/r#8") {
+		t.Errorf("expected the failed label request to be reported, got %v", err)
+	}
+}
+
 func TestPRUpdate(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/pulls/1", func(w http.ResponseWriter, r *http.Request) {

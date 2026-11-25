@@ -350,8 +350,10 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	if destExists && bytes.Equal(rendered, existingContent) {
 		rr.Status = "skipped"
 		if !dryRun {
-			// Bring the recorded PR status up to date first (GH #56), then the version and hash.
-			s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
+			// Bring the recorded PR status up to date first (GH #56), then the version and hash. A recorded PR
+			// still open gets its label back if it lacks it.
+			status, pr := s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
+			s.repairPRLabel(ctx, owner, repo, status, pr, &rr)
 			s.recordInSync(target.Repo, tmpl, contentHash, managed)
 		}
 		return rr
@@ -360,7 +362,11 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	// Check state - skip if hash matches and not forced
 	if !force && prev != nil && prev.Hash == contentHash {
 		rr.Status = "skipped"
-		if s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev) == "closed" {
+		status, pr := s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
+		if !dryRun { // a dry run writes nothing
+			s.repairPRLabel(ctx, owner, repo, status, pr, &rr)
+		}
+		if status == "closed" {
 			// The recorded PR was closed without merging, so the repo does not have this content. Retrying on
 			// every run would reopen a PR someone declined on purpose; say so and leave the retry to --force
 			// (GH #91).
@@ -470,6 +476,14 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		rr.Status = "updated"
 		rr.PRNumber = pr.Number
 		rr.PRURL = pr.URL
+		// A sync PR carries the label (SYNCPR-004): one whose label call failed when it was created, or whose label
+		// was removed, gets it back here.
+		if !hasLabel(pr.Labels, prLabel) {
+			if err := s.ghClient.PullRequests.AddLabels(ctx, owner, repo, pr.Number, []string{prLabel}); err != nil {
+				rr.Status = "error"
+				rr.Error = fmt.Sprintf("PR #%d updated but not labeled %q: %v", pr.Number, prLabel, err)
+			}
+		}
 	} else {
 		// Create new PR
 		pr, err = s.ghClient.PullRequests.Create(ctx, owner, repo, &gh.PullRequestCreate{
@@ -484,16 +498,16 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 			rr.Error = fmt.Sprintf("creating PR: %v", err)
 			return rr
 		}
-		if err != nil {
-			// The PR exists but could not be labeled. Keep it so it is recorded in
-			// the deployment state instead of orphaned and re-created on the next run.
-			sslog.L().Warn("PR created but not labeled",
-				"operation", "sync", "template_id", tmpl.ID, "repo", target.Repo,
-				"pr_number", pr.Number, "error", err.Error())
-		}
 		rr.Status = "created"
 		rr.PRNumber = pr.Number
 		rr.PRURL = pr.URL
+		if err != nil {
+			// The PR exists but could not be labeled (SYNCPR-004). It is an error, so the run fails, but the PR is
+			// still recorded in the deployment state, so the next run finds it by its head branch, updates it and
+			// labels it instead of creating another.
+			rr.Status = "error"
+			rr.Error = fmt.Sprintf("PR #%d created but not labeled %q: %v", pr.Number, prLabel, err)
+		}
 	}
 
 	// Close stale PRs if configured
@@ -523,24 +537,25 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 // recorded "open" at creation time (GH #56). Only "merged" is terminal; an
 // unmerged "closed" PR can be reopened and merged later, so it is looked up
 // again. Best-effort: a lookup failure leaves the state as it was. It returns
-// the status the state holds afterwards.
-func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, templateID string, prev *state.TemplateState) string {
+// the status the state holds afterwards, and the PR it looked up (nil when it
+// looked none up).
+func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, templateID string, prev *state.TemplateState) (string, *gh.PullRequest) {
 	if prev == nil || prev.PRNumber == 0 || prev.PRStatus == "merged" {
 		if prev == nil {
-			return ""
+			return "", nil
 		}
-		return prev.PRStatus
+		return prev.PRStatus, nil
 	}
 	pr, err := s.ghClient.PullRequests.Get(ctx, owner, repo, prev.PRNumber)
 	if err != nil || pr == nil {
-		return prev.PRStatus
+		return prev.PRStatus, nil
 	}
 	status := pr.State // "open" or "closed"
 	if pr.State == "closed" && pr.Merged {
 		status = "merged"
 	}
 	if status == prev.PRStatus {
-		return status
+		return status, pr
 	}
 	updated := *prev
 	updated.PRStatus = status
@@ -549,7 +564,23 @@ func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, tem
 	s.stateMu.Unlock()
 	sslog.L().Info("deployment state: pull request status updated",
 		"operation", "sync", "repo", fullName, "template_id", templateID, "pr", prev.PRNumber, "pr_status", status)
-	return status
+	return status, pr
+}
+
+// repairPRLabel gives a recorded sync PR that is still open its label back when it lacks it (SYNCPR-004): its label
+// call failed when it was created, or the label was removed. There may be nothing new to propose. A failure makes
+// rr an error. status and pr are what refreshPRStatus returned; pr is nil when it looked none up.
+func (s *Syncer) repairPRLabel(ctx context.Context, owner, repo, status string, pr *gh.PullRequest, rr *RepoResult) {
+	label := s.cfg.Sync.PRLabel
+	if status != "open" || pr == nil || hasLabel(pr.Labels, label) {
+		return
+	}
+	rr.PRNumber = pr.Number
+	rr.PRURL = pr.URL
+	if err := s.ghClient.PullRequests.AddLabels(ctx, owner, repo, pr.Number, []string{label}); err != nil {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf("PR #%d not labeled %q: %v", pr.Number, label, err)
+	}
 }
 
 // recordInSync records that the default branch already carries the rendered content, so the hash gate and the
@@ -882,4 +913,9 @@ func splitRepo(fullName string) (owner, repo string) {
 		return parts[0], parts[1]
 	}
 	return fullName, ""
+}
+
+// hasLabel reports whether labels holds label; GitHub label names are case-insensitive.
+func hasLabel(labels []string, label string) bool {
+	return slices.ContainsFunc(labels, func(l string) bool { return strings.EqualFold(l, label) })
 }
