@@ -1,0 +1,49 @@
+{
+  "rule_id": "TMPLT-005",
+  "revision": 0,
+  "body_hash": "blake3:90c0bb8ed9d353a15169d1e77babce72760cb9c5924435d9db755ae7eb7f5a7d",
+  "promoted_at": "2026-11-25T16:15:36Z",
+  "entity_version": "0.20.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "c0c199298d03da5c44002c8c800d4378b8f8ce4e58add2534e14768965db5200",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "Templates are required to carry a destination, and config validation enforces it as a repository-relative path by rejecting absolute, dot and dotdot segments. Sync and monitor use it as a path in the target repo, and `.claude/` tree destinations are accepted.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 292,
+      "excerpt": "return fmt.Errorf(\"templates[%d].destination is required\", i)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 294,
+      "excerpt": "if err := checkRepoPath(tmpl.Destination); err != nil {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 141,
+      "excerpt": "case strings.HasPrefix(p, \"/\"):",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/sources_test.go",
+      "line": 108,
+      "excerpt": "{name: \"claude tree\", dest: \"    destination: .claude/skills/commit/SKILL.md\"},",
+      "line_confirmed": true
+    },
+    {
+      "file": "docs/quickstart/steerspec-sync.yml",
+      "line": 63,
+      "excerpt": "destination: .claude/agents/code-review.md",
+      "line_confirmed": true
+    }
+  ]
+}
