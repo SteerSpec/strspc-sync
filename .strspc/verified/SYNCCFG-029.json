@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCCFG-029",
+  "revision": 0,
+  "body_hash": "blake3:c2a839061eee410955ffd249ab9df8a3a6558539445e4c3881346d42b7ad1936",
+  "promoted_at": "2026-11-25T11:06:10Z",
+  "entity_version": "0.45.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "b3cca1dae7852b93a7996b1eb42f4f4ffa74bf9073c670186d72f3928ce533f2",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The ConflictBehavior struct has no schedule field, YAML parsing is non-strict, validation does not check it, and a test confirms an invalid schedule key loads without error. Conflict runs start only on CLI invocation, with scheduling left to the workflow trigger.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 91,
+      "excerpt": "// ConflictBehavior has no schedule: the trigger of the workflow that calls the",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config_test.go",
+      "line": 82,
+      "excerpt": "func TestScheduleKeyIgnored(t *testing.T) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config_test.go",
+      "line": 88,
+      "excerpt": "schedule: \"not a cron expression\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 134,
+      "excerpt": "if err := yaml.Unmarshal(data, &cfg); err != nil {",
+      "line_confirmed": true
+    }
+  ]
+}

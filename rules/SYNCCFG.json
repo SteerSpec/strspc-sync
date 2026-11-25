@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.43.0",
-    "timestamp": "2026-11-25T10:30:51Z",
-    "hash": "blake3:290a23bc6e1636a58daa37f2b140f97fdd27ce11c8a9c4b44a75444d28b374e0"
+    "version": "0.45.0",
+    "timestamp": "2026-11-25T11:06:10Z",
+    "hash": "blake3:ecff09c71c798c3811b71a1c73db4dbaa568b53fcc4a5023e24c547b56bf8b84"
   },
   "rules": [
     {
@@ -257,7 +257,7 @@
     {
       "id": "SYNCCFG-028",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "strspc MUST ignore a `schedule` key in the `monitor` section; a monitor run starts only when strspc is invoked.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-21",
@@ -266,7 +266,7 @@
     {
       "id": "SYNCCFG-029",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "strspc MUST ignore a `schedule` key in the `conflicts` section; a conflict run starts only when strspc is invoked.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-21",
