@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -36,6 +37,11 @@ type ResolvedTarget struct {
 	ExcludeTemplates []string
 	IncludeTemplates []string
 }
+
+// ErrNoTargets is returned by Resolve when the include and topic patterns, minus the exclusions, match no
+// repository: a registry has one or more targets (CMPREG-003), so a run that would sync or scan nothing fails
+// instead of completing. The usual cause is a token that cannot list the organization's repositories.
+var ErrNoTargets = errors.New("no target repositories resolved")
 
 // Registry resolves target configurations into concrete repository targets.
 type Registry struct {
@@ -164,6 +170,13 @@ func (r *Registry) Resolve(ctx context.Context, targets config.TargetsConfig, gl
 		}
 
 		results = append(results, rt)
+	}
+
+	if len(results) == 0 {
+		return nil, fmt.Errorf("%w: check that the token can list the organization's repositories (a fine-grained "+
+			"PAT only sees the organization it was issued for) and that targets.include %v, targets.topics %v and "+
+			"targets.exclude %v leave at least one repository", ErrNoTargets, targets.Include, targets.Topics,
+			targets.Exclude)
 	}
 
 	sort.Slice(results, func(i, j int) bool {
