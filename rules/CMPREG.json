@@ -6,9 +6,9 @@
     "description": "The registry of target repositories for synchronization."
   },
   "rule_set": {
-    "version": "0.8.4",
-    "timestamp": "2026-11-13T19:57:49Z",
-    "hash": "blake3:4cc1dd8636479f303f0f3f73076d5ce4d77d74f7f90fc55aa415faaa745e9a74"
+    "version": "0.8.6",
+    "timestamp": "2026-11-21T22:35:16Z",
+    "hash": "blake3:ede5d810c6983eaeb7d46673c025b72de3b0d618c68061c5040fedcd91e53831"
   },
   "rules": [
     {
@@ -67,9 +67,9 @@
         "parent": "CMPREG"
       },
       "rule_set": {
-        "version": "0.11.0",
-        "timestamp": "2026-11-13T19:57:49Z",
-        "hash": "blake3:2be73f1f389bfc30386b11d996cce0963a001269fdace56cf2e80ef2dbdd0a05"
+        "version": "0.11.2",
+        "timestamp": "2026-11-21T22:35:16Z",
+        "hash": "blake3:1ff42bd379b5a2e84d4b0fd64e916f260f00ae1157f816becd0f55c7a1d0e992"
       },
       "rules": [
         {
@@ -120,14 +120,24 @@
         {
           "id": "CMPTGT-006",
           "revision": 0,
-          "state": "D",
+          "state": "A",
           "body": "HAS an `enabled` boolean flag (default: true).",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
         }
       ],
-      "notes": []
+      "notes": [
+        {
+          "id": "CMPTGT-006/01",
+          "rule_ref": "CMPTGT-006",
+          "type": "rationale",
+          "content": "Abandoned 2026-11-21 (#227): targets.exclude already removes a repository from the targets, so a second switch is not needed.",
+          "added_by": "github:pleberre",
+          "added_at": "2026-11-21",
+          "revision": 0
+        }
+      ]
     }
   ],
   "notes": []

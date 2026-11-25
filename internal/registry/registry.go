@@ -35,7 +35,6 @@ type ResolvedTarget struct {
 	Variables        map[string]string
 	ExcludeTemplates []string
 	IncludeTemplates []string
-	Enabled          bool
 }
 
 // Registry resolves target configurations into concrete repository targets.
@@ -151,7 +150,6 @@ func (r *Registry) Resolve(ctx context.Context, targets config.TargetsConfig, gl
 			DefaultBranch: repo.DefaultBranch,
 			Visibility:    repo.Visibility,
 			Variables:     vars,
-			Enabled:       true,
 		}
 
 		if override, ok := overrideIndex[repo.FullName]; ok {

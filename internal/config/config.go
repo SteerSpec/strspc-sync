@@ -81,14 +81,16 @@ const (
 	DefaultPRTitlePrefix = "chore(steerspec-sync)"
 )
 
+// MonitorBehavior has no schedule: the trigger of the workflow that calls the
+// action schedules monitor runs, and a `schedule` key is ignored.
 type MonitorBehavior struct {
-	Schedule   string `yaml:"schedule,omitempty"`
 	IssueLabel string `yaml:"issue-label,omitempty"`
 	AutoClose  *bool  `yaml:"auto-close,omitempty"`
 }
 
+// ConflictBehavior has no schedule: the trigger of the workflow that calls the
+// action schedules conflict runs, and a `schedule` key is ignored.
 type ConflictBehavior struct {
-	Schedule   string `yaml:"schedule,omitempty"`
 	Tiers      []int  `yaml:"tiers,omitempty"`
 	IssueLabel string `yaml:"issue-label,omitempty"`
 	// AutoClose closes a conflict issue once the conflict it reported is gone
@@ -160,9 +162,6 @@ func ApplyDefaults(cfg *SyncConfig) {
 		cfg.Sync.PRTitlePrefix = DefaultPRTitlePrefix
 	}
 
-	if cfg.Monitor.Schedule == "" {
-		cfg.Monitor.Schedule = "0 8 * * 1"
-	}
 	if cfg.Monitor.IssueLabel == "" {
 		cfg.Monitor.IssueLabel = "steerspec-drift"
 	}
@@ -171,9 +170,6 @@ func ApplyDefaults(cfg *SyncConfig) {
 		cfg.Monitor.AutoClose = &t
 	}
 
-	if cfg.Conflicts.Schedule == "" {
-		cfg.Conflicts.Schedule = "0 9 * * 1"
-	}
 	if len(cfg.Conflicts.Tiers) == 0 {
 		cfg.Conflicts.Tiers = []int{1, 2}
 	}

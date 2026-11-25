@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.39.0",
-    "timestamp": "2026-11-15T18:42:26Z",
-    "hash": "blake3:44545f7890165362ddb148d19ccbf5dd6ef5891be51bd75932c5efffe6c34e14"
+    "version": "0.39.4",
+    "timestamp": "2026-11-21T22:35:53Z",
+    "hash": "blake3:7403bcb388c8c5e22f2477a94fbd7b09133a721853d5b481fb889ff02e745e10"
   },
   "rules": [
     {
@@ -253,7 +253,44 @@
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
       "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-028",
+      "revision": 0,
+      "state": "D",
+      "body": "strspc MUST ignore a `schedule` key in the `monitor` section; a monitor run starts only when strspc is invoked.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-21",
+      "supersedes": "SYNCCFG-019"
+    },
+    {
+      "id": "SYNCCFG-029",
+      "revision": 0,
+      "state": "D",
+      "body": "strspc MUST ignore a `schedule` key in the `conflicts` section; a conflict run starts only when strspc is invoked.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-21",
+      "supersedes": "SYNCCFG-022"
     }
   ],
-  "notes": []
+  "notes": [
+    {
+      "id": "SYNCCFG-028/01",
+      "rule_ref": "SYNCCFG-028",
+      "type": "example",
+      "content": "A workflow with an on.schedule trigger of cron '0 8 * * 1' runs the monitor action every Monday at 08:00 UTC.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-21",
+      "revision": 0
+    },
+    {
+      "id": "SYNCCFG-029/01",
+      "rule_ref": "SYNCCFG-029",
+      "type": "example",
+      "content": "A workflow with an on.schedule trigger of cron '0 9 * * 1' runs the conflict action every Monday at 09:00 UTC.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-21",
+      "revision": 0
+    }
+  ]
 }

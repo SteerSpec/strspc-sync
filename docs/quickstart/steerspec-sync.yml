@@ -109,11 +109,9 @@ sync:
   # pr-title-prefix: chore(steerspec-sync)
 
 monitor:
-  schedule: "0 8 * * 1"
   issue-label: steerspec-drift
   auto-close: true
 
 conflicts:
-  schedule: "0 9 * * 1"
   tiers: [1, 2]
   issue-label: steerspec-conflict
