@@ -107,7 +107,8 @@ func (s *pullRequestService) Create(ctx context.Context, owner, repo string, pr 
 
 func (s *pullRequestService) AddLabels(ctx context.Context, owner, repo string, number int, labels []string) error {
 	labelsURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/labels", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), number)
-	labelsPayload, err := json.Marshal(labels)
+	// The documented request body is {"labels": [...]}; GitHub also accepts a bare array, which this sent before.
+	labelsPayload, err := json.Marshal(map[string][]string{"labels": labels})
 	if err != nil {
 		return err
 	}
