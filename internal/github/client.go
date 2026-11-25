@@ -42,6 +42,8 @@ type PullRequestService interface {
 	List(ctx context.Context, owner, repo string, opts *PullRequestListOptions) ([]*PullRequest, error)
 	Create(ctx context.Context, owner, repo string, pr *PullRequestCreate) (*PullRequest, error)
 	Update(ctx context.Context, owner, repo string, number int, pr *PullRequestUpdate) error
+	// AddLabels adds labels to a pull request, keeping the ones it already has.
+	AddLabels(ctx context.Context, owner, repo string, number int, labels []string) error
 	Close(ctx context.Context, owner, repo string, number int) error
 	CreateBranch(ctx context.Context, owner, repo, branch, baseSHA string) error
 	// DeleteBranch deletes a branch. Branch names may contain "/".

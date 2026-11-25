@@ -94,23 +94,32 @@ func (s *pullRequestService) Create(ctx context.Context, owner, repo string, pr 
 
 	created := apiPR.toDomain()
 
-	// Add labels if specified
+	// Add labels if specified. On failure the created PR is returned with the error, so the caller can keep it.
 	if len(pr.Labels) > 0 {
-		labelsURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/labels", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), created.Number)
-		labelsPayload, _ := json.Marshal(pr.Labels)
-		labelsResp, err := s.client.doRequest(ctx, http.MethodPost, labelsURL, bytes.NewReader(labelsPayload))
-		if err != nil {
+		if err := s.AddLabels(ctx, owner, repo, created.Number, pr.Labels); err != nil {
 			return created, err
 		}
-		// The PR lookup keys on this label, so an unlabeled PR is as good as lost.
-		if err := checkResponse(labelsResp); err != nil {
-			return created, fmt.Errorf("label PR %s/%s#%d: %w", owner, repo, created.Number, err)
-		}
-		labelsResp.Body.Close() //nolint:errcheck // label response body close is best-effort
 		created.Labels = pr.Labels
 	}
 
 	return created, nil
+}
+
+func (s *pullRequestService) AddLabels(ctx context.Context, owner, repo string, number int, labels []string) error {
+	labelsURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/labels", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), number)
+	labelsPayload, err := json.Marshal(labels)
+	if err != nil {
+		return err
+	}
+	labelsResp, err := s.client.doRequest(ctx, http.MethodPost, labelsURL, bytes.NewReader(labelsPayload))
+	if err != nil {
+		return fmt.Errorf("label PR %s/%s#%d: %w", owner, repo, number, err)
+	}
+	if err := checkResponse(labelsResp); err != nil {
+		return fmt.Errorf("label PR %s/%s#%d: %w", owner, repo, number, err)
+	}
+	labelsResp.Body.Close() //nolint:errcheck // label response body close is best-effort
+	return nil
 }
 
 func (s *pullRequestService) Update(ctx context.Context, owner, repo string, number int, pr *PullRequestUpdate) error {

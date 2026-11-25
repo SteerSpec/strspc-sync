@@ -138,6 +138,10 @@ type mockPRService struct {
 	// createLabelErr, when set, is returned by Create alongside the created PR,
 	// like the real client does when adding the label fails.
 	createLabelErr error
+	// addLabelsErr, when set, is returned by AddLabels, which then labels nothing.
+	addLabelsErr error
+	// labeled records the PR numbers AddLabels labeled.
+	labeled []int
 	// unfilteredHeads models a response that includes other template branches.
 	unfilteredHeads bool
 	listedHeads     []string
@@ -230,6 +234,25 @@ func (m *mockPRService) Create(_ context.Context, owner, repo string, pr *gh.Pul
 }
 
 func (m *mockPRService) Update(_ context.Context, _, _ string, _ int, _ *gh.PullRequestUpdate) error {
+	return nil
+}
+
+func (m *mockPRService) AddLabels(_ context.Context, owner, repo string, number int, labels []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.addLabelsErr != nil {
+		return m.addLabelsErr
+	}
+	m.labeled = append(m.labeled, number)
+	for _, pr := range m.prs[owner+"/"+repo] {
+		if pr.Number == number {
+			for _, l := range labels {
+				if !slices.Contains(pr.Labels, l) {
+					pr.Labels = append(pr.Labels, l)
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -612,6 +635,10 @@ func (f *failingPRService) Get(ctx context.Context, owner, repo string, number i
 	return f.inner.Get(ctx, owner, repo, number)
 }
 
+func (f *failingPRService) AddLabels(ctx context.Context, owner, repo string, number int, labels []string) error {
+	return f.inner.AddLabels(ctx, owner, repo, number, labels)
+}
+
 func (f *failingPRService) Close(ctx context.Context, owner, repo string, number int) error {
 	return f.inner.Close(ctx, owner, repo, number)
 }
@@ -699,6 +726,10 @@ func (s *slowPRService) Update(ctx context.Context, owner, repo string, number i
 
 func (s *slowPRService) Get(ctx context.Context, owner, repo string, number int) (*gh.PullRequest, error) {
 	return s.inner.Get(ctx, owner, repo, number)
+}
+
+func (s *slowPRService) AddLabels(ctx context.Context, owner, repo string, number int, labels []string) error {
+	return s.inner.AddLabels(ctx, owner, repo, number, labels)
 }
 
 func (s *slowPRService) Close(ctx context.Context, owner, repo string, number int) error {
@@ -966,37 +997,117 @@ func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {
 	}
 }
 
-// A PR that was created but could not be labeled must still be recorded, or the
-// next run cannot find it and tries to create it again.
-func TestSyncRecordsPRWhenLabelingFails(t *testing.T) {
+// labelTestSyncer returns a syncer for one target repo, and its PR mock, with every label call failing.
+func labelTestSyncer() (*Syncer, *mockPRService) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()
-	prSvc.createLabelErr = &gh.APIError{StatusCode: http.StatusForbidden, Message: "Resource not accessible"}
+	labelErr := &gh.APIError{StatusCode: http.StatusForbidden, Message: "Resource not accessible"}
+	prSvc.createLabelErr = labelErr
+	prSvc.addLabelsErr = labelErr
 	repoSvc.repos["testorg"] = []*gh.Repository{
 		{Owner: "testorg", Name: "repo-a", FullName: "testorg/repo-a", DefaultBranch: "main"},
 	}
 	repoSvc.files["testorg/central/templates/CLAUDE.md/"] = []byte("# Hello {{org_name}}")
+	return New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central"), prSvc
+}
 
-	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+// A sync PR MUST be labeled when it is created (SYNCPR-004). When the label call fails, the repo result is an error,
+// so the run fails, but the PR is still recorded, or the next run could not find it and would create another.
+func TestSyncReportsPRLabelFailure(t *testing.T) {
+	syncer, prSvc := labelTestSyncer()
 	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.PRsCreated != 1 || result.Errors != 0 {
-		t.Fatalf("a labeling failure must not fail the sync, got %+v", result)
+	if result.Errors != 1 || result.PRsCreated != 0 || len(prSvc.created) != 1 {
+		t.Fatalf("a label failure must be an error, got %+v", result)
+	}
+	rr := result.RepoResults[0]
+	if rr.Status != "error" || rr.PRNumber != 1 || !strings.Contains(rr.Error, "not labeled") {
+		t.Errorf("the error must name the unlabeled PR, got %+v", rr)
 	}
 	ts := syncer.state.GetTemplateState("testorg/repo-a", "claude-md")
 	if ts == nil || ts.PRNumber != 1 {
 		t.Errorf("the unlabeled PR must be recorded in state, got %+v", ts)
 	}
+}
 
-	// A forced repeat must find the unlabeled PR by its head branch, not create it again.
-	result, err = syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
+// Once labeling works again, a plain repeat, which the hash gate skips, labels the recorded open PR without
+// creating another (SYNCPR-004, SYNCPR-005).
+func TestSyncLabelsUnlabeledPRWhenSkipped(t *testing.T) {
+	syncer, prSvc := labelTestSyncer()
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prSvc.addLabelsErr = nil
+
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if err != nil {
+		t.Fatalf("unexpected error on repeat: %v", err)
+	}
+	if result.Errors != 0 || result.ReposSkipped != 1 || len(prSvc.created) != 1 {
+		t.Fatalf("the repeat must skip and not create a PR, got %+v, created=%d", result, len(prSvc.created))
+	}
+	if !slices.Equal(prSvc.labeled, []int{1}) {
+		t.Errorf("the repeat must label PR #1, labeled %v", prSvc.labeled)
+	}
+	pr, _ := prSvc.Get(context.Background(), "testorg", "repo-a", 1)
+	if !slices.Contains(pr.Labels, "steerspec-sync") {
+		t.Errorf("PR #1 must carry steerspec-sync, has %v", pr.Labels)
+	}
+
+	// Labeled now, so a third run labels nothing.
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("unexpected error on third run: %v", err)
+	}
+	if len(prSvc.labeled) != 1 {
+		t.Errorf("a labeled PR must not be labeled again, labeled %v", prSvc.labeled)
+	}
+}
+
+// A dry run writes nothing, so it does not label the recorded unlabeled PR either.
+func TestSyncDryRunDoesNotLabel(t *testing.T) {
+	syncer, prSvc := labelTestSyncer()
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prSvc.addLabelsErr = nil
+
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual", DryRun: true})
+	if err != nil {
+		t.Fatalf("unexpected error on dry run: %v", err)
+	}
+	if result.Errors != 0 || len(prSvc.labeled) != 0 {
+		t.Errorf("a dry run must not label, got %+v, labeled %v", result, prSvc.labeled)
+	}
+}
+
+// A forced repeat updates the recorded PR by its head branch and labels it there; a label failure on that path is
+// an error too.
+func TestSyncLabelsUnlabeledPROnUpdate(t *testing.T) {
+	syncer, prSvc := labelTestSyncer()
+	if _, err := syncer.Run(context.Background(), Options{Trigger: "manual"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
 	if err != nil {
 		t.Fatalf("unexpected error on forced repeat: %v", err)
 	}
-	if result.PRsCreated != 0 || result.PRsUpdated != 1 || len(prSvc.created) != 1 {
-		t.Errorf("forced repeat must reuse the unlabeled PR, got %+v, created=%d", result, len(prSvc.created))
+	if result.Errors != 1 || result.RepoResults[0].Status != "error" || len(prSvc.created) != 1 {
+		t.Fatalf("a label failure on update must be an error without a new PR, got %+v", result)
+	}
+
+	prSvc.addLabelsErr = nil
+	result, err = syncer.Run(context.Background(), Options{Trigger: "manual", Force: true})
+	if err != nil {
+		t.Fatalf("unexpected error on second forced repeat: %v", err)
+	}
+	if result.Errors != 0 || result.PRsUpdated != 1 || len(prSvc.created) != 1 {
+		t.Fatalf("the forced repeat must update the PR, got %+v, created=%d", result, len(prSvc.created))
+	}
+	if !slices.Equal(prSvc.labeled, []int{1}) {
+		t.Errorf("the update must label PR #1, labeled %v", prSvc.labeled)
 	}
 }
 

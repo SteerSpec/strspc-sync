@@ -135,6 +135,10 @@ func (m *mockPRService) Update(_ context.Context, _, _ string, _ int, _ *gh.Pull
 	return nil
 }
 func (m *mockPRService) Close(_ context.Context, _, _ string, _ int) error { return nil }
+func (m *mockPRService) AddLabels(_ context.Context, _, _ string, _ int, _ []string) error {
+	return nil
+}
+
 func (m *mockPRService) Get(_ context.Context, _, _ string, _ int) (*gh.PullRequest, error) {
 	return nil, nil
 }
