@@ -119,8 +119,8 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 	targets = filterTargets(targets, targetFilter)
 	result.ReposTargeted = len(targets)
 	if len(targets) == 0 {
-		sslog.L().Warn("no target repositories resolved; check that the token can list the organization's repositories (a fine-grained PAT only sees the organization it was issued for) and that targets.include matches",
-			"operation", "sync", "include", s.cfg.Targets.Include, "target_filter", opts.TargetFilter)
+		sslog.L().Warn("--target-filter matched none of the resolved target repositories (Resolve fails on an empty registry)",
+			"operation", "sync", "target_filter", opts.TargetFilter)
 	} else {
 		names := make([]string, 0, len(targets))
 		for _, t := range targets {

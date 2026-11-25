@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -152,18 +153,59 @@ func TestResolveTopicsQueriesPerOrg(t *testing.T) {
 
 // Topics with no include yields nothing rather than everything. config.Validate
 // rejects an empty include, so this is unreachable from a loaded config, but
-// Resolve is public and must fail closed regardless.
+// Resolve is public and must fail closed regardless: no topic search runs
+// without an org scope, and the empty registry is an error (CMPREG-003).
 func TestResolveTopicsWithoutIncludeResolvesNothing(t *testing.T) {
-	reg := New(newMockLister())
+	lister := newMockLister()
+	reg := New(lister)
 
 	results, err := reg.Resolve(context.Background(), config.TargetsConfig{
 		Topics: []string{"claude-managed"},
 	}, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if !errors.Is(err, ErrNoTargets) {
+		t.Fatalf("expected ErrNoTargets without an include scope, got %v", err)
 	}
 	if len(results) != 0 {
 		t.Errorf("expected no targets without an include scope, got %v", results)
+	}
+	if len(lister.topicCalls) != 0 {
+		t.Errorf("expected no topic search without an include scope, got %v", lister.topicCalls)
+	}
+}
+
+// A registry has one or more targets (CMPREG-003): when the patterns, minus the
+// exclusions, match no repository, Resolve fails with ErrNoTargets, and the
+// message names the token scope and the patterns.
+func TestResolveZeroTargetsFails(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		targets config.TargetsConfig
+	}{
+		{"include matches nothing", config.TargetsConfig{Include: []string{"acme-corp/nope-*"}}},
+		{"org lists no repositories", config.TargetsConfig{Include: []string{"beta-inc/*"}}},
+		{"exclude removes every match", config.TargetsConfig{
+			Include: []string{"acme-corp/api"},
+			Exclude: []string{"acme-corp/*"},
+		}},
+		{"topic matches nothing in scope", config.TargetsConfig{
+			Include: []string{"acme-corp/nope"},
+			Topics:  []string{"unknown-topic"},
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			results, err := New(newMockLister()).Resolve(context.Background(), tt.targets, nil)
+			if !errors.Is(err, ErrNoTargets) {
+				t.Fatalf("expected ErrNoTargets, got results %v, err %v", results, err)
+			}
+			if results != nil {
+				t.Errorf("expected nil results with the error, got %v", results)
+			}
+			for _, want := range []string{"fine-grained", tt.targets.Include[0]} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not mention %q", err, want)
+				}
+			}
+		})
 	}
 }
 

@@ -2,6 +2,7 @@ package conflict
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/hash"
+	"github.com/SteerSpec/strspc-sync/internal/registry"
 	"github.com/SteerSpec/strspc-sync/internal/state"
 	"github.com/SteerSpec/strspc-sync/internal/template"
 )
@@ -456,6 +458,24 @@ func TestTargets(t *testing.T) {
 		if strings.Join(got, ",") != tt.want {
 			t.Errorf("Targets(%q) = %v, want %s", tt.filter, got, tt.want)
 		}
+	}
+}
+
+// TestTargetsFailsWhenNoTargetsResolve: a registry has one or more targets (CMPREG-003), so conflict detection fails
+// when the config's targets resolve to no repository, even though the deployment state still lists one.
+func TestTargetsFailsWhenNoTargetsResolve(t *testing.T) {
+	repos := &mockRepoService{orgRepos: []*gh.Repository{
+		{Owner: "org", Name: "other", FullName: "org/other"},
+	}}
+	cfg := testConfig()
+	cfg.Targets.Include = []string{"org/repo*"}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/legacy", "claude-md", state.TemplateState{Version: "1.0.0"})
+	scanner := New(cfg, newTestClient(repos, &mockIssueService{}), "org", "central")
+
+	got, err := scanner.Targets(context.Background(), ds, "")
+	if !errors.Is(err, registry.ErrNoTargets) {
+		t.Fatalf("expected registry.ErrNoTargets, got targets %v, err %v", got, err)
 	}
 }
 

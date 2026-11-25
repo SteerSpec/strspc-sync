@@ -332,6 +332,42 @@ func TestRunBasic(t *testing.T) {
 	}
 }
 
+// A sync whose targets resolve to no repository fails rather than completing with nothing done (CMPREG-003):
+// the usual cause is a token that cannot list the organization. No PR is opened.
+func TestRunFailsWhenNoTargetsResolve(t *testing.T) {
+	repoSvc := newMockRepoService() // testorg lists no repositories
+	prSvc := newMockPRService()
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual"})
+	if !errors.Is(err, registry.ErrNoTargets) {
+		t.Fatalf("expected registry.ErrNoTargets, got %v", err)
+	}
+	if result.Status != "failed" {
+		t.Errorf("expected status failed, got %s", result.Status)
+	}
+	if len(prSvc.created) != 0 {
+		t.Errorf("expected no PRs, got %d", len(prSvc.created))
+	}
+}
+
+// --target-filter narrowing a non-empty registry to nothing is not an empty registry: the run completes with
+// no target.
+func TestRunTargetFilterMatchingNothingCompletes(t *testing.T) {
+	repoSvc := newMockRepoService()
+	prSvc := newMockPRService()
+	setupMockRepos(repoSvc)
+
+	syncer := New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central")
+	result, err := syncer.Run(context.Background(), Options{Trigger: "manual", TargetFilter: "testorg/none"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Status != "completed" || result.ReposTargeted != 0 {
+		t.Errorf("expected completed with 0 targets, got status %s, %d targets", result.Status, result.ReposTargeted)
+	}
+}
+
 func TestDryRun(t *testing.T) {
 	repoSvc := newMockRepoService()
 	prSvc := newMockPRService()
