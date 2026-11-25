@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.39.4",
-    "timestamp": "2026-11-21T22:35:53Z",
-    "hash": "blake3:7403bcb388c8c5e22f2477a94fbd7b09133a721853d5b481fb889ff02e745e10"
+    "version": "0.43.0",
+    "timestamp": "2026-11-25T10:30:51Z",
+    "hash": "blake3:290a23bc6e1636a58daa37f2b140f97fdd27ce11c8a9c4b44a75444d28b374e0"
   },
   "rules": [
     {
@@ -176,7 +176,7 @@
     {
       "id": "SYNCCFG-019",
       "revision": 0,
-      "state": "P",
+      "state": "T",
       "body": "The `monitor` section MAY define `schedule` as a cron expression (default: \"0 8 * * 1\" -- weekly Monday 08:00 UTC).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -203,7 +203,7 @@
     {
       "id": "SYNCCFG-022",
       "revision": 0,
-      "state": "P",
+      "state": "T",
       "body": "The `conflicts` section MAY define `schedule` as a cron expression (default: \"0 9 * * 1\" -- weekly Monday 09:00 UTC).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -257,7 +257,7 @@
     {
       "id": "SYNCCFG-028",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "strspc MUST ignore a `schedule` key in the `monitor` section; a monitor run starts only when strspc is invoked.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-21",
@@ -266,7 +266,7 @@
     {
       "id": "SYNCCFG-029",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "strspc MUST ignore a `schedule` key in the `conflicts` section; a conflict run starts only when strspc is invoked.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-21",
