@@ -21,13 +21,14 @@ const (
 	TypeDuplicateSkill           ConflictType = "duplicate-skill"
 	TypeContradictoryInstruction ConflictType = "contradictory-instruction"
 	TypeUnmanagedFile            ConflictType = "unmanaged-file"
+	TypeSectionOverlap           ConflictType = "section-overlap"
 )
 
-// Valid reports whether t is one of the six conflict types (CNFLENT-003).
+// Valid reports whether t is one of the seven conflict types (CNFLENT-003).
 func (t ConflictType) Valid() bool {
 	switch t {
 	case TypeVersionDrift, TypeManualOverride, TypeCrossReferenceBroken, TypeDuplicateSkill,
-		TypeContradictoryInstruction, TypeUnmanagedFile:
+		TypeContradictoryInstruction, TypeUnmanagedFile, TypeSectionOverlap:
 		return true
 	}
 	return false

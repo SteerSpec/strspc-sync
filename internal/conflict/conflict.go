@@ -81,9 +81,9 @@ func (s *Scanner) readFile(ctx context.Context, owner, repo, path string) (conte
 // cleanup only touches issues of tiers that actually ran.
 func tierOfType(t ConflictType) int {
 	switch t {
-	case TypeVersionDrift, TypeCrossReferenceBroken, TypeUnmanagedFile:
+	case TypeVersionDrift, TypeManualOverride, TypeCrossReferenceBroken, TypeUnmanagedFile:
 		return 1
-	case TypeDuplicateSkill, TypeManualOverride:
+	case TypeDuplicateSkill, TypeSectionOverlap:
 		return 2
 	case TypeContradictoryInstruction:
 		return 3
@@ -93,7 +93,7 @@ func tierOfType(t ConflictType) int {
 
 // issueType recovers the conflict type of an issue: from the body marker
 // written since cleanup exists, else from the title (issues created before
-// the marker, or whose body was edited). A value that is not one of the six
+// the marker, or whose body was edited). A value that is not one of the seven
 // types (CNFLENT-003) is not a type: the marker falls back to the title, and
 // the result is "" when neither holds one, so cleanup leaves the issue alone.
 func issueType(issue *gh.Issue) ConflictType {
@@ -450,12 +450,15 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 		if err != nil {
 			continue
 		}
-		// Version-drift issues about a tracked file that was absent this
-		// run were not checked; recognise them by fingerprint or title.
+		// Version-drift and manual-override issues about a tracked file that
+		// was absent this run were not checked; recognise them by
+		// fingerprint or title.
 		unchecked := make(map[string]bool)
 		for path := range s.missingTracked[repo] {
-			unchecked[hash.Fingerprint(string(TypeVersionDrift), repo, path)] = true
-			unchecked[fmt.Sprintf("[SteerSpec Conflict] %s: %s", TypeVersionDrift, path)] = true
+			for _, typ := range []ConflictType{TypeVersionDrift, TypeManualOverride} {
+				unchecked[hash.Fingerprint(string(typ), repo, path)] = true
+				unchecked[fmt.Sprintf("[SteerSpec Conflict] %s: %s", typ, path)] = true
+			}
 		}
 		existing, err := s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{
 			State:  "open",
@@ -482,7 +485,8 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 					continue // central's own files were not checked this run
 				}
 			}
-			if typ == TypeVersionDrift && (unchecked[extractFingerprint(issue.Body)] || unchecked[issue.Title]) {
+			if (typ == TypeVersionDrift || typ == TypeManualOverride) &&
+				(unchecked[extractFingerprint(issue.Body)] || unchecked[issue.Title]) {
 				continue // that tracked file is gone, so its drift was not checked
 			}
 			if err := s.ghClient.Issues.Close(ctx, owner, repoName, issue.Number); err != nil {

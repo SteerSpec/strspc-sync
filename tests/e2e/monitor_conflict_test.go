@@ -202,7 +202,7 @@ func TestConflictTier1Lifecycle(t *testing.T) {
 }
 
 // TestConflictTier2Lifecycle: tier 2 duplicate-skill (same skill file, different content in two targets; issue in the
-// central repo) and section overlap (one STEERSPEC marker id in two marker-managed files of a target; issue in the
+// central repo) and section-overlap (one STEERSPEC section in two marker-managed files of a target; issue in the
 // target). Both are warnings, so the command exits 0. The fixture has no skill or marker templates, so the scenario
 // adds them to its own copy of the run config.
 func TestConflictTier2Lifecycle(t *testing.T) {
@@ -213,8 +213,8 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 		markerA    = ".steerspec-e2e/marker-a.md"
 		markerB    = ".steerspec-e2e/marker-b.md"
 		dupTitle   = "[SteerSpec Conflict] duplicate-skill: " + skillPath
-		overTitle  = "[SteerSpec Conflict] manual-override: " + markerB
-		markerText = "<!-- STEERSPEC:e2e-shared -->\nshared section\n<!-- /STEERSPEC:e2e-shared -->\n"
+		overTitle  = "[SteerSpec Conflict] section-overlap: " + markerB
+		markerText = "<!-- STEERSPEC:BEGIN:e2e-shared -->\nshared section\n<!-- STEERSPEC:END:e2e-shared -->\n"
 	)
 	mcAddTemplates(t, env,
 		config.TemplateConfig{
@@ -266,17 +266,17 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 	}
 	mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, dupTitle, 0)
 
-	// 2. Section overlap: the same STEERSPEC marker id in two marker-managed files of one target.
+	// 2. Section overlap: the same STEERSPEC section in two marker-managed files of one target (CNFLDTS-009).
 	mcWriteAndWait(t, env, pub, markerA, []byte(markerText))
 	mcWriteAndWait(t, env, pub, markerB, []byte(markerText))
 
 	rep = mcConflict(t, env, "2", 0)
-	if got := mcEntryTypes(rep, conflict.SeverityWarning); got[conflict.TypeManualOverride] != 1 || len(got) != 1 {
-		t.Fatalf("warning entries = %v, want exactly one manual-override\n%+v", got, rep.Entries)
+	if got := mcEntryTypes(rep, conflict.SeverityWarning); got[conflict.TypeSectionOverlap] != 1 || len(got) != 1 {
+		t.Fatalf("warning entries = %v, want exactly one section-overlap\n%+v", got, rep.Entries)
 	}
 	for _, e := range rep.Entries {
 		if e.Repo != env.Org+"/"+pub || e.FilePath != markerB {
-			t.Errorf("manual-override entry = %+v, want repo %s file %s", e, env.Org+"/"+pub, markerB)
+			t.Errorf("section-overlap entry = %+v, want repo %s file %s", e, env.Org+"/"+pub, markerB)
 		}
 	}
 	if rep.IssuesCreated != 1 || rep.IssuesClosed != 0 {
