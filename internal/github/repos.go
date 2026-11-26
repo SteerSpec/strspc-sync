@@ -219,6 +219,50 @@ func (s *repoService) IsSymlink(ctx context.Context, owner, repo, path, ref stri
 	return false, nil
 }
 
+func (s *repoService) ListFiles(ctx context.Context, owner, repo, dir, ref string) ([]string, error) {
+	if ref == "" {
+		ref = "HEAD"
+	}
+	dir = strings.Trim(dir, "/")
+	// The root tree is the ref itself, as in IsSymlink; a subdirectory is ref:dir.
+	treeish, prefix := ref, ""
+	if dir != "" {
+		treeish, prefix = ref+":"+dir, dir+"/"
+	}
+	u := fmt.Sprintf("%s/repos/%s/%s/git/trees/%s?recursive=1", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(treeish))
+	resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		resp.Body.Close() //nolint:errcheck // not-found body close is best-effort
+		return nil, nil
+	}
+	if err := checkResponse(resp); err != nil {
+		return nil, fmt.Errorf("list files %s/%s@%s: %w", owner, repo, treeish, err)
+	}
+	var tree struct {
+		Tree []struct {
+			Path string `json:"path"`
+			Type string `json:"type"`
+		} `json:"tree"`
+		Truncated bool `json:"truncated"`
+	}
+	if err := decodeBody(resp, &tree); err != nil {
+		return nil, err
+	}
+	if tree.Truncated {
+		return nil, fmt.Errorf("tree %s/%s@%s is truncated: cannot list every file under %s", owner, repo, treeish, dir)
+	}
+	var files []string
+	for _, e := range tree.Tree {
+		if e.Type == "blob" { // files and symlinks; "tree" is a directory and "commit" a submodule
+			files = append(files, prefix+e.Path)
+		}
+	}
+	return files, nil
+}
+
 // CreateOrUpdateFile commits content to path on branch, or on the default branch when branch is empty. path is a
 // repository path, not a URL segment. When sha is non-empty it is the blob the caller read, and the write fails
 // if the file at the branch head has changed since, as the Contents API did with a stale sha.

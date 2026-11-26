@@ -1,0 +1,55 @@
+{
+  "rule_id": "CNFLDTS-002",
+  "revision": 0,
+  "body_hash": "blake3:f89cc518f06774847a46df666f3a2370ce561424e218d42099592b1f5054e906",
+  "promoted_at": "2026-11-26T12:13:57Z",
+  "entity_version": "0.10.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "5dee09bf329079aec40391760355b8f49eca5fe60765506c65d50055665c4351",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.95,
+  "explanation": "Tier 1 (runTier1) invokes hash-based version drift detection, cross-reference (missing file reference) checks, and unmanaged file detection, all deterministic and covered by tests.",
+  "evidence": [
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 27,
+      "excerpt": "driftEntries, err := s.checkVersionDrift(ctx, deployState, owner, repo, target)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 70,
+      "excerpt": "drifted, expected, actual := ts.Drift(content)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 34,
+      "excerpt": "crossRefEntries, err := s.checkCrossReferences(ctx, owner, repo, target)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 132,
+      "excerpt": "Type: TypeCrossReferenceBroken,",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 41,
+      "excerpt": "entries = append(entries, s.checkUnmanagedFiles(ctx, deployState, owner, repo, target)...)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 211,
+      "excerpt": "Type: TypeUnmanagedFile,",
+      "line_confirmed": true
+    }
+  ]
+}

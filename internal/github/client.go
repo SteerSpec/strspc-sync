@@ -35,6 +35,10 @@ type RepoService interface {
 	// IsSymlink reports whether path is a symlink at ref. GetFileContent cannot tell: the Contents API follows
 	// a working in-repo link and returns the target's content as a regular file.
 	IsSymlink(ctx context.Context, owner, repo, path, ref string) (bool, error)
+	// ListFiles returns the path of every file under dir at ref (the default branch when ref is empty), recursively
+	// and relative to the repository root; an empty dir lists the whole repository. A missing dir yields an empty
+	// list. When the API truncates the listing, ListFiles returns an error instead of a partial list.
+	ListFiles(ctx context.Context, owner, repo, dir, ref string) ([]string, error)
 }
 
 // PullRequestService provides access to pull-request-related GitHub API endpoints.

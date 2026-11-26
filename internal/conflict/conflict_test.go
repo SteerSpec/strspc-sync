@@ -25,10 +25,28 @@ type mockRepoService struct {
 	failPaths map[string]bool
 	files     map[string][]byte // key: "owner/repo/path"
 	orgRepos  []*gh.Repository  // returned by ListByOrg
+	// listFail lists "owner/repo" keys whose ListFiles fails with a non-404 API error.
+	listFail map[string]bool
 }
 
 func (m *mockRepoService) IsSymlink(_ context.Context, _, _, _, _ string) (bool, error) {
 	return false, nil
+}
+
+// ListFiles lists the files map's paths under dir for owner/repo, sorted, as the Git Trees listing would.
+func (m *mockRepoService) ListFiles(_ context.Context, owner, repo, dir, _ string) ([]string, error) {
+	if m.listFail[owner+"/"+repo] {
+		return nil, &gh.APIError{StatusCode: 502, Message: "bad gateway"}
+	}
+	prefix := owner + "/" + repo + "/" + strings.Trim(dir, "/") + "/"
+	var files []string
+	for key := range m.files {
+		if strings.HasPrefix(key, prefix) {
+			files = append(files, strings.TrimPrefix(key, owner+"/"+repo+"/"))
+		}
+	}
+	slices.Sort(files)
+	return files, nil
 }
 
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, _ string) ([]byte, string, error) {
@@ -382,6 +400,7 @@ func TestTier1_UnmanagedFile(t *testing.T) {
 		files     []string // paths present in org/repo1
 		tracked   []string // template IDs the state records for org/repo1
 		failPaths []string
+		listFail  bool     // the .claude/ listing fails
 		want      []string // unmanaged paths reported
 	}{
 		{name: "no state, no files", want: nil},
@@ -400,6 +419,13 @@ func TestTier1_UnmanagedFile(t *testing.T) {
 			tracked: []string{"claude-md", "skill-test"}, want: nil,
 		},
 		{name: "failed read is not reported", failPaths: []string{"CLAUDE.md"}, want: nil},
+		// CNFLDTS-002: every file under .claude/ is checked, not only the configured destinations.
+		{name: "untracked agent outside the templates", files: []string{".claude/agents/x.md"}, want: []string{".claude/agents/x.md"}},
+		{
+			name: "tracked skill, untracked agent and settings", files: []string{".claude/skills/test.md", ".claude/agents/x.md", ".claude/settings.json"},
+			tracked: []string{"skill-test"}, want: []string{".claude/agents/x.md", ".claude/settings.json"},
+		},
+		{name: "failed listing is not reported", files: []string{".claude/agents/x.md"}, listFail: true, want: nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -409,6 +435,9 @@ func TestTier1_UnmanagedFile(t *testing.T) {
 			}
 			for _, p := range tt.failPaths {
 				repos.failPaths["org/repo1/"+p] = true
+			}
+			if tt.listFail {
+				repos.listFail = map[string]bool{"org/repo1": true}
 			}
 			ds := state.NewDeploymentState()
 			for _, id := range tt.tracked {
@@ -427,8 +456,8 @@ func TestTier1_UnmanagedFile(t *testing.T) {
 			if strings.Join(paths, ",") != strings.Join(tt.want, ",") {
 				t.Errorf("unmanaged = %v, want %v", paths, tt.want)
 			}
-			if len(tt.failPaths) > 0 && !scanner.incomplete["org/repo1"] {
-				t.Error("a failed read must mark the repo incomplete")
+			if (len(tt.failPaths) > 0 || tt.listFail) && !scanner.incomplete["org/repo1"] {
+				t.Error("a failed read or listing must mark the repo incomplete")
 			}
 		})
 	}

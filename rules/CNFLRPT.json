@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.9.10",
-    "timestamp": "2026-11-26T10:43:41Z",
-    "hash": "blake3:ba7c11fab8ff68cd32e9ff2d4238ea88fb8a51c90fff41101b699f1b69490bba"
+    "version": "0.9.11",
+    "timestamp": "2026-11-26T12:13:57Z",
+    "hash": "blake3:098d512d71d28d713f32c4f93f8a2334601eb18c072ad4bf74e86d1b791b6d9f"
   },
   "rules": [
     {
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.9.1",
-        "timestamp": "2026-11-26T10:43:41Z",
-        "hash": "blake3:7059980ffe96723b207cac6e445d139d64d0837a56945d523739b2d2fd81ed01"
+        "version": "0.10.0",
+        "timestamp": "2026-11-26T12:13:57Z",
+        "hash": "blake3:cddf2ce29b99bb2cd46e0933ab9d7b2220a66e5d71dab265fb8965948240050e"
       },
       "rules": [
         {
@@ -228,7 +228,7 @@
         {
           "id": "CNFLDTS-002",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "Tier 1 (deterministic) MUST include: version drift detection via hash comparison, missing file references, and unmanaged file detection.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",

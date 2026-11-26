@@ -23,6 +23,10 @@ func (m *mockRepoService) IsSymlink(_ context.Context, _, _, _, _ string) (bool,
 	return false, nil
 }
 
+func (m *mockRepoService) ListFiles(_ context.Context, _, _, _, _ string) ([]string, error) {
+	return nil, nil
+}
+
 func (m *mockRepoService) GetFileContent(_ context.Context, owner, repo, path, _ string) ([]byte, string, error) {
 	key := owner + "/" + repo + "/" + path
 	content, ok := m.files[key]

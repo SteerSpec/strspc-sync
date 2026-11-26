@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -644,6 +645,57 @@ func TestRepoGetFileContentSymlink(t *testing.T) {
 	_, _, err := c.Repos.GetFileContent(context.Background(), "o", "r", "CLAUDE.md", "main")
 	if !errors.Is(err, ErrSymlink) {
 		t.Fatalf("expected ErrSymlink, got %v", err)
+	}
+}
+
+// ListFiles lists every file under a directory with one recursive Git Trees call, as paths from the repository root.
+// Directories and submodules are not files; a missing directory is an empty list; a truncated tree is an error.
+func TestRepoListFiles(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/git/trees/HEAD:.claude", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("recursive") != "1" {
+			t.Errorf("expected recursive=1, got %q", r.URL.RawQuery)
+		}
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
+			"truncated": false,
+			"tree": []map[string]string{
+				{"path": "agents", "type": "tree"},
+				{"path": "agents/review.md", "type": "blob"},
+				{"path": "settings.json", "type": "blob"},
+				{"path": "vendor", "type": "commit"},
+			},
+		})
+	})
+	mux.HandleFunc("/repos/o/r/git/trees/main", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
+			"truncated": false,
+			"tree":      []map[string]string{{"path": "README.md", "type": "blob"}, {"path": "docs", "type": "tree"}},
+		})
+	})
+	mux.HandleFunc("/repos/o/r/git/trees/main:none", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"message":"Not Found"}`) //nolint:errcheck // test handler write
+	})
+	mux.HandleFunc("/repos/o/r/git/trees/main:big", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"truncated": true, "tree": []map[string]string{}}) //nolint:errcheck // test handler write
+	})
+	c := testClient(t, mux)
+
+	got, err := c.Repos.ListFiles(context.Background(), "o", "r", ".claude/", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{".claude/agents/review.md", ".claude/settings.json"}; !slices.Equal(got, want) {
+		t.Errorf("ListFiles = %v, want %v", got, want)
+	}
+	if got, err := c.Repos.ListFiles(context.Background(), "o", "r", "", "main"); err != nil || !slices.Equal(got, []string{"README.md"}) {
+		t.Errorf("the repository root must list root-relative paths, got %v, %v", got, err)
+	}
+	if got, err := c.Repos.ListFiles(context.Background(), "o", "r", "none", "main"); err != nil || len(got) != 0 {
+		t.Errorf("a missing directory must be an empty list, got %v, %v", got, err)
+	}
+	if _, err := c.Repos.ListFiles(context.Background(), "o", "r", "big", "main"); err == nil || !strings.Contains(err.Error(), "truncated") {
+		t.Errorf("a truncated tree must be an error, got %v", err)
 	}
 }
 
