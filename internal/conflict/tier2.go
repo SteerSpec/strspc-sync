@@ -96,7 +96,8 @@ func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([
 // checkSectionOverlap reports a STEERSPEC:BEGIN/END section that appears in more than one marker-managed file of a
 // target (CNFLDTS-009). Sync writes each section only to its own template's destination, so a second copy was added by
 // hand or by a misconfigured template, and the two may diverge. Several marker templates may share one destination;
-// only different files count. A file whose markers cannot be parsed is skipped: tier 1 reports it.
+// only different files count. Only well-formed sections count, so a broken marker hides neither the file's other
+// sections nor an overlap among them; tier 1 reports a broken section a template manages.
 func (s *Scanner) checkSectionOverlap(ctx context.Context, targets []string) []ConflictEntry {
 	var entries []ConflictEntry
 	for _, target := range targets {
@@ -115,11 +116,7 @@ func (s *Scanner) checkSectionOverlap(ctx context.Context, targets []string) []C
 			if err != nil || !found {
 				continue
 			}
-			names, err := template.SectionNames(content)
-			if err != nil {
-				continue
-			}
-			for _, name := range names {
+			for _, name := range template.WellFormedSectionNames(content) {
 				first, ok := owners[name]
 				if !ok {
 					owners[name] = tmpl.Destination

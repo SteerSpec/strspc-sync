@@ -19,6 +19,27 @@ func TestSectionNames(t *testing.T) {
 	}
 }
 
+func TestWellFormedSectionNames(t *testing.T) {
+	sec := func(n string) string {
+		return "<!-- STEERSPEC:BEGIN:" + n + " -->\nx\n<!-- STEERSPEC:END:" + n + " -->\n"
+	}
+	for _, tc := range []struct {
+		name, content string
+		want          []string
+	}{
+		{"sorted", sec("b") + sec("a"), []string{"a", "b"}},
+		{"none", "no sections\n", nil},
+		{"unclosed beside a good one", "<!-- STEERSPEC:BEGIN:x -->\n" + sec("a"), []string{"a"}},
+		{"duplicated", sec("a") + sec("a") + sec("b"), []string{"b"}},
+		{"nested", "<!-- STEERSPEC:BEGIN:o -->\n" + sec("i") + "<!-- STEERSPEC:END:o -->\n", []string{"i"}},
+		{"end before begin", "<!-- STEERSPEC:END:a -->\n<!-- STEERSPEC:BEGIN:a -->\n", nil},
+	} {
+		if got := WellFormedSectionNames([]byte(tc.content)); !slices.Equal(got, tc.want) {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestSectionsHash(t *testing.T) {
 	const managed = "<!-- STEERSPEC:BEGIN:org -->\nOrg rules.\n<!-- STEERSPEC:END:org -->"
 	names := []string{"org"}

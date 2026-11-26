@@ -384,8 +384,8 @@ func TestLegacyOverlapIssueClosedWhenTrackedFileMissing(t *testing.T) {
 }
 
 // CNFLDTS-009: tier 2 reports a STEERSPEC:BEGIN/END section held by two marker-managed files of one target as a
-// section-overlap warning. Two templates sharing a destination are one file; a file with broken markers is left to
-// tier 1; a marker form sync never writes is not a section.
+// section-overlap warning. Two templates sharing a destination are one file; a broken section is not a section, and
+// does not hide the well-formed ones beside it; a marker form sync never writes is not a section.
 func TestTier2_SectionOverlap(t *testing.T) {
 	sec := func(name string) string {
 		return "<!-- STEERSPEC:BEGIN:" + name + " -->\n" + name + " text\n<!-- STEERSPEC:END:" + name + " -->\n"
@@ -416,9 +416,15 @@ func TestTier2_SectionOverlap(t *testing.T) {
 			files:     map[string]string{"A.md": sec("org"), "B.md": sec("team")},
 		},
 		{
-			name:      "broken markers skipped",
+			name:      "broken section skipped",
 			templates: []config.TemplateConfig{marker("a", "A.md"), marker("b", "B.md")},
 			files:     map[string]string{"A.md": sec("org"), "B.md": "<!-- STEERSPEC:BEGIN:org -->\nunclosed\n"},
+		},
+		{
+			name:      "broken unrelated marker does not hide an overlap",
+			templates: []config.TemplateConfig{marker("a", "A.md"), marker("b", "B.md")},
+			files:     map[string]string{"A.md": sec("org"), "B.md": "<!-- STEERSPEC:BEGIN:mine -->\nunclosed\n" + sec("org")},
+			want:      []string{`B.md: "org" appears in both A.md and B.md`},
 		},
 		{
 			name:      "not a sync marker",
