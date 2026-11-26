@@ -4,6 +4,12 @@ on:
     - cron: '0 8 * * 1'
   workflow_dispatch:
 
+# One monitor run at a time, so a manual run and the scheduled one don't both open an issue for the same drift.
+# A queued run waits rather than cancelling the one in progress.
+concurrency:
+  group: steerspec-monitor
+  cancel-in-progress: false
+
 jobs:
   monitor:
     runs-on: ubuntu-latest
