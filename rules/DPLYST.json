@@ -6,9 +6,9 @@
     "description": "The record of what template versions are deployed to which repositories."
   },
   "rule_set": {
-    "version": "0.7.2",
-    "timestamp": "2026-11-26T09:20:42Z",
-    "hash": "blake3:0af31a352403416027ae1db1d2da62642323d78593e0faf8d9dc944b0ee42c10"
+    "version": "0.11.0",
+    "timestamp": "2026-11-26T10:13:47Z",
+    "hash": "blake3:92bbd9f50174a4360f37a2d20b28e5d700fbffd7781691da7f059f5b9d86fd3e"
   },
   "rules": [
     {
@@ -32,7 +32,7 @@
     {
       "id": "DPLYST-003",
       "revision": 0,
-      "state": "P",
+      "state": "T",
       "body": "HAS per-repository records containing: deployed version, timestamp, PR number, and PR status.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -59,7 +59,7 @@
     {
       "id": "DPLYST-006",
       "revision": 0,
-      "state": "P",
+      "state": "T",
       "body": "For a template using the marker strategy, a per-repository record HAS the names of the sections the template manages and the Blake3 hash of those sections in the deployed file.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
@@ -68,7 +68,7 @@
     {
       "id": "DPLYST-007",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS per-repository records containing the deployed version and timestamp and, once a sync PR has been opened for that repository and template, the number and status of the latest one.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-26",
@@ -77,7 +77,7 @@
     {
       "id": "DPLYST-008",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "For a marker template that defines managed sections, a per-repository record HAS the names of those sections and the Blake3 hash of them in the deployed file.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-26",
