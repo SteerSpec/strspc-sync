@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/SteerSpec/strspc-sync/internal/hash"
@@ -63,8 +64,15 @@ func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([
 		}
 	}
 
-	// Flag a skill whose content differs between repositories
-	for path, skills := range skillsByPath {
+	// Flag a skill whose content differs between repositories, in path order so the report and the issue updates
+	// are the same on every run.
+	paths := make([]string, 0, len(skillsByPath))
+	for path := range skillsByPath {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		skills := skillsByPath[path]
 		if len(skills) < 2 {
 			continue
 		}
