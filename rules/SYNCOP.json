@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.12.2",
-    "timestamp": "2026-11-26T14:12:14Z",
-    "hash": "blake3:a2b6fccf2ea4502e88c8ed64610bf3d6cc2ff1739fb40acf772979999c006edc"
+    "version": "0.14.0",
+    "timestamp": "2026-11-26T14:20:49Z",
+    "hash": "blake3:08bbcb66d75a0a26b504b67ba417b04bd774711f8e0c32888170f1e87231de38"
   },
   "rules": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "SYNCOP-005",
       "revision": 0,
-      "state": "P",
+      "state": "T",
       "body": "HAS a status which MUST be one of: \"pending\", \"running\", \"completed\", \"failed\".",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -95,7 +95,7 @@
     {
       "id": "SYNCOP-010",
       "revision": 0,
-      "state": "D",
+      "state": "P",
       "body": "HAS a status which MUST be one of: \"completed\", \"failed\".",
       "added_by": "github:pleberre",
       "added_at": "2026-11-26",
