@@ -426,17 +426,16 @@ func runConflict(args []string, out, errOut io.Writer) error {
 	return nil
 }
 
-func detectTrigger() string {
-	if os.Getenv("GITHUB_EVENT_NAME") == "push" {
-		return "push"
+// detectTrigger maps the GitHub event that started the workflow to a sync trigger. Any event other than push or
+// schedule, and a run outside GitHub Actions, is manual.
+func detectTrigger() sync.Trigger {
+	switch os.Getenv("GITHUB_EVENT_NAME") {
+	case "push":
+		return sync.TriggerPush
+	case "schedule":
+		return sync.TriggerSchedule
 	}
-	if os.Getenv("GITHUB_EVENT_NAME") == "workflow_dispatch" {
-		return "manual"
-	}
-	if os.Getenv("GITHUB_EVENT_NAME") == "schedule" {
-		return "schedule"
-	}
-	return "manual"
+	return sync.TriggerManual
 }
 
 func detectCentralRepo(cfg *config.SyncConfig, errOut io.Writer) (string, string, error) {

@@ -35,10 +35,31 @@ const (
 	StatusFailed Status = "failed"
 )
 
+// Trigger is what started a sync run (SYNCOP-003).
+type Trigger string
+
+const (
+	// TriggerPush is a run started by a push to the central repository.
+	TriggerPush Trigger = "push"
+	// TriggerManual is a run started by hand: workflow_dispatch, a local invocation, or any other event.
+	TriggerManual Trigger = "manual"
+	// TriggerSchedule is a run started by a cron schedule.
+	TriggerSchedule Trigger = "schedule"
+)
+
+// Valid reports whether t is one of the three triggers a run may have.
+func (t Trigger) Valid() bool {
+	switch t {
+	case TriggerPush, TriggerManual, TriggerSchedule:
+		return true
+	}
+	return false
+}
+
 // Result represents the outcome of a sync operation.
 type Result struct {
 	ID        string    `json:"id"`
-	Trigger   string    `json:"trigger"`
+	Trigger   Trigger   `json:"trigger"`
 	Timestamp time.Time `json:"timestamp"`
 	Status    Status    `json:"status"`
 	// ReposTargeted is how many repositories the targets section resolved
@@ -70,7 +91,9 @@ type Options struct {
 	TargetFilter   string
 	TemplateFilter string
 	Force          bool
-	Trigger        string
+	// Trigger is what started the run. Empty means TriggerManual; any other value outside the three triggers is
+	// rejected before the run starts.
+	Trigger Trigger
 }
 
 // Syncer orchestrates template synchronization across repositories.
@@ -102,9 +125,18 @@ func New(cfg *config.SyncConfig, ghClient *gh.Client, centralOwner, centralRepo 
 
 // Run executes the sync operation.
 func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
+	trigger := opts.Trigger
+	if trigger == "" {
+		trigger = TriggerManual
+	}
+	if !trigger.Valid() {
+		// No run starts, so there is no Result to report a trigger outside the three.
+		return nil, fmt.Errorf("invalid trigger %q: must be one of %q, %q, %q",
+			trigger, TriggerPush, TriggerManual, TriggerSchedule)
+	}
 	result := &Result{
 		ID:        uuid.New().String(),
-		Trigger:   opts.Trigger,
+		Trigger:   trigger,
 		Timestamp: time.Now().UTC(),
 	}
 
