@@ -337,6 +337,29 @@ func TestTier1_ManagedSectionMismatchType(t *testing.T) {
 	}
 }
 
+// A section-overlap issue filed before section-overlap had its own type carries manual-override and the same
+// fingerprint a tier-1 manual-override would. A missing tracked file keeps only the tier-1 kind open; the legacy
+// overlap issue is closed, since nothing reports it under that type again.
+func TestLegacyOverlapIssueClosedWhenTrackedFileMissing(t *testing.T) {
+	fp := hash.Fingerprint(string(TypeManualOverride), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 31, Title: "[SteerSpec Conflict] manual-override: CLAUDE.md", State: "open", Labels: []string{"steerspec-conflict"},
+		Body: "STEERSPEC section \"org\" appears in both A.md and CLAUDE.md\n\n" + fingerprintPrefix + fp + fingerprintSuffix +
+			"\n" + typePrefix + string(TypeManualOverride) + fingerprintSuffix,
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: "h", Sections: []string{"org"}, SectionsHash: "s", Timestamp: time.Now(),
+	})
+	scanner := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central")
+	if _, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 {
+		t.Errorf("a legacy overlap issue must close on the first tier-1 run, closed %v", issues.closed)
+	}
+}
+
 // CNFLDTS-009: tier 2 reports a STEERSPEC:BEGIN/END section held by two marker-managed files of one target as a
 // section-overlap warning. Two templates sharing a destination are one file; a file with broken markers is left to
 // tier 1; a marker form sync never writes is not a section.

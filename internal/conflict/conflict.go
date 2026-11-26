@@ -485,7 +485,7 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 					continue // central's own files were not checked this run
 				}
 			}
-			if (typ == TypeVersionDrift || typ == TypeManualOverride) &&
+			if (typ == TypeVersionDrift || (typ == TypeManualOverride && !legacyOverlapIssue(issue))) &&
 				(unchecked[extractFingerprint(issue.Body)] || unchecked[issue.Title]) {
 				continue // that tracked file is gone, so its drift was not checked
 			}
@@ -496,6 +496,14 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 		}
 	}
 	return nil
+}
+
+// legacyOverlapIssue reports whether a manual-override issue is a section-overlap finding from before section-overlap
+// had its own type: tier 2 filed overlaps as manual-override, with the same repo and path fingerprint tier 1 now uses.
+// Its body starts with the overlap description, which tier 1 never writes. It is not about a managed-section edit, so
+// a missing tracked file must not keep it open: no tier reports it under that type again.
+func legacyOverlapIssue(issue *gh.Issue) bool {
+	return strings.HasPrefix(issue.Body, "STEERSPEC section ") && strings.Contains(issue.Body, " appears in both ")
 }
 
 // extractFingerprint returns the fingerprint embedded in an issue body, or ""
