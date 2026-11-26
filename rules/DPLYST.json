@@ -6,9 +6,9 @@
     "description": "The record of what template versions are deployed to which repositories."
   },
   "rule_set": {
-    "version": "0.7.0",
-    "timestamp": "2026-11-14T20:06:29Z",
-    "hash": "blake3:884bba0a45bcef96595e5ebd1669d9b11f6e00d669aaeccb3cfa9421ea436d1f"
+    "version": "0.7.2",
+    "timestamp": "2026-11-26T09:20:42Z",
+    "hash": "blake3:0af31a352403416027ae1db1d2da62642323d78593e0faf8d9dc944b0ee42c10"
   },
   "rules": [
     {
@@ -64,6 +64,24 @@
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
       "supersedes": null
+    },
+    {
+      "id": "DPLYST-007",
+      "revision": 0,
+      "state": "D",
+      "body": "HAS per-repository records containing the deployed version and timestamp and, once a sync PR has been opened for that repository and template, the number and status of the latest one.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-26",
+      "supersedes": "DPLYST-003"
+    },
+    {
+      "id": "DPLYST-008",
+      "revision": 0,
+      "state": "D",
+      "body": "For a marker template that defines managed sections, a per-repository record HAS the names of those sections and the Blake3 hash of them in the deployed file.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-26",
+      "supersedes": "DPLYST-006"
     }
   ],
   "notes": []
