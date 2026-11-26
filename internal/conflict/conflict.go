@@ -339,9 +339,12 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 				continue
 			}
 			issueFP := extractFingerprint(issue.Body)
-			legacy := legacyTitle != "" && issueFP != fp && issue.Title != title &&
-				(issueFP == legacyFP || issue.Title == legacyTitle)
-			if issueFP == fp || issue.Title == title || legacy {
+			current := issueFP == fp || issue.Title == title
+			legacyKey := legacyTitle != "" && (issueFP == legacyFP || issue.Title == legacyTitle)
+			// Retitle an issue still titled with the bare filename, and one found only by a legacy key. An issue
+			// found by its current fingerprint keeps any other title someone gave it.
+			retitle := issue.Title != title && ((legacyTitle != "" && issue.Title == legacyTitle) || (!current && legacyKey))
+			if current || legacyKey {
 				found = true
 				if len(participants) > 0 {
 					// Keep previously recorded participants this run could
@@ -357,7 +360,7 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 					}
 				}
 				update := &gh.IssueUpdate{Body: &body}
-				if legacy {
+				if retitle {
 					update.Title = &title
 				}
 				if err := s.ghClient.Issues.Update(ctx, owner, repoName, issue.Number, update); err != nil {
@@ -365,7 +368,7 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 				}
 				// Keep the listed copy current, so a later entry this run does not claim the same issue again.
 				issue.Body = body
-				if legacy {
+				if retitle {
 					issue.Title = title
 				}
 				break

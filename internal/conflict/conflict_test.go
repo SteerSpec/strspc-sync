@@ -581,6 +581,12 @@ func TestDuplicateSkillIssueMovesToFullPath(t *testing.T) {
 		{name: "legacy issue with participants", body: legacyBody, skills: []string{"a"}},
 		{name: "legacy issue without the marker", body: "old body", skills: []string{"a"}},
 		{
+			// A partial update gave the issue the full-path fingerprint but left the bare-filename title.
+			name:   "full-path fingerprint, bare-filename title",
+			body:   fingerprintPrefix + hash.Fingerprint(string(TypeDuplicateSkill), "org/central", ".claude/skills/a/SKILL.md") + fingerprintSuffix,
+			skills: []string{"a"},
+		},
+		{
 			name: "two skills share the filename", body: legacyBody, skills: []string{"a", "b"},
 			wantCreated: []string{"[SteerSpec Conflict] duplicate-skill: .claude/skills/b/SKILL.md"},
 		},
