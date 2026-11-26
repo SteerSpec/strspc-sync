@@ -1,0 +1,55 @@
+{
+  "rule_id": "SYNCACT-024",
+  "revision": 0,
+  "body_hash": "blake3:b64a106cda347f4957ff3991e754e9008c2e01f6bb2762cc2a178c07c8a4b329",
+  "promoted_at": "2026-11-26T10:27:10Z",
+  "entity_version": "0.37.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "1ef8ca6d936bac2a126e4adfe095833a33675d85406e917b65f89931bfa3ad9c",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The sync code renders with the configured strategy, skips and reports symlinked destinations, and creates or updates PRs unless dry-run. It reports closed-unmerged PRs and retries only with force, with tests covering each case.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 322,
+      "excerpt": "rendered, err := template.Render(template.Strategy(tmpl.Strategy), templateContent, existingContent, vars)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 301,
+      "excerpt": "if isLink {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 381,
+      "excerpt": "if dryRun {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 489,
+      "excerpt": "pr, err = s.ghClient.PullRequests.Create(ctx, owner, repo, &gh.PullRequestCreate{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 467,
+      "excerpt": "err = s.ghClient.PullRequests.Update(ctx, owner, repo, pr.Number, &gh.PullRequestUpdate{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 374,
+      "excerpt": "rr.Error = fmt.Sprintf(\"sync PR #%d was closed without merging; run with force to open it again\", prev.PRNumber)",
+      "line_confirmed": true
+    }
+  ]
+}
