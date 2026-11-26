@@ -41,7 +41,7 @@ func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([
 
 	// Collect skill files across all targets, grouped by their path in the repository: a skill is identified by its
 	// destination, so .claude/skills/a/SKILL.md and .claude/skills/b/SKILL.md are different skills even though they
-	// share a filename (CNFLDTS-003).
+	// share a filename (CNFLDTS-009).
 	skillsByPath := make(map[string][]skillInfo)
 
 	skillTemplates := s.skillTemplatePaths()

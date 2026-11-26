@@ -515,7 +515,7 @@ func TestTier2_DuplicateSkill(t *testing.T) {
 }
 
 // TestTier2_DuplicateSkillByPath: a skill is identified by its path in the repository, not its filename
-// (CNFLDTS-003). Two skills sharing the name SKILL.md in different directories are not duplicates of each other;
+// (CNFLDTS-009). Two skills sharing the name SKILL.md in different directories are not duplicates of each other;
 // the same skill with different content in two repositories is, reported under its full path.
 func TestTier2_DuplicateSkillByPath(t *testing.T) {
 	cfg := testConfig()
@@ -559,6 +559,40 @@ func TestTier2_DuplicateSkillByPath(t *testing.T) {
 				t.Errorf("duplicate-skill entries = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestDuplicateSkillIssueMovesToFullPath: an open duplicate-skill issue from before CNFLDTS-009, keyed by the bare
+// filename, no longer matches any finding once both participants are scanned, so it is closed, and the finding gets a
+// new issue under the skill's full path. One run leaves exactly one open issue for the skill.
+func TestDuplicateSkillIssueMovesToFullPath(t *testing.T) {
+	cfg := testConfig()
+	cfg.Templates = []config.TemplateConfig{
+		{ID: "skill-a", Type: "skill", Source: "templates/a/SKILL.md", Destination: ".claude/skills/a/SKILL.md", Strategy: "full-replace"},
+	}
+	repos := &mockRepoService{files: map[string][]byte{
+		"org/repo1/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+		"org/repo2/.claude/skills/a/SKILL.md": []byte("# Skill A, edited"),
+	}}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 21, Title: "[SteerSpec Conflict] duplicate-skill: SKILL.md", State: "open", Labels: []string{"steerspec-conflict"},
+		Body: typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix + "\n" + reposPrefix + "org/repo1, org/repo2" + fingerprintSuffix,
+	}}}}
+
+	report, err := New(cfg, newTestClient(repos, issues), "org", "central").Run(
+		context.Background(), state.NewDeploymentState(), []string{"org/repo1", "org/repo2"}, Options{Tiers: []int{2}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(issues.closed, []int{21}) {
+		t.Errorf("the bare-filename issue #21 must be closed, closed %v", issues.closed)
+	}
+	if len(issues.created) != 1 || !strings.Contains(issues.created[0].Title, "duplicate-skill: .claude/skills/a/SKILL.md") {
+		t.Fatalf("expected one new issue under the full path, created %+v", issues.created)
+	}
+	if report.IssuesCreated != 1 || report.IssuesClosed != 1 {
+		t.Errorf("report counters = created %d closed %d, want 1 and 1", report.IssuesCreated, report.IssuesClosed)
 	}
 }
 
