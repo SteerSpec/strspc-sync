@@ -175,10 +175,23 @@ func (s *Scanner) checkUnmanagedFiles(
 		}
 	}
 
+	// An unmanaged file is an AI configuration file (CLAUDE.md or .claude/**) the deployment state does not track
+	// for this repo (CNFLENT-013). Every file under .claude/ is listed, not only the configured destinations, so a
+	// repository's own agents, skills and settings are reported too (CNFLDTS-002).
 	known := []string{"CLAUDE.md"}
 	for _, tmpl := range s.cfg.Templates {
 		known = append(known, tmpl.Destination)
 	}
+	claudeFiles, err := s.ghClient.Repos.ListFiles(ctx, owner, repo, ".claude", "")
+	if err != nil {
+		// Without the listing, files under .claude/ cannot be vouched for: keep this repo's open issues.
+		s.incomplete[target] = true
+	}
+	listed := make(map[string]bool, len(claudeFiles))
+	for _, f := range claudeFiles {
+		listed[f] = true
+	}
+	known = append(known, claudeFiles...)
 
 	var entries []ConflictEntry
 	checked := make(map[string]bool, len(known))
@@ -187,8 +200,11 @@ func (s *Scanner) checkUnmanagedFiles(
 			continue
 		}
 		checked[p] = true
-		if _, found, err := s.readFile(ctx, owner, repo, p); err != nil || !found {
-			continue
+		// A listed file exists; only a path that was not listed is read to find out.
+		if !listed[p] {
+			if _, found, err := s.readFile(ctx, owner, repo, p); err != nil || !found {
+				continue
+			}
 		}
 		entries = append(entries, ConflictEntry{
 			Severity:    SeverityInfo,

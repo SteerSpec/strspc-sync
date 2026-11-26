@@ -76,6 +76,10 @@ func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, branch string) (
 	return "abc123sha", nil
 }
 
+func (m *mockRepoService) ListFiles(_ context.Context, _, _, _, _ string) ([]string, error) {
+	return nil, nil
+}
+
 func (m *mockRepoService) IsSymlink(_ context.Context, owner, repo, path, _ string) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
