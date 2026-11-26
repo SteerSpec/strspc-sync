@@ -1,0 +1,43 @@
+{
+  "rule_id": "CNFLDTS-007",
+  "revision": 0,
+  "body_hash": "blake3:22bfb642a7dffa2311f12cca9dd86a8c5108832c1d826c2e1c1cf73aa7c09d57",
+  "promoted_at": "2026-11-26T08:58:49Z",
+  "entity_version": "0.9.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "1ef8ca6d936bac2a126e4adfe095833a33675d85406e917b65f89931bfa3ad9c",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Tiers are selected via a list (config, CLI --tiers, action input) and each listed tier is dispatched independently. Tests run tier 1 alone and tier 2 alone. Tier 3 can be enabled on its own but is not yet implemented, so it errors; the enablement mechanism still holds.",
+  "evidence": [
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 227,
+      "excerpt": "switch tier {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 106,
+      "excerpt": "validConflictTiers = map[int]bool{1: true, 2: true, 3: true}",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict_test.go",
+      "line": 614,
+      "excerpt": "func TestCNFLDTS007_TierIndependentlyEnableable",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier3.go",
+      "line": 11,
+      "excerpt": "return nil, fmt.Errorf(\"tier 3 (LLM-assisted) conflict detection is not yet implemented\")",
+      "line_confirmed": true
+    }
+  ]
+}

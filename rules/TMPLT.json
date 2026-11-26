@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.20.0",
-    "timestamp": "2026-11-25T16:15:36Z",
-    "hash": "blake3:b7b5e9f3c4d2be0df5ce0e527cd4c1bf5b143eba4f801b84126d909e4e76111b"
+    "version": "0.21.0",
+    "timestamp": "2026-11-26T08:59:06Z",
+    "hash": "blake3:2ad84799fdd87bea3536d0d5729f770a19834445f773e4737fe4f2acd9d2c6b1"
   },
   "rules": [
     {
@@ -86,7 +86,7 @@
     {
       "id": "TMPLT-009",
       "revision": 1,
-      "state": "P",
+      "state": "I",
       "body": "When using the marker strategy, content outside the template's own managed sections belongs to the target repository, and once the deployment state records the template's sections, drift detection MUST compare only those sections.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-07",
