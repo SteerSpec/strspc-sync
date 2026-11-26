@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	pathpkg "path"
 	"sort"
 	"strings"
 	"time"
@@ -299,6 +300,15 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		remember(repo, fp)
 		remember(repo, title)
 
+		// Before CNFLDTS-009 a duplicate-skill finding was keyed by the skill's bare filename. An open issue still
+		// keyed that way describes the same conflict, so it is updated and retitled to the full path rather than
+		// closed and replaced (CNFLACT-016).
+		var legacyTitle, legacyFP string
+		if base := pathpkg.Base(entry.FilePath); entry.Type == TypeDuplicateSkill && base != entry.FilePath {
+			legacyTitle = fmt.Sprintf("[SteerSpec Conflict] %s: %s", entry.Type, base)
+			legacyFP = hash.Fingerprint(string(entry.Type), repo, base)
+		}
+
 		renderBody := func(participants []string) string {
 			body := entry.Description
 			if entry.SuggestedResolution != "" {
@@ -328,7 +338,13 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 			if !issue.Trusted(s.cfg.Conflicts.IssueLabel) {
 				continue
 			}
-			if extractFingerprint(issue.Body) == fp || issue.Title == title {
+			issueFP := extractFingerprint(issue.Body)
+			current := issueFP == fp || issue.Title == title
+			legacyKey := legacyTitle != "" && (issueFP == legacyFP || issue.Title == legacyTitle)
+			// Retitle an issue still titled with the bare filename, and one found only by a legacy key. An issue
+			// found by its current fingerprint keeps any other title someone gave it.
+			retitle := issue.Title != title && ((legacyTitle != "" && issue.Title == legacyTitle) || (!current && legacyKey))
+			if current || legacyKey {
 				found = true
 				if len(participants) > 0 {
 					// Keep previously recorded participants this run could
@@ -343,8 +359,17 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 						body = renderBody(s.mergeParticipants(participants, prev, targets))
 					}
 				}
-				if err := s.ghClient.Issues.Update(ctx, owner, repoName, issue.Number, &gh.IssueUpdate{Body: &body}); err != nil {
+				update := &gh.IssueUpdate{Body: &body}
+				if retitle {
+					update.Title = &title
+				}
+				if err := s.ghClient.Issues.Update(ctx, owner, repoName, issue.Number, update); err != nil {
 					return fmt.Errorf("updating issue for %s: %w", repo, err)
+				}
+				// Keep the listed copy current, so a later entry this run does not claim the same issue again.
+				issue.Body = body
+				if retitle {
+					issue.Title = title
 				}
 				break
 			}
