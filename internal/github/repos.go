@@ -224,10 +224,10 @@ func (s *repoService) ListFiles(ctx context.Context, owner, repo, dir, ref strin
 		ref = "HEAD"
 	}
 	dir = strings.Trim(dir, "/")
-	treeish := ref + ":" + dir
-	prefix := ""
+	// The root tree is the ref itself, as in IsSymlink; a subdirectory is ref:dir.
+	treeish, prefix := ref, ""
 	if dir != "" {
-		prefix = dir + "/"
+		treeish, prefix = ref+":"+dir, dir+"/"
 	}
 	u := fmt.Sprintf("%s/repos/%s/%s/git/trees/%s?recursive=1", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(treeish))
 	resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)

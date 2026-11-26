@@ -666,7 +666,7 @@ func TestRepoListFiles(t *testing.T) {
 			},
 		})
 	})
-	mux.HandleFunc("/repos/o/r/git/trees/main:", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/git/trees/main", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
 			"truncated": false,
 			"tree":      []map[string]string{{"path": "README.md", "type": "blob"}, {"path": "docs", "type": "tree"}},
