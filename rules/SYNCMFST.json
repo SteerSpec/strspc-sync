@@ -6,9 +6,9 @@
     "description": "The central configuration for synchronizing AI configuration files across a GitHub organization."
   },
   "rule_set": {
-    "version": "0.6.0",
-    "timestamp": "2026-11-15T18:41:12Z",
-    "hash": "blake3:758f7a47e5126ea057aefa3935c71f74961df653ea630669704fd31ed8a11a2c"
+    "version": "0.6.1",
+    "timestamp": "2026-11-26T14:12:14Z",
+    "hash": "blake3:4ce33c9066e1955f4d2277ca6f0e9bbc94901d52b4d7160b466a00e0774f527b"
   },
   "rules": [
     {
@@ -82,6 +82,15 @@
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
       "supersedes": null
+    },
+    {
+      "id": "SYNCMFST-009",
+      "revision": 0,
+      "state": "D",
+      "body": "MUST define a `targets` section with at least one `include` pattern selecting the target repositories.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-26",
+      "supersedes": "SYNCMFST-004"
     }
   ],
   "notes": [
