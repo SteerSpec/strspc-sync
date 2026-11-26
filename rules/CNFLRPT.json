@@ -7,8 +7,8 @@
   },
   "rule_set": {
     "version": "0.9.10",
-    "timestamp": "2026-11-26T10:54:41Z",
-    "hash": "blake3:d8f57d5c7d7849fafef2aaec665aa141a4067a160ff4e9adf4f997c9236cd201"
+    "timestamp": "2026-11-26T10:43:41Z",
+    "hash": "blake3:ba7c11fab8ff68cd32e9ff2d4238ea88fb8a51c90fff41101b699f1b69490bba"
   },
   "rules": [
     {
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.10.0",
-        "timestamp": "2026-11-26T10:54:41Z",
-        "hash": "blake3:7b576dc1a7757e58d33f8e51269189969ac044b54e6b6c46248cf4b51805e65e"
+        "version": "0.9.1",
+        "timestamp": "2026-11-26T10:43:41Z",
+        "hash": "blake3:7059980ffe96723b207cac6e445d139d64d0837a56945d523739b2d2fd81ed01"
       },
       "rules": [
         {
@@ -228,7 +228,7 @@
         {
           "id": "CNFLDTS-002",
           "revision": 0,
-          "state": "I",
+          "state": "P",
           "body": "Tier 1 (deterministic) MUST include: version drift detection via hash comparison, missing file references, and unmanaged file detection.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -287,6 +287,15 @@
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-009",
+          "revision": 0,
+          "state": "D",
+          "body": "Tier 2 (heuristic) MUST include: duplicate skill detection via destination path and content hash comparison, and section overlap detection between managed files.",
+          "added_by": "github:pleberre",
+          "added_at": "2026-11-26",
+          "supersedes": "CNFLDTS-003"
         }
       ],
       "notes": [

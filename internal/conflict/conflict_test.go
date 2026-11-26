@@ -123,12 +123,16 @@ func (m *mockIssueService) Create(_ context.Context, _, _ string, issue *gh.Issu
 
 func (m *mockIssueService) Update(_ context.Context, owner, repo string, number int, issue *gh.IssueUpdate) error {
 	m.updated = append(m.updated, issueUpdateCall{owner, repo, number, issue})
-	// Persist the body like the real API so a later run sees it.
-	if issue.Body != nil {
-		for _, iss := range append(m.issues, m.repoIssues[owner+"/"+repo]...) {
-			if iss.Number == number {
-				iss.Body = *issue.Body
-			}
+	// Persist the body and title like the real API so a later run sees them.
+	for _, iss := range append(m.issues, m.repoIssues[owner+"/"+repo]...) {
+		if iss.Number != number {
+			continue
+		}
+		if issue.Body != nil {
+			iss.Body = *issue.Body
+		}
+		if issue.Title != nil {
+			iss.Title = *issue.Title
 		}
 	}
 	return nil
@@ -540,6 +544,126 @@ func TestTier2_DuplicateSkill(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected duplicate skill entry, got none")
+	}
+}
+
+// TestTier2_DuplicateSkillByPath: a skill is identified by its path in the repository, not its filename
+// (CNFLDTS-009). Two skills sharing the name SKILL.md in different directories are not duplicates of each other;
+// the same skill with different content in two repositories is, reported under its full path.
+func TestTier2_DuplicateSkillByPath(t *testing.T) {
+	cfg := testConfig()
+	cfg.Templates = []config.TemplateConfig{
+		{ID: "skill-a", Type: "skill", Source: "templates/a/SKILL.md", Destination: ".claude/skills/a/SKILL.md", Strategy: "full-replace"},
+		{ID: "skill-b", Type: "skill", Source: "templates/b/SKILL.md", Destination: ".claude/skills/b/SKILL.md", Strategy: "full-replace"},
+	}
+	for _, tt := range []struct {
+		name  string
+		files map[string][]byte
+		want  []string // FilePath of each duplicate-skill entry
+	}{
+		{"same filename, different skills", map[string][]byte{
+			"org/repo1/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+			"org/repo2/.claude/skills/b/SKILL.md": []byte("# Skill B"),
+		}, nil},
+		{"both skills in both repos, each identical", map[string][]byte{
+			"org/repo1/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+			"org/repo1/.claude/skills/b/SKILL.md": []byte("# Skill B"),
+			"org/repo2/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+			"org/repo2/.claude/skills/b/SKILL.md": []byte("# Skill B"),
+		}, nil},
+		{"same skill, different content", map[string][]byte{
+			"org/repo1/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+			"org/repo2/.claude/skills/a/SKILL.md": []byte("# Skill A, edited"),
+		}, []string{".claude/skills/a/SKILL.md"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			scanner := New(cfg, newTestClient(&mockRepoService{files: tt.files}, &mockIssueService{}), "org", "central")
+			entries, err := scanner.runTier2(context.Background(), []string{"org/repo1", "org/repo2"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, e := range entries {
+				if e.Type == TypeDuplicateSkill {
+					got = append(got, e.FilePath)
+				}
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("duplicate-skill entries = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestDuplicateSkillIssueMovesToFullPath: an open duplicate-skill issue from before CNFLDTS-009, keyed by the bare
+// filename, describes a conflict that is still present, so it is updated and retitled to the skill's full path, not
+// closed and replaced (CNFLACT-016). That holds for an issue without the participant marker too. When two skills
+// share the filename, only the first claims the old issue; the other gets its own.
+func TestDuplicateSkillIssueMovesToFullPath(t *testing.T) {
+	legacyBody := typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix + "\n" + reposPrefix + "org/repo1, org/repo2" + fingerprintSuffix
+	for _, tt := range []struct {
+		name        string
+		body        string
+		skills      []string // skill directories, each a duplicate across repo1 and repo2
+		wantCreated []string // titles of new issues
+	}{
+		{name: "legacy issue with participants", body: legacyBody, skills: []string{"a"}},
+		{name: "legacy issue without the marker", body: "old body", skills: []string{"a"}},
+		{
+			// A partial update gave the issue the full-path fingerprint but left the bare-filename title.
+			name:   "full-path fingerprint, bare-filename title",
+			body:   fingerprintPrefix + hash.Fingerprint(string(TypeDuplicateSkill), "org/central", ".claude/skills/a/SKILL.md") + fingerprintSuffix,
+			skills: []string{"a"},
+		},
+		{
+			name: "two skills share the filename", body: legacyBody, skills: []string{"a", "b"},
+			wantCreated: []string{"[SteerSpec Conflict] duplicate-skill: .claude/skills/b/SKILL.md"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := testConfig()
+			cfg.Templates = nil
+			files := map[string][]byte{}
+			for _, d := range tt.skills {
+				dest := ".claude/skills/" + d + "/SKILL.md"
+				cfg.Templates = append(cfg.Templates, config.TemplateConfig{
+					ID: "skill-" + d, Type: "skill", Source: "templates/" + d + "/SKILL.md", Destination: dest, Strategy: "full-replace",
+				})
+				files["org/repo1/"+dest] = []byte("# Skill " + d)
+				files["org/repo2/"+dest] = []byte("# Skill " + d + ", edited")
+			}
+			old := &gh.Issue{
+				Number: 21, Title: "[SteerSpec Conflict] duplicate-skill: SKILL.md", State: "open", Labels: []string{"steerspec-conflict"},
+				Body: tt.body,
+			}
+			issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {old}}}
+
+			report, err := New(cfg, newTestClient(&mockRepoService{files: files}, issues), "org", "central").Run(
+				context.Background(), state.NewDeploymentState(), []string{"org/repo1", "org/repo2"}, Options{Tiers: []int{2}},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(issues.closed) != 0 {
+				t.Errorf("a still-present conflict must keep its issue open, closed %v", issues.closed)
+			}
+			if want := "[SteerSpec Conflict] duplicate-skill: .claude/skills/a/SKILL.md"; old.Title != want {
+				t.Errorf("issue #21 title = %q, want %q", old.Title, want)
+			}
+			if !strings.Contains(old.Body, fingerprintPrefix+hash.Fingerprint(string(TypeDuplicateSkill), "org/central", ".claude/skills/a/SKILL.md")) {
+				t.Errorf("issue #21 must carry the full-path fingerprint, body:\n%s", old.Body)
+			}
+			var created []string
+			for _, c := range issues.created {
+				created = append(created, c.Title)
+			}
+			if !slices.Equal(created, tt.wantCreated) {
+				t.Errorf("created %v, want %v", created, tt.wantCreated)
+			}
+			if report.IssuesClosed != 0 || report.IssuesCreated != len(tt.wantCreated) {
+				t.Errorf("report counters = created %d closed %d", report.IssuesCreated, report.IssuesClosed)
+			}
+		})
 	}
 }
 
@@ -1015,6 +1139,9 @@ func TestAggregateUpdateKeepsUncheckedParticipants(t *testing.T) {
 	}
 	if len(issues.closed) != 0 {
 		t.Fatalf("run 1 must not close anything, closed %v", issues.closed)
+	}
+	if len(issues.created) != 0 {
+		t.Fatalf("run 1 must update the existing issue (migrated from the bare filename), created %+v", issues.created)
 	}
 	if !strings.Contains(issues.repoIssues["org/central"][0].Body, "org/c") {
 		t.Fatalf("run 1 should keep the unchecked participant org/c in the marker, got:\n%s", issues.repoIssues["org/central"][0].Body)

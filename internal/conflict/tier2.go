@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/SteerSpec/strspc-sync/internal/hash"
@@ -39,8 +40,10 @@ type skillInfo struct {
 func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([]ConflictEntry, error) {
 	var entries []ConflictEntry
 
-	// Collect skill files across all targets grouped by filename
-	skillsByName := make(map[string][]skillInfo)
+	// Collect skill files across all targets, grouped by their path in the repository: a skill is identified by its
+	// destination, so .claude/skills/a/SKILL.md and .claude/skills/b/SKILL.md are different skills even though they
+	// share a filename (CNFLDTS-009).
+	skillsByPath := make(map[string][]skillInfo)
 
 	skillTemplates := s.skillTemplatePaths()
 	for _, target := range targets {
@@ -54,19 +57,22 @@ func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([
 			if err != nil || !found {
 				continue
 			}
-			// Extract just the filename from the path
-			parts := strings.Split(path, "/")
-			filename := parts[len(parts)-1]
-
-			skillsByName[filename] = append(skillsByName[filename], skillInfo{
+			skillsByPath[path] = append(skillsByPath[path], skillInfo{
 				repo: target,
 				hash: hash.HashBytes(content),
 			})
 		}
 	}
 
-	// Flag skills with the same name but different content
-	for filename, skills := range skillsByName {
+	// Flag a skill whose content differs between repositories, in path order so the report and the issue updates
+	// are the same on every run.
+	paths := make([]string, 0, len(skillsByPath))
+	for path := range skillsByPath {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		skills := skillsByPath[path]
 		if len(skills) < 2 {
 			continue
 		}
@@ -83,8 +89,8 @@ func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([
 				Severity:            SeverityWarning,
 				Type:                TypeDuplicateSkill,
 				Repo:                strings.Join(repos, ", "),
-				FilePath:            filename,
-				Description:         fmt.Sprintf("skill %q exists in %d repos with different content", filename, len(skills)),
+				FilePath:            path,
+				Description:         fmt.Sprintf("skill %q exists in %d repos with different content", path, len(skills)),
 				SuggestedResolution: "Consolidate the skill into a single template or ensure intentional divergence.",
 			})
 		}
