@@ -1,0 +1,49 @@
+{
+  "rule_id": "TMPLT-009",
+  "revision": 1,
+  "body_hash": "blake3:617b49cf51f41658a4f12cdaf827ce52f07499835fbcb65077cb7902fbb9054b",
+  "promoted_at": "2026-11-26T08:59:06Z",
+  "entity_version": "0.21.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "1ef8ca6d936bac2a126e4adfe095833a33675d85406e917b65f89931bfa3ad9c",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "Under the marker strategy, sync records section names and their hash in state. Drift detection in state, monitor and conflict tier1 compares only those sections once they are recorded, so repo-owned content outside them is not drift. Tests confirm this. The whole-file hash fallback applies only when no sections are recorded, which matches the rule's condition.",
+  "evidence": [
+    {
+      "file": "internal/state/state.go",
+      "line": 109,
+      "excerpt": "func (ts TemplateState) Drift(content []byte) (drifted bool, expected, actual string) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/state/state.go",
+      "line": 114,
+      "excerpt": "actual, ok := template.SectionsHash(content, ts.Sections)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 174,
+      "excerpt": "drifted, expectedHash, actualHash := ts.Drift(content)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 70,
+      "excerpt": "drifted, expected, actual := ts.Drift(content)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 619,
+      "excerpt": "func markerSections(tmpl config.TemplateConfig, templateContent, rendered []byte) (managedSections, error) {",
+      "line_confirmed": true
+    }
+  ]
+}
