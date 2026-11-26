@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -116,12 +117,43 @@ func ParseSource(src string) (repo, path string, err error) {
 		return "", "", fmt.Errorf("source must not be empty")
 	}
 	if m := sourceRepoRE.FindStringSubmatch(src); m != nil {
+		if err := checkRepoPath(m[2]); err != nil {
+			return "", "", fmt.Errorf("source %q: %w", src, err)
+		}
 		return m[1], m[2], nil
 	}
 	if strings.Contains(src, ":") {
 		return "", "", fmt.Errorf("source %q must be a path or owner/repo:path", src)
 	}
+	if err := checkRepoPath(src); err != nil {
+		return "", "", fmt.Errorf("source %q: %w", src, err)
+	}
 	return "", src, nil
+}
+
+// checkRepoPath reports why p is not a path relative to a repository's root, the form a template source
+// (TMPLT-004) and destination (TMPLT-005) take: not empty, not absolute, "/" separators only, no empty, "." or
+// ".." segment (so it cannot leave the repository or name it in two ways), and no control character.
+func checkRepoPath(p string) error {
+	switch {
+	case p == "":
+		return fmt.Errorf("path must not be empty")
+	case strings.HasPrefix(p, "/"):
+		return fmt.Errorf("path %q must be relative to the repository root, not absolute", p)
+	case strings.Contains(p, `\`):
+		return fmt.Errorf("path %q must use / as separator, not \\", p)
+	case strings.ContainsFunc(p, unicode.IsControl):
+		return fmt.Errorf("path %q must not contain control characters", p)
+	}
+	for _, seg := range strings.Split(p, "/") {
+		switch seg {
+		case "":
+			return fmt.Errorf("path %q must not have an empty segment (a doubled or trailing /)", p)
+		case ".", "..":
+			return fmt.Errorf("path %q must not have a %q segment", p, seg)
+		}
+	}
+	return nil
 }
 
 func Load(path string) (*SyncConfig, error) {
@@ -254,6 +286,13 @@ func Validate(cfg *SyncConfig) error {
 			if _, _, err := ParseSource(src); err != nil {
 				return fmt.Errorf("templates[%d].sources.%s: %w", i, vis, err)
 			}
+		}
+
+		if tmpl.Destination == "" {
+			return fmt.Errorf("templates[%d].destination is required", i)
+		}
+		if err := checkRepoPath(tmpl.Destination); err != nil {
+			return fmt.Errorf("templates[%d].destination: %w", i, err)
 		}
 
 		if !validTemplateTypes[tmpl.Type] {

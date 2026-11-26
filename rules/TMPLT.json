@@ -6,9 +6,9 @@
     "description": "A managed file synchronized to target repositories."
   },
   "rule_set": {
-    "version": "0.18.0",
-    "timestamp": "2026-11-15T18:47:10Z",
-    "hash": "blake3:7f52a5d0482f49f3ad6f391cbd20bedcb54f316ac23ef3f151cc002bc8cd67c3"
+    "version": "0.20.0",
+    "timestamp": "2026-11-25T16:15:36Z",
+    "hash": "blake3:b7b5e9f3c4d2be0df5ce0e527cd4c1bf5b143eba4f801b84126d909e4e76111b"
   },
   "rules": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "TMPLT-004",
       "revision": 2,
-      "state": "P",
+      "state": "I",
       "body": "A source IS a path relative to the central repository, or an owner/repo:path reference to another repository.",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
@@ -50,7 +50,7 @@
     {
       "id": "TMPLT-005",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS a destination path relative to the target repository (supports `.claude/` tree paths).",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
