@@ -7,8 +7,8 @@
   },
   "rule_set": {
     "version": "0.34.1",
-    "timestamp": "2026-11-26T09:16:04Z",
-    "hash": "blake3:7130eeaffa679f289be7fa68928ba1ccdc847794934605f56a9cdd619c549cf2"
+    "timestamp": "2026-11-26T09:20:42Z",
+    "hash": "blake3:dfac1336d04065ff2783e92934cc46874d0ae800568208126419bb595b933a35"
   },
   "rules": [
     {
@@ -222,7 +222,7 @@
       "id": "SYNCACT-024",
       "revision": 0,
       "state": "D",
-      "body": "For each out-of-date target, MUST render the template using the configured strategy and, unless the run is a dry run, create or update a SyncPullRequest, except for a symlinked destination, which is skipped and reported, and for content whose sync PR was closed without merging, which is reported and retried only when forced.",
+      "body": "For each out-of-date target, MUST render the template using the configured strategy and, unless the run is a dry run, create or update a SyncPullRequest, except for a symlinked destination, which is skipped and reported, and for unchanged content whose sync PR was closed without merging, which is reported and retried only when forced.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-26",
       "supersedes": "SYNCACT-007"

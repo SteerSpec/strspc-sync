@@ -7,8 +7,8 @@
   },
   "rule_set": {
     "version": "0.7.2",
-    "timestamp": "2026-11-26T09:16:04Z",
-    "hash": "blake3:3260c80852f2e2282f1c3ec02071140af355dc2509790e9a72f18436fc08dfde"
+    "timestamp": "2026-11-26T09:20:42Z",
+    "hash": "blake3:0af31a352403416027ae1db1d2da62642323d78593e0faf8d9dc944b0ee42c10"
   },
   "rules": [
     {
@@ -69,7 +69,7 @@
       "id": "DPLYST-007",
       "revision": 0,
       "state": "D",
-      "body": "HAS per-repository records containing the deployed version and timestamp and, once a sync PR has been opened for the template, the number and status of the latest one.",
+      "body": "HAS per-repository records containing the deployed version and timestamp and, once a sync PR has been opened for that repository and template, the number and status of the latest one.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-26",
       "supersedes": "DPLYST-003"
