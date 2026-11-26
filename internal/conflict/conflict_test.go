@@ -26,7 +26,9 @@ type mockRepoService struct {
 	files     map[string][]byte // key: "owner/repo/path"
 	orgRepos  []*gh.Repository  // returned by ListByOrg
 	// listFail lists "owner/repo" keys whose ListFiles fails with a non-404 API error.
-	listFail map[string]bool
+	listFail      map[string]bool
+	visibility    map[string]string // owner/repo -> visibility
+	visibilityErr error
 }
 
 func (m *mockRepoService) IsSymlink(_ context.Context, _, _, _, _ string) (bool, error) {
@@ -73,6 +75,17 @@ func (m *mockRepoService) GetDefaultBranch(_ context.Context, _, _ string) (stri
 	return "main", nil
 }
 
+// GetVisibility returns visibility["owner/repo"], "private" when unset, or visibilityErr.
+func (m *mockRepoService) GetVisibility(_ context.Context, owner, repo string) (string, error) {
+	if m.visibilityErr != nil {
+		return "", m.visibilityErr
+	}
+	if v := m.visibility[owner+"/"+repo]; v != "" {
+		return v, nil
+	}
+	return "private", nil
+}
+
 func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, _ string) (string, error) {
 	return "abc123sha", nil
 }
@@ -86,9 +99,11 @@ type mockIssueService struct {
 	// repoIssues, when set, scopes List to the "owner/repo" asked for, as the
 	// real API does; tests that predate it keep the flat issues slice.
 	repoIssues map[string][]*gh.Issue
-	created    []*gh.IssueCreate
-	updated    []issueUpdateCall
-	closed     []int
+	// listErr fails List for the "owner/repo" it names, as a token without access to that repo would.
+	listErr map[string]error
+	created []*gh.IssueCreate
+	updated []issueUpdateCall
+	closed  []int
 }
 
 type issueUpdateCall struct {
@@ -98,6 +113,9 @@ type issueUpdateCall struct {
 }
 
 func (m *mockIssueService) List(_ context.Context, owner, repo string, opts *gh.IssueListOptions) ([]*gh.Issue, error) {
+	if err := m.listErr[owner+"/"+repo]; err != nil {
+		return nil, err
+	}
 	all := m.issues
 	if m.repoIssues != nil {
 		all = m.repoIssues[owner+"/"+repo]
@@ -1085,17 +1103,17 @@ func TestCNFLACT007_NoDuplicateConflictIssues(t *testing.T) {
 		},
 	}
 
-	// Pre-populate an existing conflict issue with matching title
+	// Pre-populate an existing central conflict issue with matching title (CNFLACT-006)
 	issues := &mockIssueService{
-		issues: []*gh.Issue{
+		repoIssues: map[string][]*gh.Issue{"org/central": {
 			{
 				Number: 55,
-				Title:  fmt.Sprintf("[SteerSpec Conflict] %s: %s", TypeVersionDrift, "CLAUDE.md"),
+				Title:  fmt.Sprintf("[SteerSpec Conflict] %s: %s", TypeVersionDrift, "org/repo1/CLAUDE.md"),
 				Body:   "old conflict body",
 				State:  "open",
 				Labels: []string{"steerspec-conflict"},
 			},
-		},
+		}},
 	}
 	client := newTestClient(repos, issues)
 	cfg := testConfig()
@@ -1161,7 +1179,7 @@ func TestStillPresentConflictIssueStaysOpen(t *testing.T) {
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
 	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
 	issues := &mockIssueService{
-		repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		repoIssues: map[string][]*gh.Issue{"org/central": {{
 			Number: 8,
 			Title:  "some other title",
 			Body:   "<!-- steerspec-fingerprint: " + fp + " -->",
@@ -1461,7 +1479,7 @@ func TestFingerprintBasedDedup_SkipsWhenFingerprintMatches(t *testing.T) {
 	// Pre-populate an existing issue with a fingerprint in the body (but a DIFFERENT title)
 	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
 	issues := &mockIssueService{
-		issues: []*gh.Issue{
+		repoIssues: map[string][]*gh.Issue{"org/central": {
 			{
 				Number: 77,
 				Title:  "[SteerSpec Conflict] TOTALLY DIFFERENT TITLE",
@@ -1469,7 +1487,7 @@ func TestFingerprintBasedDedup_SkipsWhenFingerprintMatches(t *testing.T) {
 				State:  "open",
 				Labels: []string{"steerspec-conflict"},
 			},
-		},
+		}},
 	}
 	client := newTestClient(repos, issues)
 	cfg := testConfig()
@@ -1652,5 +1670,243 @@ func TestUntrustedLookAlikeConflictIssueIgnored(t *testing.T) {
 	}
 	if len(issues.created) != 1 {
 		t.Errorf("created %d issue(s), want 1", len(issues.created))
+	}
+}
+
+// driftSetup returns repos and a deployment state where every target's CLAUDE.md has drifted (critical).
+func driftSetup(targets ...string) (*mockRepoService, *state.DeploymentState) {
+	repos := &mockRepoService{files: map[string][]byte{}}
+	ds := state.NewDeploymentState()
+	for _, t := range targets {
+		repos.files[t+"/CLAUDE.md"] = []byte("# Drifted")
+		ds.SetTemplateState(t, "claude-md", state.TemplateState{
+			Version: "1.0.0", Hash: hash.HashBytes([]byte("# Original")), Timestamp: time.Now(),
+		})
+	}
+	return repos, ds
+}
+
+// CNFLACT-006: every conflict issue is filed in the central repository. The same conflict in two targets gets two
+// issues, each titled with its repository and listing it as the participant.
+func TestConflictIssuesFiledInCentral(t *testing.T) {
+	repos, ds := driftSetup("org/repo1", "org/repo2")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+	report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+		Run(context.Background(), ds, []string{"org/repo1", "org/repo2"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.created) != 2 || report.IssuesCreated != 2 {
+		t.Fatalf("created %d (report %d), want 2", len(issues.created), report.IssuesCreated)
+	}
+	for i, repo := range []string{"org/repo1", "org/repo2"} {
+		c := issues.created[i]
+		if want := "[SteerSpec Conflict] version-drift: " + repo + "/CLAUDE.md"; c.Title != want {
+			t.Errorf("title %q, want %q", c.Title, want)
+		}
+		if !strings.Contains(c.Body, reposPrefix+repo+fingerprintSuffix) ||
+			!strings.Contains(c.Body, hash.Fingerprint(string(TypeVersionDrift), repo, "CLAUDE.md")) {
+			t.Errorf("body for %s lacks its participant or fingerprint:\n%s", repo, c.Body)
+		}
+	}
+}
+
+// CNFLACT-006/007: an issue conflict filed in the target before CNFLACT-006 is closed once the central issue tracks
+// its conflict, with a line pointing to it, even with auto-close off. Its fingerprint is the central issue's.
+func TestLegacyTargetIssueMovedToCentral(t *testing.T) {
+	for _, autoClose := range []bool{true, false} {
+		repos, ds := driftSetup("org/repo1")
+		fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+		legacy := &gh.Issue{
+			Number: 40, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+			Labels: []string{"steerspec-conflict"}, Body: "old\n\n" + fingerprintPrefix + fp + fingerprintSuffix,
+		}
+		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {legacy}}}
+		cfg := testConfig()
+		cfg.Conflicts.AutoClose = &autoClose
+		report, err := New(cfg, newTestClient(repos, issues), "org", "central").
+			Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(issues.created) != 1 || !slices.Equal(issues.closed, []int{40}) || report.IssuesMoved != 1 || report.IssuesClosed != 0 {
+			t.Fatalf("auto-close %v: created %d, closed %v, report %+v; want 1 central issue and #40 moved",
+				autoClose, len(issues.created), issues.closed, report)
+		}
+		if !strings.Contains(legacy.Body, "**Moved:** this conflict is now tracked in org/central#1.") {
+			t.Errorf("auto-close %v: legacy body lacks the moved line:\n%s", autoClose, legacy.Body)
+		}
+	}
+}
+
+// The target pass is best-effort: a token scoped to the central repository cannot list a target's issues, and the
+// run still succeeds with its central issue filed.
+func TestLegacyTargetIssueListFailureIsBestEffort(t *testing.T) {
+	repos, ds := driftSetup("org/repo1")
+	issues := &mockIssueService{
+		repoIssues: map[string][]*gh.Issue{},
+		listErr:    map[string]error{"org/repo1": errors.New("403 resource not accessible")},
+	}
+	report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+		Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatalf("a target the token cannot reach must not fail the run: %v", err)
+	}
+	if report.IssuesCreated != 1 {
+		t.Errorf("IssuesCreated = %d, want 1", report.IssuesCreated)
+	}
+}
+
+// CNFLACT-006: only conflicts at or above conflicts.severity-threshold get an issue. One below it is still
+// detected, so its open issue is neither updated nor closed.
+func TestSeverityThreshold(t *testing.T) {
+	unmanaged := func() (*mockRepoService, *state.DeploymentState) {
+		// A CLAUDE.md the deployment state does not track: unmanaged-file (info).
+		return &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Mine")}}, state.NewDeploymentState()
+	}
+	for _, tc := range []struct {
+		threshold   string
+		wantCreated int
+	}{{"info", 1}, {"warning", 0}, {"critical", 0}, {"", 0}} {
+		repos, ds := unmanaged()
+		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+		cfg := testConfig()
+		cfg.Conflicts.SeverityThreshold = tc.threshold
+		report, err := New(cfg, newTestClient(repos, issues), "org", "central").
+			Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if report.SeveritySummary.Info == 0 {
+			t.Fatalf("%q: fixture has no info entry: %+v", tc.threshold, report.Entries)
+		}
+		if len(issues.created) != tc.wantCreated {
+			t.Errorf("threshold %q: created %d, want %d", tc.threshold, len(issues.created), tc.wantCreated)
+		}
+	}
+
+	// Raising the threshold above an open issue's severity keeps that issue open: its conflict is still there. Here
+	// a managed-section edit (manual-override, warning) with the threshold at critical.
+	repos := &mockRepoService{files: map[string][]byte{
+		"org/repo1/CLAUDE.md": []byte("<!-- STEERSPEC:BEGIN:org -->\nedited\n<!-- STEERSPEC:END:org -->\n"),
+	}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: "h", Sections: []string{"org"}, SectionsHash: "s", Timestamp: time.Now(),
+	})
+	fp := hash.Fingerprint(string(TypeManualOverride), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 41, Title: "[SteerSpec Conflict] manual-override: org/repo1/CLAUDE.md", State: "open",
+		Labels: []string{"steerspec-conflict"},
+		Body: fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeManualOverride) + fingerprintSuffix +
+			"\n" + reposPrefix + "org/repo1" + fingerprintSuffix,
+	}}}}
+	cfg := testConfig()
+	cfg.Conflicts.SeverityThreshold = "critical"
+	report, err := New(cfg, newTestClient(repos, issues), "org", "central").
+		Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.SeveritySummary.Warning != 1 {
+		t.Fatalf("fixture must report one warning, got %+v", report.Entries)
+	}
+	if len(issues.closed) != 0 || len(issues.updated) != 0 || len(issues.created) != 0 {
+		t.Errorf("a warning below the threshold must leave its issue alone: closed %v, updated %d, created %d",
+			issues.closed, len(issues.updated), len(issues.created))
+	}
+}
+
+// Cleanup closes a central issue only once every repository its participants marker lists was scanned cleanly: a run
+// limited by target-filter to another repository leaves it open.
+func TestCentralIssueClosedOnlyWhenItsRepoWasScanned(t *testing.T) {
+	content := []byte("# In sync")
+	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content, "org/repo2/CLAUDE.md": content}}
+	ds := state.NewDeploymentState()
+	for _, r := range []string{"org/repo1", "org/repo2"} {
+		ds.SetTemplateState(r, "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
+	}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issue := func() *gh.Issue {
+		return &gh.Issue{
+			Number: 42, Title: "[SteerSpec Conflict] version-drift: org/repo1/CLAUDE.md", State: "open",
+			Labels: []string{"steerspec-conflict"},
+			Body: fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeVersionDrift) + fingerprintSuffix +
+				"\n" + reposPrefix + "org/repo1" + fingerprintSuffix,
+		}
+	}
+	for _, tc := range []struct {
+		targets   []string
+		wantClose bool
+	}{{[]string{"org/repo2"}, false}, {[]string{"org/repo1", "org/repo2"}, true}} {
+		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {issue()}}}
+		if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+			Run(context.Background(), ds, tc.targets, Options{Tiers: []int{1}}); err != nil {
+			t.Fatal(err)
+		}
+		if got := len(issues.closed) == 1; got != tc.wantClose {
+			t.Errorf("targets %v: closed %v, want closed %v", tc.targets, issues.closed, tc.wantClose)
+		}
+	}
+}
+
+// A public central repository's issues are public: a conflict about a private or internal repository is withheld
+// there, counted and logged without naming the repository. A private central repository files everything.
+func TestConflictWithheldFromPublicCentral(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		visibility   map[string]string
+		visErr       error
+		wantCreated  int
+		wantWithheld int
+	}{
+		{"private central", map[string]string{"org/central": "private"}, nil, 1, 0},
+		{"public central, private target", map[string]string{"org/central": "public"}, nil, 0, 1},
+		{"public central, internal target", map[string]string{"org/central": "public", "org/repo1": "internal"}, nil, 0, 1},
+		{"public central, public target", map[string]string{"org/central": "public", "org/repo1": "public"}, nil, 1, 0},
+		{"visibility unreadable", nil, errors.New("403"), 0, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repos, ds := driftSetup("org/repo1")
+			repos.visibility, repos.visibilityErr = tc.visibility, tc.visErr
+			issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+			report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+				Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(issues.created) != tc.wantCreated || report.IssuesWithheld != tc.wantWithheld {
+				t.Errorf("created %d, withheld %d; want %d, %d", len(issues.created), report.IssuesWithheld,
+					tc.wantCreated, tc.wantWithheld)
+			}
+		})
+	}
+}
+
+// A withheld conflict is still detected: its legacy issue in the target stays open (it is not moved, since no central
+// issue tracks it), and an open central issue about it is not closed as resolved.
+func TestWithheldConflictKeepsItsIssues(t *testing.T) {
+	repos, ds := driftSetup("org/repo1")
+	repos.visibility = map[string]string{"org/central": "public"}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{
+		"org/repo1": {{
+			Number: 50, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+			Labels: []string{"steerspec-conflict"}, Body: fingerprintPrefix + fp + fingerprintSuffix,
+		}},
+		"org/central": {{
+			Number: 51, Title: "[SteerSpec Conflict] version-drift: org/repo1/CLAUDE.md", State: "open",
+			Labels: []string{"steerspec-conflict"},
+			Body:   fingerprintPrefix + fp + fingerprintSuffix + "\n" + reposPrefix + "org/repo1" + fingerprintSuffix,
+		}},
+	}}
+	report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+		Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 || len(issues.updated) != 0 || report.IssuesWithheld != 1 {
+		t.Errorf("closed %v, updated %d, withheld %d; want nothing touched and 1 withheld",
+			issues.closed, len(issues.updated), report.IssuesWithheld)
 	}
 }

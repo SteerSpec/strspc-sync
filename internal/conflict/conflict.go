@@ -15,6 +15,7 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/hash"
+	sslog "github.com/SteerSpec/strspc-sync/internal/log"
 	"github.com/SteerSpec/strspc-sync/internal/registry"
 	"github.com/SteerSpec/strspc-sync/internal/state"
 )
@@ -51,6 +52,9 @@ type Scanner struct {
 	// them, so their issues cannot be called resolved. Other files in the
 	// same repo are unaffected.
 	missingTracked map[string]map[string]bool
+	// visibility caches repository visibility ("public", "internal", "private"), from target resolution or looked
+	// up; "" when the lookup failed.
+	visibility map[string]string
 }
 
 // noteMissingTracked records that a tracked destination was absent.
@@ -177,6 +181,7 @@ func New(cfg *config.SyncConfig, ghClient *gh.Client, centralOwner, centralRepo 
 		ghClient:     ghClient,
 		centralOwner: centralOwner,
 		centralRepo:  centralRepo,
+		visibility:   make(map[string]string),
 	}
 }
 
@@ -197,6 +202,9 @@ func (s *Scanner) Targets(ctx context.Context, deployState *state.DeploymentStat
 	seen := make(map[string]bool, len(resolved)+len(deployState.Repositories))
 	for _, t := range resolved {
 		seen[t.Repo] = true
+		if t.Visibility != "" {
+			s.visibility[t.Repo] = t.Visibility
+		}
 	}
 	for repo := range deployState.Repositories {
 		seen[repo] = true
@@ -263,9 +271,69 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 	return report, errors.Join(tierErrs...)
 }
 
+// conflictTitle is the title of a conflict's issue. Every issue is filed in the central repository (CNFLACT-006),
+// so a conflict about one repository names it; a cross-repository conflict keeps the path alone, as it always has.
+func conflictTitle(typ ConflictType, repo, path string, aggregate bool) string {
+	if aggregate {
+		return targetTitle(typ, path)
+	}
+	return fmt.Sprintf("[SteerSpec Conflict] %s: %s/%s", typ, repo, path)
+}
+
+// targetTitle is the title an issue had when a single-repository conflict was filed in its own repository, before
+// CNFLACT-006, and the title of a cross-repository conflict's issue.
+func targetTitle(typ ConflictType, path string) string {
+	return fmt.Sprintf("[SteerSpec Conflict] %s: %s", typ, path)
+}
+
+// visibilityOf returns repo's visibility, looked up once; "" when it cannot be read.
+func (s *Scanner) visibilityOf(ctx context.Context, repo string) string {
+	if v, ok := s.visibility[repo]; ok {
+		return v
+	}
+	v := ""
+	if owner, name, err := splitRepo(repo); err == nil {
+		if got, err := s.ghClient.Repos.GetVisibility(ctx, owner, name); err == nil {
+			v = got
+		}
+	}
+	s.visibility[repo] = v
+	return v
+}
+
+// mayPublish reports whether a conflict about repos may be filed in the central repository. A public central
+// repository's issues are public, so they must not name a private or internal repository or its files: such a
+// conflict is withheld. A visibility that cannot be read counts as public for the central repository and as non-public
+// for the others.
+func (s *Scanner) mayPublish(ctx context.Context, repos []string) bool {
+	if v := s.visibilityOf(ctx, s.centralOwner+"/"+s.centralRepo); v != "public" && v != "" {
+		return true
+	}
+	for _, r := range repos {
+		if s.visibilityOf(ctx, r) != "public" {
+			return false
+		}
+	}
+	return true
+}
+
+// severityRank orders severities for the issue threshold (CNFLACT-006).
+var severityRank = map[Severity]int{SeverityInfo: 1, SeverityWarning: 2, SeverityCritical: 3}
+
+// threshold is the lowest severity that gets an issue: conflicts.severity-threshold, warning by default.
+func (s *Scanner) threshold() Severity {
+	if t := Severity(s.cfg.Conflicts.SeverityThreshold); severityRank[t] > 0 {
+		return t
+	}
+	return SeverityWarning
+}
+
 func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport, targets []string, ran map[int]bool) error {
-	// Fingerprints and titles reported this run, per repo, so issues whose
-	// conflict is gone can be closed afterwards (SteerSpec/strspc-sync#55).
+	central := s.centralOwner + "/" + s.centralRepo
+	// Keys of every conflict detected this run, per repo the issue may be in, so issues whose conflict is gone can be
+	// closed afterwards (SteerSpec/strspc-sync#55). Under central: fingerprints and titles of the central issues.
+	// Under a target: the keys its own issues had before CNFLACT-006. A conflict below the threshold is remembered
+	// too: it is still there, so its issue is not closed as resolved.
 	current := make(map[string]map[string]bool)
 	remember := func(repo, key string) {
 		if current[repo] == nil {
@@ -273,46 +341,65 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		}
 		current[repo][key] = true
 	}
+	// moved maps the keys of a conflict's issue in its target repository to the central issue that now tracks it,
+	// so cleanup can close the target copy (CNFLACT-007).
+	moved := make(map[string]map[string]int)
+	move := func(repo, key string, number int) {
+		if moved[repo] == nil {
+			moved[repo] = make(map[string]int)
+		}
+		moved[repo][key] = number
+	}
 
-	// Open issues per repo, listed once. The label is not required: an issue
-	// whose label was removed or renamed is still found by its fingerprint or
-	// title, so it is updated rather than duplicated (CNFLACT-007/016). Both
-	// keys are specific to one conflict. An unlabeled issue counts only when a
-	// trusted author opened it, so a copied title cannot capture the update.
-	openIssues := make(map[string][]*gh.Issue)
+	// The central repo's open issues, listed once. The label is not required: an issue whose label was removed or
+	// renamed is still found by its fingerprint or title, so it is updated rather than duplicated (CNFLACT-007/016).
+	// Both keys are specific to one conflict. An unlabeled issue counts only when a trusted author opened it, so a
+	// copied title cannot capture the update.
+	var openIssues []*gh.Issue
+	listed := false
+	threshold := s.threshold()
 
-	// Only create issues for critical and warning entries
 	for _, entry := range report.Entries {
-		if entry.Severity == SeverityInfo {
+		if _, _, err := splitRepo(entry.Repo); err != nil {
 			continue
 		}
-
-		// Determine which repo to file the issue against
-		repo := entry.Repo
-		var participants []string
-		if len(entry.Repos) > 0 {
-			// Cross-repository entries (duplicate skills) go to the central repo
-			participants = entry.Repos
-			repo = s.centralOwner + "/" + s.centralRepo
+		// A cross-repository entry (duplicate skills) lists its participants; any other concerns entry.Repo alone.
+		aggregate := len(entry.Repos) > 0
+		participants := entry.Repos
+		if !aggregate {
+			participants = []string{entry.Repo}
 		}
 
-		owner, repoName, err := splitRepo(repo)
-		if err != nil {
+		title := conflictTitle(entry.Type, entry.Repo, entry.FilePath, aggregate)
+		// The fingerprint names the repository the conflict concerns, so the same conflict in two repositories gets
+		// two issues. It is the fingerprint the issue had in that repository before CNFLACT-006.
+		fp := hash.Fingerprint(string(entry.Type), entry.Repo, entry.FilePath)
+		remember(central, fp)
+		remember(central, title)
+		var oldTitle string // the title of this conflict's issue in its own repository, before CNFLACT-006
+		if !aggregate {
+			oldTitle = targetTitle(entry.Type, entry.FilePath)
+			remember(entry.Repo, fp)
+			remember(entry.Repo, oldTitle)
+		}
+		if severityRank[entry.Severity] < severityRank[threshold] {
 			continue
 		}
-
-		title := fmt.Sprintf("[SteerSpec Conflict] %s: %s", entry.Type, entry.FilePath)
-		fp := hash.Fingerprint(string(entry.Type), repo, entry.FilePath)
-		remember(repo, fp)
-		remember(repo, title)
+		if !s.mayPublish(ctx, participants) {
+			report.IssuesWithheld++ // still remembered above, so its open issues are kept
+			continue
+		}
 
 		// Before CNFLDTS-009 a duplicate-skill finding was keyed by the skill's bare filename. An open issue still
 		// keyed that way describes the same conflict, so it is updated and retitled to the full path rather than
-		// closed and replaced (CNFLACT-016).
+		// closed and replaced (CNFLACT-016). A conflict about the central repo itself was filed there before
+		// CNFLACT-006 under its old title, which is retitled the same way.
 		var legacyTitle, legacyFP string
 		if base := pathpkg.Base(entry.FilePath); entry.Type == TypeDuplicateSkill && base != entry.FilePath {
-			legacyTitle = fmt.Sprintf("[SteerSpec Conflict] %s: %s", entry.Type, base)
-			legacyFP = hash.Fingerprint(string(entry.Type), repo, base)
+			legacyTitle = targetTitle(entry.Type, base)
+			legacyFP = hash.Fingerprint(string(entry.Type), entry.Repo, base)
+		} else if !aggregate && entry.Repo == central {
+			legacyTitle = oldTitle
 		}
 
 		renderBody := func(participants []string) string {
@@ -329,91 +416,103 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		}
 		body := renderBody(participants)
 
-		// Check if an issue already exists
-		existing, listed := openIssues[repo]
 		if !listed {
-			existing, err = s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{State: "open"})
+			var err error
+			openIssues, err = s.ghClient.Issues.List(ctx, s.centralOwner, s.centralRepo, &gh.IssueListOptions{State: "open"})
 			if err != nil {
-				return fmt.Errorf("listing issues for %s: %w", repo, err)
+				return fmt.Errorf("listing issues for %s: %w", central, err)
 			}
-			openIssues[repo] = existing
+			listed = true
 		}
 
-		found := false
-		for _, issue := range existing {
+		number := 0
+		for _, issue := range openIssues {
 			if !issue.Trusted(s.cfg.Conflicts.IssueLabel) {
 				continue
 			}
 			issueFP := extractFingerprint(issue.Body)
-			current := issueFP == fp || issue.Title == title
-			legacyKey := legacyTitle != "" && (issueFP == legacyFP || issue.Title == legacyTitle)
-			// Retitle an issue still titled with the bare filename, and one found only by a legacy key. An issue
-			// found by its current fingerprint keeps any other title someone gave it.
-			retitle := issue.Title != title && ((legacyTitle != "" && issue.Title == legacyTitle) || (!current && legacyKey))
-			if current || legacyKey {
-				found = true
-				if len(participants) > 0 {
-					// Keep previously recorded participants this run could
-					// not vouch for (unscanned or failed read), so a later
-					// cleanup still requires their coverage. An issue that
-					// predates the marker has an unknown participant list:
-					// leave it without one, so cleanup never closes it on
-					// partial evidence (it needs a human to close).
-					if prev := issueRepos(issue); prev == nil {
-						body = renderBody(nil)
-					} else {
-						body = renderBody(s.mergeParticipants(participants, prev, targets))
-					}
-				}
-				update := &gh.IssueUpdate{Body: &body}
-				if retitle {
-					update.Title = &title
-				}
-				if err := s.ghClient.Issues.Update(ctx, owner, repoName, issue.Number, update); err != nil {
-					return fmt.Errorf("updating issue for %s: %w", repo, err)
-				}
-				// Keep the listed copy current, so a later entry this run does not claim the same issue again.
-				issue.Body = body
-				if retitle {
-					issue.Title = title
-				}
-				break
+			isCurrent := issueFP == fp || issue.Title == title
+			legacyKey := legacyTitle != "" && ((legacyFP != "" && issueFP == legacyFP) || issue.Title == legacyTitle)
+			if !isCurrent && !legacyKey {
+				continue
 			}
+			// Retitle an issue still titled with a legacy title, and one found only by a legacy key. An issue
+			// found by its current fingerprint keeps any other title someone gave it.
+			retitle := issue.Title != title && ((legacyTitle != "" && issue.Title == legacyTitle) || !isCurrent)
+			if aggregate {
+				// Keep previously recorded participants this run could not vouch for (unscanned or failed read),
+				// so a later cleanup still requires their coverage. An issue that predates the marker has an
+				// unknown participant list: leave it without one, so cleanup never closes it on partial evidence
+				// (it needs a human to close).
+				if prev := issueRepos(issue); prev == nil {
+					body = renderBody(nil)
+				} else {
+					body = renderBody(s.mergeParticipants(participants, prev, targets))
+				}
+			}
+			update := &gh.IssueUpdate{Body: &body}
+			if retitle {
+				update.Title = &title
+			}
+			if err := s.ghClient.Issues.Update(ctx, s.centralOwner, s.centralRepo, issue.Number, update); err != nil {
+				return fmt.Errorf("updating issue for %s: %w", central, err)
+			}
+			// Keep the listed copy current, so a later entry this run does not claim the same issue again.
+			issue.Body = body
+			if retitle {
+				issue.Title = title
+			}
+			number = issue.Number
+			break
 		}
 
-		if !found {
-			created, err := s.ghClient.Issues.Create(ctx, owner, repoName, &gh.IssueCreate{
+		if number == 0 {
+			created, err := s.ghClient.Issues.Create(ctx, s.centralOwner, s.centralRepo, &gh.IssueCreate{
 				Title:  title,
 				Body:   body,
 				Labels: []string{s.cfg.Conflicts.IssueLabel},
 			})
 			if err != nil {
-				return fmt.Errorf("creating issue for %s: %w", repo, err)
+				return fmt.Errorf("creating issue for %s: %w", central, err)
 			}
 			if created != nil {
-				openIssues[repo] = append(openIssues[repo], created)
+				openIssues = append(openIssues, created)
+				number = created.Number
 			}
 			report.IssuesCreated++
 		}
+		if !aggregate && entry.Repo != central && number != 0 {
+			move(entry.Repo, fp, number)
+			move(entry.Repo, oldTitle, number)
+		}
 	}
 
-	if s.cfg.Conflicts.AutoClose != nil && !*s.cfg.Conflicts.AutoClose {
-		return nil
+	if report.IssuesWithheld > 0 {
+		// The central repository's logs are as public as its issues, so this names no repository.
+		sslog.L().Warn("conflict: issues withheld: the central repository is public and these conflicts concern "+
+			"private or internal repositories; make the central repository private to file them",
+			"operation", "conflict", "issues_withheld", report.IssuesWithheld)
 	}
-	return s.closeResolvedIssues(ctx, report, targets, current, ran)
+
+	autoClose := s.cfg.Conflicts.AutoClose == nil || *s.cfg.Conflicts.AutoClose
+	return s.closeResolvedIssues(ctx, report, targets, current, moved, ran, autoClose)
 }
 
-// closeResolvedIssues closes, in every scanned repo and in the central repo,
-// the open issues carrying the conflict label whose fingerprint (or title)
-// was not reported by this run: the conflict they described is gone.
-// Monitor has done the same for drift issues since v0.2.0; conflict issues
-// used to stay open forever (SteerSpec/strspc-sync#55).
+// closeResolvedIssues closes the open issues carrying the conflict label whose conflict is gone, when autoClose is
+// set: in the central repo, those whose fingerprint (or title) this run did not report. Monitor has done the same for
+// drift issues since v0.2.0; conflict issues used to stay open forever (SteerSpec/strspc-sync#55).
 //
-// An issue is only closed when this run can vouch for it: at least one
-// target was scanned, the issue's type belongs to a tier that ran, and no
-// content read failed in the repo the issue is about (for a central-repo
-// issue about several repos, in any repo).
-func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictReport, targets []string, current map[string]map[string]bool, ran map[int]bool) error {
+// An issue is only closed when this run can vouch for it: the issue's type belongs to a tier that ran, every
+// repository its participants marker lists was scanned with no failed content read, and the tracked file it is
+// about was found.
+//
+// Each target is also cleaned of the issues conflict filed there before CNFLACT-006. One whose conflict now has a
+// central issue is a duplicate: it is closed even when autoClose is off, with a line pointing to the central issue
+// (CNFLACT-007). One whose conflict is gone is closed as resolved under the rules above. This pass is best-effort:
+// the token may not reach the target's issues, and a failure there is logged, not returned.
+func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictReport, targets []string,
+	current map[string]map[string]bool, moved map[string]map[string]int, ran map[int]bool, autoClose bool,
+) error {
 	if len(targets) == 0 {
 		return nil
 	}
@@ -422,81 +521,90 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 	for _, t := range targets {
 		scanned[t] = true
 	}
-	// An aggregate issue can only be closed when every participant was
-	// scanned this run and none of them had a failed read.
 	covered := func(participants []string) bool {
-		if len(participants) == 0 {
-			return false // legacy issue without the marker: coverage unknown
-		}
 		for _, p := range participants {
 			if !scanned[p] || s.incomplete[p] {
 				return false
 			}
 		}
-		return true
+		return len(participants) > 0
 	}
-	repos := append([]string{}, targets...)
-	repos = append(repos, central)
-	seen := make(map[string]bool, len(repos))
-	for _, repo := range repos {
-		if seen[repo] {
-			continue
-		}
-		seen[repo] = true
-		if s.incomplete[repo] {
-			continue
-		}
-		owner, repoName, err := splitRepo(repo)
-		if err != nil {
-			continue
-		}
-		// Version-drift and manual-override issues about a tracked file that
-		// was absent this run were not checked; recognise them by
-		// fingerprint or title.
-		unchecked := make(map[string]bool)
-		for path := range s.missingTracked[repo] {
+	// Version-drift and manual-override issues about a tracked file that was absent this run were not checked;
+	// recognise them by fingerprint or title. Central issues use the repo-qualified title, target issues the old one.
+	uncheckedCentral := make(map[string]bool)
+	uncheckedIn := make(map[string]map[string]bool)
+	for repo, paths := range s.missingTracked {
+		uncheckedIn[repo] = make(map[string]bool)
+		for path := range paths {
 			for _, typ := range []ConflictType{TypeVersionDrift, TypeManualOverride} {
-				unchecked[hash.Fingerprint(string(typ), repo, path)] = true
-				unchecked[fmt.Sprintf("[SteerSpec Conflict] %s: %s", typ, path)] = true
+				fp := hash.Fingerprint(string(typ), repo, path)
+				uncheckedCentral[fp] = true
+				uncheckedCentral[conflictTitle(typ, repo, path, false)] = true
+				uncheckedIn[repo][fp] = true
+				uncheckedIn[repo][targetTitle(typ, path)] = true
+				if repo == central {
+					uncheckedCentral[targetTitle(typ, path)] = true // a central issue from before CNFLACT-006
+				}
 			}
 		}
-		existing, err := s.ghClient.Issues.List(ctx, owner, repoName, &gh.IssueListOptions{
+	}
+	// resolvable reports whether issue may be closed as resolved on this run's evidence, given the keys of the
+	// tracked files that were not checked.
+	resolvable := func(issue *gh.Issue, unchecked map[string]bool) bool {
+		typ := issueType(issue)
+		tier := tierOfType(typ)
+		if typ == TypeManualOverride && legacyOverlapIssue(issue) {
+			tier = 2 // tier 2 filed it, and tier 2 files its section-overlap replacement
+		}
+		if tier == 0 || !ran[tier] {
+			return false // unknown type, or a tier this run did not check
+		}
+		if (typ == TypeVersionDrift || (typ == TypeManualOverride && !legacyOverlapIssue(issue))) &&
+			(unchecked[extractFingerprint(issue.Body)] || unchecked[issue.Title]) {
+			return false // that tracked file is gone, so it was not checked
+		}
+		return true
+	}
+
+	if autoClose {
+		existing, err := s.ghClient.Issues.List(ctx, s.centralOwner, s.centralRepo, &gh.IssueListOptions{
 			State:  "open",
 			Labels: []string{s.cfg.Conflicts.IssueLabel},
 		})
 		if err != nil {
-			return fmt.Errorf("listing issues for %s: %w", repo, err)
+			return fmt.Errorf("listing issues for %s: %w", central, err)
 		}
 		for _, issue := range existing {
-			if current[repo][extractFingerprint(issue.Body)] || current[repo][issue.Title] {
+			if current[central][extractFingerprint(issue.Body)] || current[central][issue.Title] {
 				continue
 			}
-			typ := issueType(issue)
-			tier := tierOfType(typ)
-			if typ == TypeManualOverride && legacyOverlapIssue(issue) {
-				tier = 2 // tier 2 filed it, and tier 2 files its section-overlap replacement
+			if !resolvable(issue, uncheckedCentral) {
+				continue
 			}
-			if tier == 0 || !ran[tier] {
-				continue // unknown type, or a tier this run did not check
-			}
-			if repo == central {
-				if typ == TypeDuplicateSkill {
-					if !covered(issueRepos(issue)) {
-						continue // not every participant was scanned this run
-					}
-				} else if !scanned[central] {
-					continue // central's own files were not checked this run
+			if participants := issueRepos(issue); participants != nil {
+				if !covered(participants) {
+					continue // not every repository it concerns was scanned cleanly this run
 				}
+			} else if issueType(issue) == TypeDuplicateSkill || !covered([]string{central}) {
+				// An aggregate issue from before the participants marker has an unknown coverage, and any other
+				// marker-less issue predates CNFLACT-006: it is about the central repo's own files.
+				continue
 			}
-			if (typ == TypeVersionDrift || (typ == TypeManualOverride && !legacyOverlapIssue(issue))) &&
-				(unchecked[extractFingerprint(issue.Body)] || unchecked[issue.Title]) {
-				continue // that tracked file is gone, so its drift was not checked
-			}
-			if err := s.ghClient.Issues.Close(ctx, owner, repoName, issue.Number); err != nil {
-				return fmt.Errorf("closing resolved issue #%d in %s: %w", issue.Number, repo, err)
+			if err := s.ghClient.Issues.Close(ctx, s.centralOwner, s.centralRepo, issue.Number); err != nil {
+				return fmt.Errorf("closing resolved issue #%d in %s: %w", issue.Number, central, err)
 			}
 			report.IssuesClosed++
 		}
+	}
+
+	seen := map[string]bool{central: true}
+	for _, repo := range targets {
+		if seen[repo] {
+			continue
+		}
+		seen[repo] = true
+		s.cleanTargetIssues(ctx, report, repo, current[repo], moved[repo], autoClose && !s.incomplete[repo],
+			func(issue *gh.Issue) bool { return resolvable(issue, uncheckedIn[repo]) })
 	}
 	return nil
 }
@@ -507,6 +615,58 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 // a missing tracked file must not keep it open: no tier reports it under that type again.
 func legacyOverlapIssue(issue *gh.Issue) bool {
 	return strings.HasPrefix(issue.Body, "STEERSPEC section ") && strings.Contains(issue.Body, " appears in both ")
+}
+
+// cleanTargetIssues closes the conflict issues filed in repo before CNFLACT-006: one whose conflict has a central
+// issue (moved), and, when closeResolved is set, one whose conflict this run no longer detects and resolvable accepts.
+// Failures are logged: the token may be scoped to the central repository.
+func (s *Scanner) cleanTargetIssues(ctx context.Context, report *ConflictReport, repo string, current map[string]bool,
+	moved map[string]int, closeResolved bool, resolvable func(*gh.Issue) bool,
+) {
+	owner, name, err := splitRepo(repo)
+	if err != nil {
+		return
+	}
+	existing, err := s.ghClient.Issues.List(ctx, owner, name, &gh.IssueListOptions{
+		State:  "open",
+		Labels: []string{s.cfg.Conflicts.IssueLabel},
+	})
+	if err != nil {
+		sslog.L().Warn("conflict: could not list legacy conflict issues", "operation", "conflict", "repo", repo, "err", err)
+		return
+	}
+	for _, issue := range existing {
+		key := extractFingerprint(issue.Body)
+		number, ok := moved[key]
+		if !ok || key == "" {
+			number, ok = moved[issue.Title]
+		}
+		switch {
+		case ok:
+			body := issue.Body + fmt.Sprintf("\n\n**Moved:** this conflict is now tracked in %s/%s#%d.",
+				s.centralOwner, s.centralRepo, number)
+			if err := s.ghClient.Issues.Update(ctx, owner, name, issue.Number, &gh.IssueUpdate{Body: &body}); err != nil {
+				sslog.L().Warn("conflict: could not mark a legacy conflict issue as moved", "operation", "conflict",
+					"repo", repo, "issue", issue.Number, "err", err)
+				continue
+			}
+			if err := s.ghClient.Issues.Close(ctx, owner, name, issue.Number); err != nil {
+				sslog.L().Warn("conflict: could not close a moved conflict issue", "operation", "conflict",
+					"repo", repo, "issue", issue.Number, "err", err)
+				continue
+			}
+			report.IssuesMoved++
+		case current[key] && key != "", current[issue.Title]:
+			// Still detected, but below the severity threshold or not filed this run: left alone.
+		case closeResolved && resolvable(issue):
+			if err := s.ghClient.Issues.Close(ctx, owner, name, issue.Number); err != nil {
+				sslog.L().Warn("conflict: could not close a resolved legacy conflict issue", "operation", "conflict",
+					"repo", repo, "issue", issue.Number, "err", err)
+				continue
+			}
+			report.IssuesClosed++
+		}
+	}
 }
 
 // extractFingerprint returns the fingerprint embedded in an issue body, or ""

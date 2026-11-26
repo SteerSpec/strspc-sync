@@ -65,6 +65,19 @@ issue instead of opening another, conflict finds it by fingerprint or title, not
 the cleanup that closes resolved conflict issues still only considers issues carrying the label. As for
 monitor, an issue without the label counts only when a bot, or an owner, member or collaborator, opened it.
 
+Every conflict issue is filed in the central repository, like monitor's drift issues. Its title names the target
+(`[SteerSpec Conflict] version-drift: org/repo/CLAUDE.md`), and a cross-repository conflict such as a duplicate skill
+lists its repositories in the body. Only conflicts at or above `conflicts.severity-threshold` get an issue: `critical`,
+`warning` (the default) or `info`. Raising the threshold leaves the issue of a conflict still detected below it open.
+A conflict issue an earlier version filed in a target is closed once the central issue tracks its conflict, with a line
+pointing to it. That happens even with `auto-close` off, since it would be a duplicate. When the token cannot reach the
+target's issues, it is logged and skipped. The report counts those in `issues_moved`.
+
+A public central repository's issues are public, so a conflict about a private or internal repository gets no issue
+there. The report counts it in `issues_withheld`, and a warning that names no repository is logged. Make the central
+repository private or internal to file them. Note that the report itself, printed to the job log and the `report`
+output, still lists every conflict.
+
 **Action usage:**
 
 ```yaml

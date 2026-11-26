@@ -115,3 +115,4 @@ monitor:
 conflicts:
   tiers: [1, 2]
   issue-label: steerspec-conflict
+  severity-threshold: warning # lowest severity that gets an issue: critical, warning or info

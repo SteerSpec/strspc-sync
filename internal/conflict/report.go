@@ -44,6 +44,12 @@ type ConflictReport struct {
 	// and the ones it closed because their conflict no longer exists.
 	IssuesCreated int `json:"issues_created"`
 	IssuesClosed  int `json:"issues_closed"`
+	// IssuesMoved counts the issues a run closed in a target repository because the central issue now tracks
+	// their conflict (CNFLACT-006).
+	IssuesMoved int `json:"issues_moved"`
+	// IssuesWithheld counts the conflicts at or above the threshold that got no issue because the central repository
+	// is public and they concern a private or internal repository.
+	IssuesWithheld int `json:"issues_withheld"`
 }
 
 // ConflictEntry describes a single detected conflict.

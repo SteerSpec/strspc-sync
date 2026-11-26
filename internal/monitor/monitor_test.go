@@ -49,6 +49,10 @@ func (m *mockRepoService) GetDefaultBranch(_ context.Context, _, _ string) (stri
 	return "main", nil
 }
 
+func (m *mockRepoService) GetVisibility(_ context.Context, _, _ string) (string, error) {
+	return "private", nil
+}
+
 func (m *mockRepoService) GetBranchSHA(_ context.Context, _, _, _ string) (string, error) {
 	return "abc123sha", nil
 }

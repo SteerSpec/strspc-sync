@@ -97,6 +97,9 @@ type ConflictBehavior struct {
 	// AutoClose closes a conflict issue once the conflict it reported is gone
 	// (same semantics as monitor.auto-close). Defaults to true.
 	AutoClose *bool `yaml:"auto-close,omitempty"`
+	// SeverityThreshold is the lowest severity a conflict needs for an issue: critical, warning or info. Defaults to
+	// warning (CNFLACT-006).
+	SeverityThreshold string `yaml:"severity-threshold,omitempty"`
 }
 
 var (
@@ -104,6 +107,7 @@ var (
 	validTemplateTypes = map[string]bool{"claude-md": true, "skill": true, "agent": true, "config": true, "custom": true}
 	validStrategies    = map[string]bool{"mustache": true, "marker": true, "full-replace": true}
 	validConflictTiers = map[int]bool{1: true, 2: true, 3: true}
+	validSeverities    = map[string]bool{"critical": true, "warning": true, "info": true}
 	validVisibilities  = map[string]bool{"public": true, "internal": true, "private": true}
 	// MAJOR.MINOR.PATCH with no leading zeros (SemVer 2.0.0 §2) and no pre-release or build suffix.
 	semverRE     = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
@@ -212,6 +216,9 @@ func ApplyDefaults(cfg *SyncConfig) {
 		t := true
 		cfg.Conflicts.AutoClose = &t
 	}
+	if cfg.Conflicts.SeverityThreshold == "" {
+		cfg.Conflicts.SeverityThreshold = "warning"
+	}
 }
 
 func Validate(cfg *SyncConfig) error {
@@ -311,6 +318,9 @@ func Validate(cfg *SyncConfig) error {
 		if !validConflictTiers[tier] {
 			return fmt.Errorf("conflict tier %d is not valid (must be 1, 2, or 3)", tier)
 		}
+	}
+	if t := cfg.Conflicts.SeverityThreshold; t != "" && !validSeverities[t] {
+		return fmt.Errorf("conflicts.severity-threshold %q is not valid (must be critical, warning or info)", t)
 	}
 
 	return nil
