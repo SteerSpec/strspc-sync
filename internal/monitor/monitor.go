@@ -309,10 +309,10 @@ func driftFingerprint(repo, templateID string) string {
 }
 
 // pairIssues returns the open issue to keep for one repository and template pair, and the duplicates to close. The
-// fingerprint is stable across title changes, so the oldest issue carrying it is kept; failing that, the oldest
-// issue with the pair's title. The duplicates are the other issues carrying the fingerprint, and those with the
-// pair's title and no fingerprint at all. A title match that carries another fingerprint is never closed. issues is
-// sorted by number, and issues already closed this run are skipped.
+// pair's issues are those carrying its fingerprint, which is stable across title changes, and legacy issues with
+// its title and no fingerprint. The oldest issue carrying the fingerprint is kept, failing that the oldest legacy
+// issue; the rest are duplicates. An issue carrying another pair's fingerprint is never kept or closed for this
+// pair, whatever its title. issues is sorted by number, and issues already closed this run are skipped.
 func pairIssues(issues []*gh.Issue, closed map[int]bool, fp, title string) (keep *gh.Issue, duplicates []*gh.Issue) {
 	var byFingerprint, byTitle []*gh.Issue
 	for _, iss := range issues {
@@ -322,25 +322,16 @@ func pairIssues(issues []*gh.Issue, closed map[int]bool, fp, title string) (keep
 		switch issueFP := extractFingerprint(iss.Body); {
 		case issueFP == fp:
 			byFingerprint = append(byFingerprint, iss)
-		case iss.Title == title:
+		case issueFP == "" && iss.Title == title:
+			// A legacy issue without a fingerprint. One carrying another pair's fingerprint belongs to that pair.
 			byTitle = append(byTitle, iss)
 		}
 	}
-	switch {
-	case len(byFingerprint) > 0:
-		keep, duplicates = byFingerprint[0], byFingerprint[1:]
-	case len(byTitle) > 0:
-		keep = byTitle[0]
-		byTitle = byTitle[1:]
-	default:
+	all := slices.Concat(byFingerprint, byTitle)
+	if len(all) == 0 {
 		return nil, nil
 	}
-	for _, iss := range byTitle {
-		if extractFingerprint(iss.Body) == "" {
-			duplicates = append(duplicates, iss)
-		}
-	}
-	return keep, duplicates
+	return all[0], all[1:]
 }
 
 // extractFingerprint returns the fingerprint embedded in an issue body, or ""

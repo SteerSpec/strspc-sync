@@ -991,3 +991,43 @@ func TestDuplicateDriftIssueCloseFailureIsolated(t *testing.T) {
 		t.Errorf("closed %v (DuplicatesClosed %d), want [52] and 1", issueSvc.closed, res.DuplicatesClosed)
 	}
 }
+
+// An issue carrying another pair's fingerprint is never taken for this pair, even when it is the only issue with the
+// pair's title: drift opens a new issue, and an in-sync run closes nothing.
+func TestTitleMatchWithOtherFingerprintNotTaken(t *testing.T) {
+	expected := []byte("expected")
+	for _, tc := range []struct {
+		name        string
+		content     []byte
+		wantCreated int
+	}{
+		{"drift", []byte("drifted"), 1},
+		{"in sync", expected, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			issueSvc := newMockIssueService()
+			issueSvc.issues = []*gh.Issue{{
+				Number: 42,
+				Title:  "[SteerSpec Drift] org/app: claude-md",
+				Body:   fingerprintPrefix + driftFingerprint("org/other", "claude-md") + fingerprintSuffix,
+				State:  "open",
+				Labels: []string{"steerspec-drift"},
+			}}
+			ds := makeState(map[string]map[string]state.TemplateState{
+				"org/app": {"claude-md": {Version: "1.0", Hash: hash.HashBytes(expected), Timestamp: time.Now()}},
+			})
+			repoSvc := &mockRepoService{files: map[string][]byte{"org/app/CLAUDE.md": tc.content}}
+
+			res, err := New(testConfig(), makeClient(repoSvc, issueSvc), "test", "central").Run(context.Background(), ds, Options{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := issueSvc.updated[42]; ok || len(issueSvc.closed) != 0 {
+				t.Errorf("issue #42 was updated or closed (closed %v)", issueSvc.closed)
+			}
+			if res.IssuesCreated != tc.wantCreated {
+				t.Errorf("IssuesCreated = %d, want %d", res.IssuesCreated, tc.wantCreated)
+			}
+		})
+	}
+}
