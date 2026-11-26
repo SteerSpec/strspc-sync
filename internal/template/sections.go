@@ -23,6 +23,26 @@ func SectionNames(templateContent []byte) ([]string, error) {
 	return slices.Compact(names), nil
 }
 
+// WellFormedSectionNames returns, sorted, the names of the sections in content that are well formed: exactly one
+// STEERSPEC:BEGIN followed by its END with no other marker between. Unlike SectionNames, a malformed marker elsewhere
+// in content does not hide the other sections.
+func WellFormedSectionNames(content []byte) []string {
+	markers := collectMarkers(content)
+	seen := make(map[string]bool, len(markers))
+	var names []string
+	for _, m := range markers {
+		if seen[m.name] {
+			continue
+		}
+		seen[m.name] = true
+		if _, ok := namedSection(content, markers, m.name); ok {
+			names = append(names, m.name)
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
 // SectionsHash returns the Blake3 hash of the named STEERSPEC:BEGIN/END sections in content: the part of a file one
 // marker template manages. Everything else, including sections other templates or the repository own, does not
 // affect the hash, and neither does a malformed marker of another name. Sections are taken in name order with LF

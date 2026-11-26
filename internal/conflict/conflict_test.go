@@ -236,7 +236,8 @@ func TestTier1_VersionDrift(t *testing.T) {
 }
 
 // GH #133: with a sections hash recorded, tier 1 ignores a repo's own content outside the managed sections and
-// still reports an edit inside them, with a resolution that says re-running sync keeps the repo's content.
+// still reports an edit inside them, with a resolution that says re-running sync keeps the repo's content. That edit
+// is a manual-override (CNFLENT-009).
 func TestTier1_VersionDriftManagedSectionsOnly(t *testing.T) {
 	const managed = "<!-- STEERSPEC:BEGIN:org -->\nOrg rules.\n<!-- STEERSPEC:END:org -->\n"
 	deployed := []byte(managed)
@@ -271,7 +272,215 @@ func TestTier1_VersionDriftManagedSectionsOnly(t *testing.T) {
 			if tt.drifted && !strings.Contains(entries[0].SuggestedResolution, "--force") {
 				t.Errorf("resolution = %q, want it to say re-running sync keeps repo content", entries[0].SuggestedResolution)
 			}
+			if tt.drifted && (entries[0].Type != TypeManualOverride || entries[0].Severity != SeverityWarning) {
+				t.Errorf("entry = %+v, want a manual-override warning", entries[0])
+			}
 		})
+	}
+}
+
+// CNFLENT-009 and CNFLENT-008: a managed-section mismatch is a manual-override when the file was last confirmed at
+// the recorded version (its sync PR merged, or none), and version-drift while the recorded version is only proposed
+// by a sync PR that is open or was closed unmerged. A whole-file mismatch is always version-drift.
+func TestTier1_ManagedSectionMismatchType(t *testing.T) {
+	const managed = "<!-- STEERSPEC:BEGIN:org -->\nOrg rules.\n<!-- STEERSPEC:END:org -->\n"
+	const edited = "<!-- STEERSPEC:BEGIN:org -->\nChanged.\n<!-- STEERSPEC:END:org -->\n"
+	sections, ok := template.SectionsHash([]byte(managed), []string{"org"})
+	if !ok {
+		t.Fatal("SectionsHash: no sections")
+	}
+	tests := []struct {
+		name     string
+		prNumber int
+		prStatus string
+		marker   bool
+		wantType ConflictType
+		wantSev  Severity
+		content  string // the file in the target; empty means edited
+	}{
+		{"no sync PR", 0, "", true, TypeManualOverride, SeverityWarning, ""},
+		{"sync PR merged", 7, "merged", true, TypeManualOverride, SeverityWarning, ""},
+		{"sync PR open", 7, "open", true, TypeVersionDrift, SeverityCritical, ""},
+		{"sync PR closed unmerged", 7, "closed", true, TypeVersionDrift, SeverityCritical, ""},
+		{"status without a PR number", 0, "open", true, TypeManualOverride, SeverityWarning, ""},
+		{"whole-file record, PR merged", 7, "merged", false, TypeVersionDrift, SeverityCritical, ""},
+		// A missing or unreadable section is not an edit inside it, and sync cannot render the file: critical.
+		{"section missing, PR merged", 7, "merged", true, TypeVersionDrift, SeverityCritical, "# no sections\n"},
+		{"broken marker, no PR", 0, "", true, TypeVersionDrift, SeverityCritical, "<!-- STEERSPEC:BEGIN:org -->\nunclosed\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := tt.content
+			if content == "" {
+				content = edited
+			}
+			repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte(content)}}
+			ts := state.TemplateState{
+				Version: "1.1.0", Hash: hash.HashBytes([]byte(managed)), Timestamp: time.Now(),
+				PRNumber: tt.prNumber, PRStatus: tt.prStatus,
+			}
+			if tt.marker {
+				ts.Sections, ts.SectionsHash = []string{"org"}, sections
+			}
+			ds := state.NewDeploymentState()
+			ds.SetTemplateState("org/repo1", "claude-md", ts)
+			scanner := New(testConfig(), newTestClient(repos, &mockIssueService{}), "org", "central")
+			scanner.missingTracked = make(map[string]map[string]bool)
+			entries, err := scanner.checkVersionDrift(context.Background(), ds, "org", "repo1", "org/repo1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 1 || entries[0].Type != tt.wantType || entries[0].Severity != tt.wantSev {
+				t.Fatalf("entries = %+v, want one %s (%s)", entries, tt.wantType, tt.wantSev)
+			}
+		})
+	}
+}
+
+// A legacy overlap issue (manual-override from tier 2) belongs to tier 2, which now files section-overlap: a
+// tier-2-only run closes it once the overlap is gone, and a tier-1-only run leaves it alone.
+func TestLegacyOverlapIssueBelongsToTier2(t *testing.T) {
+	for _, tc := range []struct {
+		tiers     []int
+		wantClose bool
+	}{{[]int{2}, true}, {[]int{1}, false}} {
+		fp := hash.Fingerprint(string(TypeManualOverride), "org/repo1", "B.md")
+		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+			Number: 32, Title: "[SteerSpec Conflict] manual-override: B.md", State: "open", Labels: []string{"steerspec-conflict"},
+			Body: "STEERSPEC section \"org\" appears in both A.md and B.md\n\n" + fingerprintPrefix + fp + fingerprintSuffix +
+				"\n" + typePrefix + string(TypeManualOverride) + fingerprintSuffix,
+		}}}}
+		scanner := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central")
+		if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), []string{"org/repo1"}, Options{Tiers: tc.tiers}); err != nil {
+			t.Fatal(err)
+		}
+		if got := len(issues.closed) == 1; got != tc.wantClose {
+			t.Errorf("tiers %v: closed %v, want closed %v", tc.tiers, issues.closed, tc.wantClose)
+		}
+	}
+}
+
+// A section-overlap issue filed before section-overlap had its own type carries manual-override and the same
+// fingerprint a tier-1 manual-override would. A missing tracked file keeps only the tier-1 kind open; the legacy
+// overlap issue is closed, since nothing reports it under that type again.
+func TestLegacyOverlapIssueClosedWhenTrackedFileMissing(t *testing.T) {
+	fp := hash.Fingerprint(string(TypeManualOverride), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 31, Title: "[SteerSpec Conflict] manual-override: CLAUDE.md", State: "open", Labels: []string{"steerspec-conflict"},
+		Body: "STEERSPEC section \"org\" appears in both A.md and CLAUDE.md\n\n" + fingerprintPrefix + fp + fingerprintSuffix +
+			"\n" + typePrefix + string(TypeManualOverride) + fingerprintSuffix,
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: "h", Sections: []string{"org"}, SectionsHash: "s", Timestamp: time.Now(),
+	})
+	scanner := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central")
+	if _, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1, 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 1 {
+		t.Errorf("a legacy overlap issue must close on the first run with tiers 1 and 2, closed %v", issues.closed)
+	}
+}
+
+// CNFLDTS-009: tier 2 reports a STEERSPEC:BEGIN/END section held by two marker-managed files of one target as a
+// section-overlap warning. Two templates sharing a destination are one file; a broken section is not a section, and
+// does not hide the well-formed ones beside it; a marker form sync never writes is not a section.
+func TestTier2_SectionOverlap(t *testing.T) {
+	sec := func(name string) string {
+		return "<!-- STEERSPEC:BEGIN:" + name + " -->\n" + name + " text\n<!-- STEERSPEC:END:" + name + " -->\n"
+	}
+	marker := func(id, dest string) config.TemplateConfig {
+		return config.TemplateConfig{ID: id, Type: "custom", Source: "t", Destination: dest, Strategy: "marker"}
+	}
+	tests := []struct {
+		name      string
+		templates []config.TemplateConfig
+		files     map[string]string
+		want      []string // "<file>: <description fragment>"
+	}{
+		{
+			name:      "same section in two files",
+			templates: []config.TemplateConfig{marker("a", "A.md"), marker("b", "B.md")},
+			files:     map[string]string{"A.md": sec("org") + sec("a-only"), "B.md": sec("org")},
+			want:      []string{`B.md: "org" appears in both A.md and B.md`},
+		},
+		{
+			name:      "two templates, one destination",
+			templates: []config.TemplateConfig{marker("a", "CLAUDE.md"), marker("b", "CLAUDE.md")},
+			files:     map[string]string{"CLAUDE.md": sec("org") + sec("team")},
+		},
+		{
+			name:      "different sections",
+			templates: []config.TemplateConfig{marker("a", "A.md"), marker("b", "B.md")},
+			files:     map[string]string{"A.md": sec("org"), "B.md": sec("team")},
+		},
+		{
+			name:      "broken section skipped",
+			templates: []config.TemplateConfig{marker("a", "A.md"), marker("b", "B.md")},
+			files:     map[string]string{"A.md": sec("org"), "B.md": "<!-- STEERSPEC:BEGIN:org -->\nunclosed\n"},
+		},
+		{
+			name:      "broken unrelated marker does not hide an overlap",
+			templates: []config.TemplateConfig{marker("a", "A.md"), marker("b", "B.md")},
+			files:     map[string]string{"A.md": sec("org"), "B.md": "<!-- STEERSPEC:BEGIN:mine -->\nunclosed\n" + sec("org")},
+			want:      []string{`B.md: "org" appears in both A.md and B.md`},
+		},
+		{
+			name:      "not a sync marker",
+			templates: []config.TemplateConfig{marker("a", "A.md"), marker("b", "B.md")},
+			files:     map[string]string{"A.md": "<!-- STEERSPEC:org -->\n", "B.md": "<!-- STEERSPEC:org -->\n"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := make(map[string][]byte)
+			for path, content := range tt.files {
+				files["org/repo1/"+path] = []byte(content)
+			}
+			cfg := testConfig()
+			cfg.Templates = tt.templates
+			scanner := New(cfg, newTestClient(&mockRepoService{files: files}, &mockIssueService{}), "org", "central")
+			scanner.incomplete = make(map[string]bool)
+			entries := scanner.checkSectionOverlap(context.Background(), []string{"org/repo1"})
+			var got []string
+			for _, e := range entries {
+				if e.Type != TypeSectionOverlap || e.Severity != SeverityWarning || e.Repo != "org/repo1" {
+					t.Errorf("entry = %+v, want a section-overlap warning in org/repo1", e)
+				}
+				got = append(got, e.FilePath+": "+e.Description)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("entries = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				file, frag, _ := strings.Cut(tt.want[i], ": ")
+				if !strings.HasPrefix(got[i], file+": ") || !strings.Contains(got[i], frag) {
+					t.Errorf("entry %d = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+// A manual-override issue about a tracked file that is gone this run was not checked, so cleanup keeps it, as it
+// keeps a version-drift issue in that case.
+func TestManualOverrideIssueKeptWhenTrackedFileMissing(t *testing.T) {
+	fp := hash.Fingerprint(string(TypeManualOverride), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+		Number: 30, Title: "[SteerSpec Conflict] manual-override: CLAUDE.md", State: "open", Labels: []string{"steerspec-conflict"},
+		Body: fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeManualOverride) + fingerprintSuffix,
+	}}}}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: "h", Sections: []string{"org"}, SectionsHash: "s", Timestamp: time.Now(),
+	})
+	scanner := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central")
+	if _, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(issues.closed) != 0 {
+		t.Errorf("a manual-override issue whose file was not found must stay open, closed %v", issues.closed)
 	}
 }
 
@@ -552,7 +761,7 @@ func TestTier2_DuplicateSkill(t *testing.T) {
 	}
 }
 
-// CNFLENT-003: a conflict type read back from an issue is one of the six, or "" (which cleanup ignores).
+// CNFLENT-003: a conflict type read back from an issue is one of the seven, or "" (which cleanup ignores).
 func TestIssueTypeOnlyReturnsValidTypes(t *testing.T) {
 	marker := func(v string) string { return typePrefix + v + fingerprintSuffix }
 	for _, tc := range []struct {
@@ -572,7 +781,7 @@ func TestIssueTypeOnlyReturnsValidTypes(t *testing.T) {
 	}
 	for _, typ := range []ConflictType{
 		TypeVersionDrift, TypeManualOverride, TypeCrossReferenceBroken, TypeDuplicateSkill,
-		TypeContradictoryInstruction, TypeUnmanagedFile,
+		TypeContradictoryInstruction, TypeUnmanagedFile, TypeSectionOverlap,
 	} {
 		if !typ.Valid() {
 			t.Errorf("%q must be valid", typ)
@@ -1333,6 +1542,7 @@ func TestConflictEntrySeverityMapping(t *testing.T) {
 	}{
 		{TypeVersionDrift, SeverityCritical},
 		{TypeCrossReferenceBroken, SeverityCritical},
+		{TypeManualOverride, SeverityWarning},
 		{TypeDuplicateSkill, SeverityWarning},
 		{TypeUnmanagedFile, SeverityInfo},
 	}

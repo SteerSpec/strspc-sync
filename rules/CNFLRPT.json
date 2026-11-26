@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.9.14",
-    "timestamp": "2026-11-26T13:40:05Z",
-    "hash": "blake3:addb0498e09adffd8a270ed600e04b847f0a81c6c9cdc0b0acdbcced7f90c8a1"
+    "version": "0.9.17",
+    "timestamp": "2026-11-26T18:07:55Z",
+    "hash": "blake3:d71680e4c2ce93a894628e0b0c7d9df210b35439af3013da8e7e9d98b0790ec3"
   },
   "rules": [
     {
@@ -67,9 +67,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.9.0",
-        "timestamp": "2026-11-26T08:58:35Z",
-        "hash": "blake3:c08d5240b5352811265ec0ac3242ff4f7daab366634b44f4f6b4e5e109975860"
+        "version": "0.9.3",
+        "timestamp": "2026-11-26T18:07:55Z",
+        "hash": "blake3:37b92169f921c5937acd6aea7ad13e59da4c697d7228b08ff7ec7449c3524f80"
       },
       "rules": [
         {
@@ -92,9 +92,9 @@
         },
         {
           "id": "CNFLENT-003",
-          "revision": 0,
+          "revision": 1,
           "state": "D",
-          "body": "HAS a type which MUST be one of: \"version-drift\", \"manual-override\", \"cross-reference-broken\", \"duplicate-skill\", \"contradictory-instruction\", \"unmanaged-file\".",
+          "body": "HAS a type which MUST be one of: \"version-drift\", \"manual-override\", \"cross-reference-broken\", \"duplicate-skill\", \"contradictory-instruction\", \"unmanaged-file\", \"section-overlap\".",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
@@ -137,9 +137,9 @@
         },
         {
           "id": "CNFLENT-008",
-          "revision": 0,
+          "revision": 1,
           "state": "D",
-          "body": "`version-drift` IS a managed file at a version different from the expected version in DeploymentState; severity: critical.",
+          "body": "`version-drift` IS a managed file whose content differs from what DeploymentState records for its expected version, unless the difference is a `manual-override`; severity: critical.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
@@ -187,6 +187,15 @@
           "body": "`unmanaged-file` IS an AI configuration file (CLAUDE.md or `.claude/**`) not tracked in the SyncManifest; severity: info.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
+          "supersedes": null
+        },
+        {
+          "id": "CNFLENT-014",
+          "revision": 0,
+          "state": "D",
+          "body": "`section-overlap` IS a STEERSPEC section that appears in more than one managed file of the same repository; severity: warning.",
+          "added_by": "github:pleberre",
+          "added_at": "2026-11-26",
           "supersedes": null
         }
       ],
