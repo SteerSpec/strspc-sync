@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -240,8 +241,9 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 		t.Fatalf("warning entries = %v, want exactly one duplicate-skill\n%+v", got, rep.Entries)
 	}
 	for _, e := range rep.Entries {
-		if e.FilePath != skillPath || !strings.Contains(e.Repo, env.Org+"/"+pub) || !strings.Contains(e.Repo, env.Org+"/"+priv) {
-			t.Errorf("duplicate-skill entry = %+v, want file %s naming both repos", e, skillPath)
+		if e.FilePath != skillPath || !slices.Contains(e.Repos, env.Org+"/"+pub) || !slices.Contains(e.Repos, env.Org+"/"+priv) ||
+			e.Repo != env.Central() {
+			t.Errorf("duplicate-skill entry = %+v, want file %s in the central repo, listing both repos", e, skillPath)
 		}
 	}
 	if rep.SeveritySummary.Critical != 0 || rep.IssuesCreated != 1 || rep.IssuesClosed != 0 {

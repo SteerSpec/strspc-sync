@@ -23,6 +23,16 @@ const (
 	TypeUnmanagedFile            ConflictType = "unmanaged-file"
 )
 
+// Valid reports whether t is one of the six conflict types (CNFLENT-003).
+func (t ConflictType) Valid() bool {
+	switch t {
+	case TypeVersionDrift, TypeManualOverride, TypeCrossReferenceBroken, TypeDuplicateSkill,
+		TypeContradictoryInstruction, TypeUnmanagedFile:
+		return true
+	}
+	return false
+}
+
 // ConflictReport holds the results of a conflict scan.
 type ConflictReport struct {
 	ID              string          `json:"id"`
@@ -37,12 +47,16 @@ type ConflictReport struct {
 
 // ConflictEntry describes a single detected conflict.
 type ConflictEntry struct {
-	Severity            Severity     `json:"severity"`
-	Type                ConflictType `json:"type"`
-	Repo                string       `json:"repo"`
-	FilePath            string       `json:"file_path"`
-	Description         string       `json:"description"`
-	SuggestedResolution string       `json:"suggested_resolution,omitempty"`
+	Severity Severity     `json:"severity"`
+	Type     ConflictType `json:"type"`
+	// Repo is the repository the conflict concerns, in owner/repo format (CNFLENT-004). A cross-repository conflict
+	// such as duplicate-skill concerns no single target: Repo is then the central repository its issue is filed in,
+	// and Repos lists the participating repositories.
+	Repo                string   `json:"repo"`
+	Repos               []string `json:"repos,omitempty"`
+	FilePath            string   `json:"file_path"`
+	Description         string   `json:"description"`
+	SuggestedResolution string   `json:"suggested_resolution,omitempty"`
 }
 
 // SeveritySummary counts entries by severity level.
