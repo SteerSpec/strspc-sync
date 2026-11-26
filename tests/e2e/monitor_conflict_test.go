@@ -209,10 +209,9 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 	pub, priv := harness.RepoPublic, harness.RepoPrivate
 	const (
 		skillPath  = ".claude/skills/e2e-dup-skill.md"
-		skillFile  = "e2e-dup-skill.md"
 		markerA    = ".steerspec-e2e/marker-a.md"
 		markerB    = ".steerspec-e2e/marker-b.md"
-		dupTitle   = "[SteerSpec Conflict] duplicate-skill: " + skillFile
+		dupTitle   = "[SteerSpec Conflict] duplicate-skill: " + skillPath
 		overTitle  = "[SteerSpec Conflict] manual-override: " + markerB
 		markerText = "<!-- STEERSPEC:e2e-shared -->\nshared section\n<!-- /STEERSPEC:e2e-shared -->\n"
 	)
@@ -232,7 +231,7 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 	)
 	mcSeedSynced(t, env, pub, priv)
 
-	// 1. Duplicate skill: same file name, different content in two targets.
+	// 1. Duplicate skill: the same skill path, different content in two targets (CNFLDTS-009).
 	mcWriteAndWait(t, env, pub, skillPath, []byte("# skill\nversion A\n"))
 	mcWriteAndWait(t, env, priv, skillPath, []byte("# skill\nversion B\n"))
 
@@ -241,8 +240,8 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 		t.Fatalf("warning entries = %v, want exactly one duplicate-skill\n%+v", got, rep.Entries)
 	}
 	for _, e := range rep.Entries {
-		if e.FilePath != skillFile || !strings.Contains(e.Repo, env.Org+"/"+pub) || !strings.Contains(e.Repo, env.Org+"/"+priv) {
-			t.Errorf("duplicate-skill entry = %+v, want file %s naming both repos", e, skillFile)
+		if e.FilePath != skillPath || !strings.Contains(e.Repo, env.Org+"/"+pub) || !strings.Contains(e.Repo, env.Org+"/"+priv) {
+			t.Errorf("duplicate-skill entry = %+v, want file %s naming both repos", e, skillPath)
 		}
 	}
 	if rep.SeveritySummary.Critical != 0 || rep.IssuesCreated != 1 || rep.IssuesClosed != 0 {
