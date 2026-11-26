@@ -1,9 +1,12 @@
 package conflict
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +15,7 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/config"
 	gh "github.com/SteerSpec/strspc-sync/internal/github"
 	"github.com/SteerSpec/strspc-sync/internal/hash"
+	sslog "github.com/SteerSpec/strspc-sync/internal/log"
 	"github.com/SteerSpec/strspc-sync/internal/registry"
 	"github.com/SteerSpec/strspc-sync/internal/state"
 	"github.com/SteerSpec/strspc-sync/internal/template"
@@ -1594,13 +1598,13 @@ func TestUnlabeledConflictIssueUpdated(t *testing.T) {
 	originalContent := []byte("# Original")
 	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte("# Drifted")}}
 	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
-	issues := &mockIssueService{issues: []*gh.Issue{{
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
 		Number:            77,
 		Title:             "[SteerSpec Conflict] version_drift: CLAUDE.md",
 		Body:              "old body\n\n<!-- steerspec-fingerprint: " + fp + " -->",
 		State:             "open",
 		AuthorAssociation: "MEMBER", // opened with a member's PAT
-	}}}
+	}}}}
 	ds := state.NewDeploymentState()
 	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
 		Version: "1.0.0", Hash: hash.HashBytes(originalContent), Timestamp: time.Now(),
@@ -1908,5 +1912,58 @@ func TestWithheldConflictKeepsItsIssues(t *testing.T) {
 	if len(issues.closed) != 0 || len(issues.updated) != 0 || report.IssuesWithheld != 1 {
 		t.Errorf("closed %v, updated %d, withheld %d; want nothing touched and 1 withheld",
 			issues.closed, len(issues.updated), report.IssuesWithheld)
+	}
+}
+
+// CNFLACT-007: a legacy target issue whose conflict label was removed is still moved when a trusted author opened it;
+// an untrusted one is left alone.
+func TestRelabeledLegacyTargetIssueMoved(t *testing.T) {
+	for _, tc := range []struct {
+		association string
+		wantMoved   int
+	}{{"MEMBER", 1}, {"NONE", 0}} {
+		repos, ds := driftSetup("org/repo1")
+		fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+			Number: 60, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+			AuthorAssociation: tc.association, Body: fingerprintPrefix + fp + fingerprintSuffix,
+		}}}}
+		report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+			Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if report.IssuesMoved != tc.wantMoved {
+			t.Errorf("author %s: moved %d, want %d", tc.association, report.IssuesMoved, tc.wantMoved)
+		}
+	}
+}
+
+// A public central repository's job logs are public: a failed target cleanup logs neither the target nor the error.
+func TestTargetCleanupWarningRedactedForPublicCentral(t *testing.T) {
+	for _, tc := range []struct {
+		central  string
+		wantName bool
+	}{{"public", false}, {"private", true}} {
+		var buf bytes.Buffer
+		sslog.InitTo(&buf, slog.LevelInfo, sslog.FormatText)
+		repos, ds := driftSetup("org/secret")
+		repos.visibility = map[string]string{"org/central": tc.central, "org/secret": "public"}
+		issues := &mockIssueService{
+			repoIssues: map[string][]*gh.Issue{},
+			listErr:    map[string]error{"org/secret": errors.New("403 on org/secret")},
+		}
+		if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+			Run(context.Background(), ds, []string{"org/secret"}, Options{Tiers: []int{1}}); err != nil {
+			t.Fatal(err)
+		}
+		sslog.InitTo(os.Stderr, slog.LevelInfo, sslog.FormatText)
+		out := buf.String()
+		if !strings.Contains(out, "could not list legacy conflict issues") {
+			t.Fatalf("central %s: no warning logged:\n%s", tc.central, out)
+		}
+		if got := strings.Contains(out, "org/secret"); got != tc.wantName {
+			t.Errorf("central %s: log names the target = %v, want %v:\n%s", tc.central, got, tc.wantName, out)
+		}
 	}
 }

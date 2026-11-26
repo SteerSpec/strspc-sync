@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	pathpkg "path"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -618,8 +619,11 @@ func legacyOverlapIssue(issue *gh.Issue) bool {
 }
 
 // cleanTargetIssues closes the conflict issues filed in repo before CNFLACT-006: one whose conflict has a central
-// issue (moved), and, when closeResolved is set, one whose conflict this run no longer detects and resolvable accepts.
-// Failures are logged: the token may be scoped to the central repository.
+// issue (moved), and, when closeResolved is set, one carrying the conflict label whose conflict this run no longer
+// detects and resolvable accepts. Like the central lookup, it lists every open issue, so a legacy issue whose label was
+// removed or renamed is still moved when a trusted author opened it (CNFLACT-007). Failures are logged: the token may
+// be scoped to the central repository. When the central repository is public, or its visibility cannot be read, its
+// job logs are public, so the warnings name neither the repository nor the API error.
 func (s *Scanner) cleanTargetIssues(ctx context.Context, report *ConflictReport, repo string, current map[string]bool,
 	moved map[string]int, closeResolved bool, resolvable func(*gh.Issue) bool,
 ) {
@@ -627,15 +631,28 @@ func (s *Scanner) cleanTargetIssues(ctx context.Context, report *ConflictReport,
 	if err != nil {
 		return
 	}
-	existing, err := s.ghClient.Issues.List(ctx, owner, name, &gh.IssueListOptions{
-		State:  "open",
-		Labels: []string{s.cfg.Conflicts.IssueLabel},
-	})
+	central := s.visibilityOf(ctx, s.centralOwner+"/"+s.centralRepo)
+	redact := central == "public" || central == ""
+	warn := func(msg string, number int, err error) {
+		attrs := []any{"operation", "conflict"}
+		if !redact {
+			attrs = append(attrs, "repo", repo, "err", err)
+			if number != 0 {
+				attrs = append(attrs, "issue", number)
+			}
+		}
+		sslog.L().Warn("conflict: "+msg, attrs...)
+	}
+	existing, err := s.ghClient.Issues.List(ctx, owner, name, &gh.IssueListOptions{State: "open"})
 	if err != nil {
-		sslog.L().Warn("conflict: could not list legacy conflict issues", "operation", "conflict", "repo", repo, "err", err)
+		warn("could not list legacy conflict issues in a target repository", 0, err)
 		return
 	}
+	label := s.cfg.Conflicts.IssueLabel
 	for _, issue := range existing {
+		if !issue.Trusted(label) {
+			continue
+		}
 		key := extractFingerprint(issue.Body)
 		number, ok := moved[key]
 		if !ok || key == "" {
@@ -646,27 +663,30 @@ func (s *Scanner) cleanTargetIssues(ctx context.Context, report *ConflictReport,
 			body := issue.Body + fmt.Sprintf("\n\n**Moved:** this conflict is now tracked in %s/%s#%d.",
 				s.centralOwner, s.centralRepo, number)
 			if err := s.ghClient.Issues.Update(ctx, owner, name, issue.Number, &gh.IssueUpdate{Body: &body}); err != nil {
-				sslog.L().Warn("conflict: could not mark a legacy conflict issue as moved", "operation", "conflict",
-					"repo", repo, "issue", issue.Number, "err", err)
+				warn("could not mark a legacy conflict issue as moved", issue.Number, err)
 				continue
 			}
 			if err := s.ghClient.Issues.Close(ctx, owner, name, issue.Number); err != nil {
-				sslog.L().Warn("conflict: could not close a moved conflict issue", "operation", "conflict",
-					"repo", repo, "issue", issue.Number, "err", err)
+				warn("could not close a moved conflict issue", issue.Number, err)
 				continue
 			}
 			report.IssuesMoved++
 		case current[key] && key != "", current[issue.Title]:
 			// Still detected, but below the severity threshold or not filed this run: left alone.
-		case closeResolved && resolvable(issue):
+		case closeResolved && hasLabel(issue, label) && resolvable(issue):
 			if err := s.ghClient.Issues.Close(ctx, owner, name, issue.Number); err != nil {
-				sslog.L().Warn("conflict: could not close a resolved legacy conflict issue", "operation", "conflict",
-					"repo", repo, "issue", issue.Number, "err", err)
+				warn("could not close a resolved legacy conflict issue", issue.Number, err)
 				continue
 			}
 			report.IssuesClosed++
 		}
 	}
+}
+
+// hasLabel reports whether issue carries label, compared case-insensitively as GitHub does. Cleanup only closes
+// resolved issues that carry the conflict label.
+func hasLabel(issue *gh.Issue, label string) bool {
+	return label != "" && slices.ContainsFunc(issue.Labels, func(l string) bool { return strings.EqualFold(l, label) })
 }
 
 // extractFingerprint returns the fingerprint embedded in an issue body, or ""
