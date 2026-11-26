@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -64,6 +65,8 @@ type mockIssueService struct {
 	nextNum int
 	// createErr, when set, is returned by Create for an issue whose title contains its key.
 	createErr map[string]error
+	// closeErr, when set, is returned by Close for the issue number.
+	closeErr map[int]error
 }
 
 func newMockIssueService() *mockIssueService {
@@ -126,6 +129,9 @@ func (m *mockIssueService) Update(_ context.Context, _, _ string, number int, iu
 }
 
 func (m *mockIssueService) Close(_ context.Context, _, _ string, number int) error {
+	if err := m.closeErr[number]; err != nil {
+		return err
+	}
 	m.closed = append(m.closed, number)
 	// Remove from issues list.
 	for i, iss := range m.issues {
@@ -830,6 +836,197 @@ func TestUntrustedLookAlikeDriftIssueIgnored(t *testing.T) {
 			}
 			if len(issueSvc.closed) != 0 {
 				t.Errorf("closed %v, want none", issueSvc.closed)
+			}
+		})
+	}
+}
+
+// MNRACT-006: monitor keeps one open drift issue per repository and template pair. The oldest is kept and updated;
+// the other issues for the pair are closed, whether or not auto-close is set.
+func TestDuplicateDriftIssuesClosed(t *testing.T) {
+	expected := []byte("expected")
+	const title = "[SteerSpec Drift] org/app: claude-md"
+	fpBody := "drift body\n" + fingerprintPrefix + driftFingerprint("org/app", "claude-md") + fingerprintSuffix + "\n"
+	otherFP := "drift body\n" + fingerprintPrefix + driftFingerprint("org/other", "claude-md") + fingerprintSuffix + "\n"
+	issue := func(n int, body string) *gh.Issue {
+		return &gh.Issue{Number: n, Title: title, Body: body, State: "open", Labels: []string{"steerspec-drift"}}
+	}
+	off := false
+	for _, tc := range []struct {
+		name        string
+		content     []byte
+		autoClose   *bool
+		issues      []*gh.Issue
+		wantKept    int // updated issue, 0 for none
+		wantClosed  []int
+		wantDupes   int
+		wantResolve int
+	}{
+		{
+			name:       "two fingerprint issues keep the oldest",
+			content:    []byte("drifted"),
+			issues:     []*gh.Issue{issue(72, fpBody), issue(41, fpBody)},
+			wantKept:   41,
+			wantClosed: []int{72},
+			wantDupes:  1,
+		},
+		{
+			name:       "fingerprint issue kept over an older legacy title-only issue",
+			content:    []byte("drifted"),
+			issues:     []*gh.Issue{issue(30, "legacy body"), issue(55, fpBody)},
+			wantKept:   55,
+			wantClosed: []int{30},
+			wantDupes:  1,
+		},
+		{
+			name:     "one issue matching by fingerprint and title is kept",
+			content:  []byte("drifted"),
+			issues:   []*gh.Issue{issue(41, fpBody)},
+			wantKept: 41,
+		},
+		{
+			name:     "a title match with another pair's fingerprint is left open",
+			content:  []byte("drifted"),
+			issues:   []*gh.Issue{issue(41, fpBody), issue(42, otherFP)},
+			wantKept: 41,
+		},
+		{
+			name:       "fetch error still closes duplicates",
+			content:    nil, // no file: the fetch fails and counts as drift
+			issues:     []*gh.Issue{issue(41, fpBody), issue(43, fpBody)},
+			wantKept:   41,
+			wantClosed: []int{43},
+			wantDupes:  1,
+		},
+		{
+			name:        "in sync with auto-close closes every issue",
+			content:     expected,
+			issues:      []*gh.Issue{issue(41, fpBody), issue(43, fpBody), issue(44, "legacy body")},
+			wantClosed:  []int{43, 44, 41},
+			wantDupes:   2,
+			wantResolve: 1,
+		},
+		{
+			name:       "in sync without auto-close keeps the oldest open",
+			content:    expected,
+			autoClose:  &off,
+			issues:     []*gh.Issue{issue(41, fpBody), issue(43, fpBody)},
+			wantClosed: []int{43},
+			wantDupes:  1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			files := map[string][]byte{}
+			if tc.content != nil {
+				files["org/app/CLAUDE.md"] = tc.content
+			}
+			issueSvc := newMockIssueService()
+			issueSvc.issues = tc.issues
+			cfg := testConfig()
+			if tc.autoClose != nil {
+				cfg.Monitor.AutoClose = tc.autoClose
+			}
+			ds := makeState(map[string]map[string]state.TemplateState{
+				"org/app": {"claude-md": {Version: "1.0", Hash: hash.HashBytes(expected), Timestamp: time.Now()}},
+			})
+
+			res, err := New(cfg, makeClient(&mockRepoService{files: files}, issueSvc), "test", "central").Run(context.Background(), ds, Options{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(issueSvc.created) != 0 {
+				t.Errorf("created %d issues, want none", len(issueSvc.created))
+			}
+			if !slices.Equal(issueSvc.closed, tc.wantClosed) {
+				t.Errorf("closed %v, want %v", issueSvc.closed, tc.wantClosed)
+			}
+			if res.DuplicatesClosed != tc.wantDupes || res.IssuesClosed != tc.wantResolve {
+				t.Errorf("DuplicatesClosed = %d, IssuesClosed = %d, want %d and %d", res.DuplicatesClosed, res.IssuesClosed, tc.wantDupes, tc.wantResolve)
+			}
+			if tc.wantKept != 0 {
+				if _, ok := issueSvc.updated[tc.wantKept]; !ok || len(issueSvc.updated) != 1 {
+					t.Errorf("updated %v, want only #%d", issueSvc.updated, tc.wantKept)
+				}
+				if len(res.DriftEntries) != 1 || res.DriftEntries[0].IssueNumber != tc.wantKept {
+					t.Errorf("drift entries %+v, want one on #%d", res.DriftEntries, tc.wantKept)
+				}
+			} else if len(issueSvc.updated) != 0 {
+				t.Errorf("updated %v, want none", issueSvc.updated)
+			}
+			if res.Errors != 0 {
+				t.Errorf("Errors = %d (%+v), want 0", res.Errors, res.RepoErrors)
+			}
+		})
+	}
+}
+
+// A duplicate that cannot be closed is an error for its pair only: the kept issue is still updated, and the other
+// targets are still checked (MNRACT-019).
+func TestDuplicateDriftIssueCloseFailureIsolated(t *testing.T) {
+	expected := []byte("expected")
+	body := func(repo string) string {
+		return fingerprintPrefix + driftFingerprint(repo, "claude-md") + fingerprintSuffix
+	}
+	issue := func(n int, repo string) *gh.Issue {
+		return &gh.Issue{Number: n, Title: "[SteerSpec Drift] " + repo + ": claude-md", Body: body(repo), State: "open", Labels: []string{"steerspec-drift"}}
+	}
+	issueSvc := newMockIssueService()
+	issueSvc.issues = []*gh.Issue{issue(41, "org/a"), issue(42, "org/a"), issue(51, "org/b"), issue(52, "org/b")}
+	issueSvc.closeErr = map[int]error{42: fmt.Errorf("502 bad gateway")}
+	ts := state.TemplateState{Version: "1.0", Hash: hash.HashBytes(expected), Timestamp: time.Now()}
+	ds := makeState(map[string]map[string]state.TemplateState{"org/a": {"claude-md": ts}, "org/b": {"claude-md": ts}})
+	repoSvc := &mockRepoService{files: map[string][]byte{"org/a/CLAUDE.md": []byte("drifted"), "org/b/CLAUDE.md": []byte("drifted")}}
+
+	res, err := New(testConfig(), makeClient(repoSvc, issueSvc), "test", "central").Run(context.Background(), ds, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Errors != 1 || len(res.RepoErrors) != 1 || res.RepoErrors[0].Repo != "org/a" {
+		t.Errorf("Errors = %d, RepoErrors = %+v, want one error for org/a", res.Errors, res.RepoErrors)
+	}
+	if _, ok := issueSvc.updated[41]; !ok {
+		t.Error("kept issue #41 was not updated after its duplicate failed to close")
+	}
+	if !slices.Equal(issueSvc.closed, []int{52}) || res.DuplicatesClosed != 1 {
+		t.Errorf("closed %v (DuplicatesClosed %d), want [52] and 1", issueSvc.closed, res.DuplicatesClosed)
+	}
+}
+
+// An issue carrying another pair's fingerprint is never taken for this pair, even when it is the only issue with the
+// pair's title: drift opens a new issue, and an in-sync run closes nothing.
+func TestTitleMatchWithOtherFingerprintNotTaken(t *testing.T) {
+	expected := []byte("expected")
+	for _, tc := range []struct {
+		name        string
+		content     []byte
+		wantCreated int
+	}{
+		{"drift", []byte("drifted"), 1},
+		{"in sync", expected, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			issueSvc := newMockIssueService()
+			issueSvc.issues = []*gh.Issue{{
+				Number: 42,
+				Title:  "[SteerSpec Drift] org/app: claude-md",
+				Body:   fingerprintPrefix + driftFingerprint("org/other", "claude-md") + fingerprintSuffix,
+				State:  "open",
+				Labels: []string{"steerspec-drift"},
+			}}
+			ds := makeState(map[string]map[string]state.TemplateState{
+				"org/app": {"claude-md": {Version: "1.0", Hash: hash.HashBytes(expected), Timestamp: time.Now()}},
+			})
+			repoSvc := &mockRepoService{files: map[string][]byte{"org/app/CLAUDE.md": tc.content}}
+
+			res, err := New(testConfig(), makeClient(repoSvc, issueSvc), "test", "central").Run(context.Background(), ds, Options{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := issueSvc.updated[42]; ok || len(issueSvc.closed) != 0 {
+				t.Errorf("issue #42 was updated or closed (closed %v)", issueSvc.closed)
+			}
+			if res.IssuesCreated != tc.wantCreated {
+				t.Errorf("IssuesCreated = %d, want %d", res.IssuesCreated, tc.wantCreated)
 			}
 		})
 	}

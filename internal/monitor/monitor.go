@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,11 +21,14 @@ const (
 
 // Result holds the outcome of a monitor run.
 type Result struct {
-	ReposInSync   int          `json:"repos_in_sync"`
-	ReposDrifted  int          `json:"repos_drifted"`
-	IssuesCreated int          `json:"issues_created"`
-	IssuesClosed  int          `json:"issues_closed"`
-	DriftEntries  []DriftEntry `json:"drift_entries,omitempty"`
+	ReposInSync   int `json:"repos_in_sync"`
+	ReposDrifted  int `json:"repos_drifted"`
+	IssuesCreated int `json:"issues_created"`
+	IssuesClosed  int `json:"issues_closed"`
+	// DuplicatesClosed counts extra open drift issues closed so that each repository and template pair keeps one
+	// (MNRACT-006). IssuesClosed counts only issues auto-closed because their drift was resolved.
+	DuplicatesClosed int          `json:"duplicates_closed"`
+	DriftEntries     []DriftEntry `json:"drift_entries,omitempty"`
 	// Errors counts the repo/template checks whose issue could not be
 	// created, updated or closed. Each failure is isolated: monitor goes on
 	// with the other targets and lists the failures in RepoErrors.
@@ -108,18 +112,16 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 		return nil, fmt.Errorf("listing drift issues: %w", err)
 	}
 
-	// Index existing issues by fingerprint (preferred) and title (fallback) for fast lookup.
-	issueByFingerprint := make(map[string]*gh.Issue, len(existingIssues))
-	issueByTitle := make(map[string]*gh.Issue, len(existingIssues))
+	// Keep the trusted issues, oldest first, so the issue kept for a pair is the one that recorded its drift first.
+	var trusted []*gh.Issue
 	for _, iss := range existingIssues {
-		if !iss.Trusted(label) {
-			continue
-		}
-		issueByTitle[iss.Title] = iss
-		if fp := extractFingerprint(iss.Body); fp != "" {
-			issueByFingerprint[fp] = iss
+		if iss.Trusted(label) {
+			trusted = append(trusted, iss)
 		}
 	}
+	slices.SortFunc(trusted, func(a, b *gh.Issue) int { return a.Number - b.Number })
+	// closedIssues holds the issues this run closed, so no later pair matches them.
+	closedIssues := make(map[int]bool)
 
 	now := time.Now().UTC()
 	result := &Result{}
@@ -150,7 +152,18 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 			fp := driftFingerprint(repoFullName, templateID)
 
 			issTitle := driftIssueTitle(repoFullName, templateID)
-			existing := findIssueByFingerprintOrTitle(issueByFingerprint, issueByTitle, fp, issTitle)
+			existing, duplicates := pairIssues(trusted, closedIssues, fp, issTitle)
+			// Every path keeps at most one open issue for the pair (MNRACT-006), auto-close or not. A failed close
+			// is reported for this pair and does not stop the kept issue from being updated.
+			for _, dup := range duplicates {
+				if err := m.ghClient.Issues.Close(ctx, m.centralOwner, m.centralRepo, dup.Number); err != nil {
+					fail(repoFullName, templateID, fmt.Errorf("closing duplicate drift issue #%d (keeping #%d): %w",
+						dup.Number, existing.Number, err))
+					continue
+				}
+				closedIssues[dup.Number] = true
+				result.DuplicatesClosed++
+			}
 
 			content, _, err := m.ghClient.Repos.GetFileContent(ctx, owner, repo, destPath, "")
 			if err != nil {
@@ -181,8 +194,7 @@ func (m *Monitor) Run(ctx context.Context, deployState *state.DeploymentState, o
 							fail(repoFullName, templateID, fmt.Errorf("closing resolved drift issue #%d: %w", existing.Number, err))
 						} else {
 							result.IssuesClosed++
-							delete(issueByTitle, existing.Title)
-							delete(issueByFingerprint, fp)
+							closedIssues[existing.Number] = true
 						}
 					}
 				}
@@ -296,20 +308,30 @@ func driftFingerprint(repo, templateID string) string {
 	return hash.Fingerprint("drift", repo, templateID)
 }
 
-// findIssueByFingerprintOrTitle looks up an existing issue first by fingerprint
-// (stable across title changes), then falls back to title match.
-func findIssueByFingerprintOrTitle(
-	byFingerprint map[string]*gh.Issue,
-	byTitle map[string]*gh.Issue,
-	fp, title string,
-) *gh.Issue {
-	if iss, ok := byFingerprint[fp]; ok {
-		return iss
+// pairIssues returns the open issue to keep for one repository and template pair, and the duplicates to close. The
+// pair's issues are those carrying its fingerprint, which is stable across title changes, and legacy issues with
+// its title and no fingerprint. The oldest issue carrying the fingerprint is kept, failing that the oldest legacy
+// issue; the rest are duplicates. An issue carrying another pair's fingerprint is never kept or closed for this
+// pair, whatever its title. issues is sorted by number, and issues already closed this run are skipped.
+func pairIssues(issues []*gh.Issue, closed map[int]bool, fp, title string) (keep *gh.Issue, duplicates []*gh.Issue) {
+	var byFingerprint, byTitle []*gh.Issue
+	for _, iss := range issues {
+		if closed[iss.Number] {
+			continue
+		}
+		switch issueFP := extractFingerprint(iss.Body); {
+		case issueFP == fp:
+			byFingerprint = append(byFingerprint, iss)
+		case issueFP == "" && iss.Title == title:
+			// A legacy issue without a fingerprint. One carrying another pair's fingerprint belongs to that pair.
+			byTitle = append(byTitle, iss)
+		}
 	}
-	if iss, ok := byTitle[title]; ok {
-		return iss
+	all := slices.Concat(byFingerprint, byTitle)
+	if len(all) == 0 {
+		return nil, nil
 	}
-	return nil
+	return all[0], all[1:]
 }
 
 // extractFingerprint returns the fingerprint embedded in an issue body, or ""
