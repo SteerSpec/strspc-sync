@@ -1952,6 +1952,21 @@ func TestSaveStateFailureIsCounted(t *testing.T) {
 	if result.Errors != 1 {
 		t.Errorf("expected the state-save failure counted as 1 error, got %d", result.Errors)
 	}
+	// It created PRs, so it completed (SYNCOP-010).
+	if result.Status != StatusCompleted {
+		t.Errorf("status = %q, want completed: the run created PRs", result.Status)
+	}
+
+	// A run that created or updated no PR and could not record its results failed.
+	result, err = New(makeTestConfig(), makeTestClient(repoSvc, prSvc), "testorg", "central").
+		Run(context.Background(), Options{Trigger: "manual", TemplateFilter: "no-such-template"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.PRsCreated != 0 || result.PRsUpdated != 0 || result.Errors != 1 || result.Status != StatusFailed {
+		t.Errorf("created %d, updated %d, errors %d, status %q; want 0, 0, 1 and failed",
+			result.PRsCreated, result.PRsUpdated, result.Errors, result.Status)
+	}
 }
 
 // SYNCPR-003: a forced re-run of an open PR keeps reporting the version that

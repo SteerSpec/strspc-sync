@@ -24,12 +24,23 @@ import (
 	"github.com/SteerSpec/strspc-sync/internal/template"
 )
 
+// Status is the outcome of a sync run (SYNCOP-010). A run is synchronous and is never reported while it is still
+// in progress, so it has only these two values.
+type Status string
+
+const (
+	// StatusCompleted is a run that finished, possibly with errors on some targets.
+	StatusCompleted Status = "completed"
+	// StatusFailed is a run that could not start, or that had errors and created or updated no PR.
+	StatusFailed Status = "failed"
+)
+
 // Result represents the outcome of a sync operation.
 type Result struct {
 	ID        string    `json:"id"`
 	Trigger   string    `json:"trigger"`
 	Timestamp time.Time `json:"timestamp"`
-	Status    string    `json:"status"`
+	Status    Status    `json:"status"`
 	// ReposTargeted is how many repositories the targets section resolved
 	// to after include, exclude, topics and the --target-filter. Zero means
 	// the token could not list the organization or nothing matched, which
@@ -100,19 +111,19 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 	// Parse the filters before any API call, so a malformed glob fails fast.
 	targetFilter, err := registry.ParseFilter(opts.TargetFilter)
 	if err != nil {
-		result.Status = "failed"
+		result.Status = StatusFailed
 		return result, fmt.Errorf("--target-filter: %w", err)
 	}
 	templateFilter, err := registry.ParseFilter(opts.TemplateFilter)
 	if err != nil {
-		result.Status = "failed"
+		result.Status = StatusFailed
 		return result, fmt.Errorf("--template-filter: %w", err)
 	}
 
 	// Resolve targets
 	targets, err := s.reg.Resolve(ctx, s.cfg.Targets, s.cfg.Variables)
 	if err != nil {
-		result.Status = "failed"
+		result.Status = StatusFailed
 		return result, fmt.Errorf("resolving targets: %w", err)
 	}
 
@@ -201,10 +212,6 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 		}
 	}
 	result.RepoResults = results
-	result.Status = "completed"
-	if result.Errors > 0 && result.PRsCreated == 0 && result.PRsUpdated == 0 {
-		result.Status = "failed"
-	}
 
 	// Save state back (skip on dry run).
 	//
@@ -219,6 +226,12 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 				"operation", "sync", "err", err)
 			result.Errors++
 		}
+	}
+
+	// Decided after the state write, so a run whose only error is failing to record its results is not completed.
+	result.Status = StatusCompleted
+	if result.Errors > 0 && result.PRsCreated == 0 && result.PRsUpdated == 0 {
+		result.Status = StatusFailed
 	}
 
 	return result, nil

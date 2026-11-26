@@ -1,0 +1,55 @@
+{
+  "rule_id": "SYNCOP-010",
+  "revision": 0,
+  "body_hash": "blake3:7b5e9571146d6e993818aad730ce27103d9d299a54c63fe5fbfdd1276a6beaed",
+  "promoted_at": "2026-11-26T14:49:49Z",
+  "entity_version": "0.15.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "7002826e3ea7222eacd9ab21d06f90f4c9460e19faa2ec4f7c7eb5a03d09e6dd",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The sync Result has a Status field typed Status, which defines only \"completed\" and \"failed\". Every assignment in the findings uses one of those two values, and a default of completed is set before failure is decided.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 29,
+      "excerpt": "type Status string",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 33,
+      "excerpt": "StatusCompleted Status = \"completed\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 35,
+      "excerpt": "StatusFailed Status = \"failed\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 43,
+      "excerpt": "Status    Status    `json:\"status\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 232,
+      "excerpt": "result.Status = StatusCompleted",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 234,
+      "excerpt": "result.Status = StatusFailed",
+      "line_confirmed": true
+    }
+  ]
+}
