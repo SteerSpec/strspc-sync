@@ -1,0 +1,49 @@
+{
+  "rule_id": "MNRACT-006",
+  "revision": 1,
+  "body_hash": "blake3:71786b60d009659954a133173748fffce1da0180990536db279f5fe4ad39a129",
+  "promoted_at": "2026-11-26T13:46:50Z",
+  "entity_version": "0.33.0",
+  "scope": "all tracked files",
+  "files": 148,
+  "files_hash": "bd73e0e4a93d847ae0eca64018027598f084269558f01af3778dd2df17fe9332",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.88,
+  "explanation": "The monitor pairs issues by repo/template fingerprint or title in the central repo, creates one only when none exists, updates the existing one otherwise, and closes duplicates. Unit and e2e tests confirm there is a single open issue per pair and no duplicates on rerun.",
+  "evidence": [
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 155,
+      "excerpt": "existing, duplicates := pairIssues(trusted, closedIssues, fp, issTitle)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 158,
+      "excerpt": "for _, dup := range duplicates {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 235,
+      "excerpt": "func (m *Monitor) reportDrift(ctx context.Context, entry *DriftEntry, existing *gh.Issue, title, label string, result *Result) error {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/monitor/monitor.go",
+      "line": 245,
+      "excerpt": "iss, err := m.ghClient.Issues.Create(ctx, m.centralOwner, m.centralRepo, &gh.IssueCreate{",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/e2e/monitor_conflict_test.go",
+      "line": 107,
+      "excerpt": "if m.ReposDrifted != 1 || m.IssuesCreated != 0 || m.IssuesClosed != 0 {",
+      "line_confirmed": true
+    }
+  ]
+}
