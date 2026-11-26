@@ -514,6 +514,54 @@ func TestTier2_DuplicateSkill(t *testing.T) {
 	}
 }
 
+// TestTier2_DuplicateSkillByPath: a skill is identified by its path in the repository, not its filename
+// (CNFLDTS-003). Two skills sharing the name SKILL.md in different directories are not duplicates of each other;
+// the same skill with different content in two repositories is, reported under its full path.
+func TestTier2_DuplicateSkillByPath(t *testing.T) {
+	cfg := testConfig()
+	cfg.Templates = []config.TemplateConfig{
+		{ID: "skill-a", Type: "skill", Source: "templates/a/SKILL.md", Destination: ".claude/skills/a/SKILL.md", Strategy: "full-replace"},
+		{ID: "skill-b", Type: "skill", Source: "templates/b/SKILL.md", Destination: ".claude/skills/b/SKILL.md", Strategy: "full-replace"},
+	}
+	for _, tt := range []struct {
+		name  string
+		files map[string][]byte
+		want  []string // FilePath of each duplicate-skill entry
+	}{
+		{"same filename, different skills", map[string][]byte{
+			"org/repo1/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+			"org/repo2/.claude/skills/b/SKILL.md": []byte("# Skill B"),
+		}, nil},
+		{"both skills in both repos, each identical", map[string][]byte{
+			"org/repo1/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+			"org/repo1/.claude/skills/b/SKILL.md": []byte("# Skill B"),
+			"org/repo2/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+			"org/repo2/.claude/skills/b/SKILL.md": []byte("# Skill B"),
+		}, nil},
+		{"same skill, different content", map[string][]byte{
+			"org/repo1/.claude/skills/a/SKILL.md": []byte("# Skill A"),
+			"org/repo2/.claude/skills/a/SKILL.md": []byte("# Skill A, edited"),
+		}, []string{".claude/skills/a/SKILL.md"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			scanner := New(cfg, newTestClient(&mockRepoService{files: tt.files}, &mockIssueService{}), "org", "central")
+			entries, err := scanner.runTier2(context.Background(), []string{"org/repo1", "org/repo2"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, e := range entries {
+				if e.Type == TypeDuplicateSkill {
+					got = append(got, e.FilePath)
+				}
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("duplicate-skill entries = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTier3_NotImplemented(t *testing.T) {
 	repos := &mockRepoService{files: map[string][]byte{}}
 	issues := &mockIssueService{}

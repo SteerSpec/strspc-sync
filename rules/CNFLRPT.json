@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.9.9",
-    "timestamp": "2026-11-26T08:58:49Z",
-    "hash": "blake3:e979141d4e406b50bbdaaa2164b6652f870566c0b65853f9fc18243057c30365"
+    "version": "0.9.10",
+    "timestamp": "2026-11-26T10:43:41Z",
+    "hash": "blake3:ba7c11fab8ff68cd32e9ff2d4238ea88fb8a51c90fff41101b699f1b69490bba"
   },
   "rules": [
     {
@@ -211,9 +211,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.9.0",
-        "timestamp": "2026-11-26T08:58:49Z",
-        "hash": "blake3:63102bc0a5a58b1457889205999bf88f0a3c7a4e868b2fb5f6665a04d8e0bef4"
+        "version": "0.9.1",
+        "timestamp": "2026-11-26T10:43:41Z",
+        "hash": "blake3:7059980ffe96723b207cac6e445d139d64d0837a56945d523739b2d2fd81ed01"
       },
       "rules": [
         {
@@ -287,6 +287,15 @@
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
           "supersedes": null
+        },
+        {
+          "id": "CNFLDTS-009",
+          "revision": 0,
+          "state": "D",
+          "body": "Tier 2 (heuristic) MUST include: duplicate skill detection via destination path and content hash comparison, and section overlap detection between managed files.",
+          "added_by": "github:pleberre",
+          "added_at": "2026-11-26",
+          "supersedes": "CNFLDTS-003"
         }
       ],
       "notes": [
