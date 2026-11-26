@@ -93,12 +93,16 @@ func tierOfType(t ConflictType) int {
 
 // issueType recovers the conflict type of an issue: from the body marker
 // written since cleanup exists, else from the title (issues created before
-// the marker, or whose body was edited).
+// the marker, or whose body was edited). A value that is not one of the six
+// types (CNFLENT-003) is not a type: the marker falls back to the title, and
+// the result is "" when neither holds one, so cleanup leaves the issue alone.
 func issueType(issue *gh.Issue) ConflictType {
 	if idx := strings.Index(issue.Body, typePrefix); idx >= 0 {
 		rest := issue.Body[idx+len(typePrefix):]
 		if end := strings.Index(rest, fingerprintSuffix); end >= 0 {
-			return ConflictType(strings.TrimSpace(rest[:end]))
+			if t := ConflictType(strings.TrimSpace(rest[:end])); t.Valid() {
+				return t
+			}
 		}
 	}
 	return typeFromTitle(issue.Title)
@@ -159,7 +163,9 @@ func typeFromTitle(title string) ConflictType {
 	}
 	rest := strings.TrimPrefix(title, prefix)
 	if i := strings.Index(rest, ":"); i > 0 {
-		return ConflictType(rest[:i])
+		if t := ConflictType(rest[:i]); t.Valid() {
+			return t
+		}
 	}
 	return ""
 }
@@ -284,9 +290,9 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		// Determine which repo to file the issue against
 		repo := entry.Repo
 		var participants []string
-		if strings.Contains(repo, ", ") {
-			// Multi-repo entries (e.g., duplicate skills) go to the central repo
-			participants = strings.Split(repo, ", ")
+		if len(entry.Repos) > 0 {
+			// Cross-repository entries (duplicate skills) go to the central repo
+			participants = entry.Repos
 			repo = s.centralOwner + "/" + s.centralRepo
 		}
 

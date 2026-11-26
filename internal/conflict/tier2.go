@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strings"
 
 	"github.com/SteerSpec/strspc-sync/internal/hash"
 )
@@ -88,7 +87,8 @@ func (s *Scanner) checkDuplicateSkills(ctx context.Context, targets []string) ([
 			entries = append(entries, ConflictEntry{
 				Severity:            SeverityWarning,
 				Type:                TypeDuplicateSkill,
-				Repo:                strings.Join(repos, ", "),
+				Repo:                s.centralOwner + "/" + s.centralRepo,
+				Repos:               repos,
 				FilePath:            path,
 				Description:         fmt.Sprintf("skill %q exists in %d repos with different content", path, len(skills)),
 				SuggestedResolution: "Consolidate the skill into a single template or ensure intentional divergence.",

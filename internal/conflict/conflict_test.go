@@ -540,10 +540,43 @@ func TestTier2_DuplicateSkill(t *testing.T) {
 			if e.Severity != SeverityWarning {
 				t.Errorf("expected warning severity, got %s", e.Severity)
 			}
+			// CNFLENT-004: Repo is one owner/repo (the central repository the issue is filed in); the participants
+			// are listed separately.
+			if e.Repo != "org/central" || !slices.Equal(e.Repos, []string{"org/repo1", "org/repo2"}) {
+				t.Errorf("duplicate-skill repo %q, repos %v; want org/central and [org/repo1 org/repo2]", e.Repo, e.Repos)
+			}
 		}
 	}
 	if !found {
 		t.Error("expected duplicate skill entry, got none")
+	}
+}
+
+// CNFLENT-003: a conflict type read back from an issue is one of the six, or "" (which cleanup ignores).
+func TestIssueTypeOnlyReturnsValidTypes(t *testing.T) {
+	marker := func(v string) string { return typePrefix + v + fingerprintSuffix }
+	for _, tc := range []struct {
+		name, title, body string
+		want              ConflictType
+	}{
+		{"marker", "anything", marker("unmanaged-file"), TypeUnmanagedFile},
+		{"title", "[SteerSpec Conflict] version-drift: CLAUDE.md", "", TypeVersionDrift},
+		{"invalid marker falls back to title", "[SteerSpec Conflict] duplicate-skill: x.md", marker("foo"), TypeDuplicateSkill},
+		{"invalid marker and title", "[SteerSpec Conflict] bar: x.md", marker("foo"), ""},
+		{"invalid title", "[SteerSpec Conflict] Version-Drift: CLAUDE.md", "", ""},
+		{"no prefix", "version-drift: CLAUDE.md", "", ""},
+	} {
+		if got := issueType(&gh.Issue{Title: tc.title, Body: tc.body}); got != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	for _, typ := range []ConflictType{
+		TypeVersionDrift, TypeManualOverride, TypeCrossReferenceBroken, TypeDuplicateSkill,
+		TypeContradictoryInstruction, TypeUnmanagedFile,
+	} {
+		if !typ.Valid() {
+			t.Errorf("%q must be valid", typ)
+		}
 	}
 }
 
