@@ -212,10 +212,6 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 		}
 	}
 	result.RepoResults = results
-	result.Status = StatusCompleted
-	if result.Errors > 0 && result.PRsCreated == 0 && result.PRsUpdated == 0 {
-		result.Status = StatusFailed
-	}
 
 	// Save state back (skip on dry run).
 	//
@@ -230,6 +226,12 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 				"operation", "sync", "err", err)
 			result.Errors++
 		}
+	}
+
+	// Decided after the state write, so a run whose only error is failing to record its results is not completed.
+	result.Status = StatusCompleted
+	if result.Errors > 0 && result.PRsCreated == 0 && result.PRsUpdated == 0 {
+		result.Status = StatusFailed
 	}
 
 	return result, nil
