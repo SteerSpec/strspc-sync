@@ -473,6 +473,9 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 			}
 			typ := issueType(issue)
 			tier := tierOfType(typ)
+			if typ == TypeManualOverride && legacyOverlapIssue(issue) {
+				tier = 2 // tier 2 filed it, and tier 2 files its section-overlap replacement
+			}
 			if tier == 0 || !ran[tier] {
 				continue // unknown type, or a tier this run did not check
 			}

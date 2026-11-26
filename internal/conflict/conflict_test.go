@@ -337,6 +337,29 @@ func TestTier1_ManagedSectionMismatchType(t *testing.T) {
 	}
 }
 
+// A legacy overlap issue (manual-override from tier 2) belongs to tier 2, which now files section-overlap: a
+// tier-2-only run closes it once the overlap is gone, and a tier-1-only run leaves it alone.
+func TestLegacyOverlapIssueBelongsToTier2(t *testing.T) {
+	for _, tc := range []struct {
+		tiers     []int
+		wantClose bool
+	}{{[]int{2}, true}, {[]int{1}, false}} {
+		fp := hash.Fingerprint(string(TypeManualOverride), "org/repo1", "B.md")
+		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {{
+			Number: 32, Title: "[SteerSpec Conflict] manual-override: B.md", State: "open", Labels: []string{"steerspec-conflict"},
+			Body: "STEERSPEC section \"org\" appears in both A.md and B.md\n\n" + fingerprintPrefix + fp + fingerprintSuffix +
+				"\n" + typePrefix + string(TypeManualOverride) + fingerprintSuffix,
+		}}}}
+		scanner := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central")
+		if _, err := scanner.Run(context.Background(), state.NewDeploymentState(), []string{"org/repo1"}, Options{Tiers: tc.tiers}); err != nil {
+			t.Fatal(err)
+		}
+		if got := len(issues.closed) == 1; got != tc.wantClose {
+			t.Errorf("tiers %v: closed %v, want closed %v", tc.tiers, issues.closed, tc.wantClose)
+		}
+	}
+}
+
 // A section-overlap issue filed before section-overlap had its own type carries manual-override and the same
 // fingerprint a tier-1 manual-override would. A missing tracked file keeps only the tier-1 kind open; the legacy
 // overlap issue is closed, since nothing reports it under that type again.
@@ -352,11 +375,11 @@ func TestLegacyOverlapIssueClosedWhenTrackedFileMissing(t *testing.T) {
 		Version: "1.0.0", Hash: "h", Sections: []string{"org"}, SectionsHash: "s", Timestamp: time.Now(),
 	})
 	scanner := New(testConfig(), newTestClient(&mockRepoService{files: map[string][]byte{}}, issues), "org", "central")
-	if _, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}}); err != nil {
+	if _, err := scanner.Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1, 2}}); err != nil {
 		t.Fatal(err)
 	}
 	if len(issues.closed) != 1 {
-		t.Errorf("a legacy overlap issue must close on the first tier-1 run, closed %v", issues.closed)
+		t.Errorf("a legacy overlap issue must close on the first run with tiers 1 and 2, closed %v", issues.closed)
 	}
 }
 
