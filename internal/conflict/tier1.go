@@ -80,24 +80,32 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 			SuggestedResolution: "Re-run sync to update the file, or update the deployment state if the change is intentional.",
 		}
 		if ts.SectionsHash != "" && len(ts.Sections) > 0 {
-			if syncPRPending(ts) {
+			const forceResolution = "Re-run sync with force (`--force`, or the action's `force` input) to " +
+				"restore the managed sections; content outside them is kept. To change a managed section, change " +
+				"the template in the central repository."
+			switch {
+			case actual == "":
+				// A managed section is missing, duplicated or has a broken marker: not an edit inside a section, and
+				// sync cannot render the file until it is fixed, so it stays critical version drift.
+				entry.Description = fmt.Sprintf("the managed STEERSPEC sections of template %q are missing or "+
+					"unreadable: expected hash %s, got %s", templateID, expected, actualOrNone(actual))
+				entry.SuggestedResolution = "If a STEERSPEC marker is broken (unclosed, unpaired or nested), fix it " +
+					"by hand first: sync cannot render a file it cannot parse. " + forceResolution
+			case syncPRPending(ts):
 				// The recorded hash is that of the version a sync PR proposes, and the file still holds another
 				// version's sections: version drift, not an edit.
 				entry.Description = fmt.Sprintf("the managed STEERSPEC sections of template %q are not at version %s, "+
 					"which sync PR #%d (%s) proposes: expected hash %s, got %s",
-					templateID, ts.Version, ts.PRNumber, ts.PRStatus, expected, actualOrNone(actual))
+					templateID, ts.Version, ts.PRNumber, ts.PRStatus, expected, actual)
 				entry.SuggestedResolution = "Merge the sync PR, or re-run sync to propose the version again."
-			} else {
-				// The file was last confirmed at this version, so the sections were changed outside the sync process
-				// (CNFLENT-009).
+			default:
+				// The file was last confirmed at this version and its sections are readable, so they were changed
+				// outside the sync process (CNFLENT-009).
 				entry.Severity = SeverityWarning
 				entry.Type = TypeManualOverride
 				entry.Description = fmt.Sprintf("the managed STEERSPEC sections of template %q were edited outside "+
-					"sync: expected hash %s, got %s", templateID, expected, actualOrNone(actual))
-				entry.SuggestedResolution = "Re-run sync with force (`--force`, or the action's `force` input) to " +
-					"restore the managed sections; content outside them is kept. To change a managed section, change " +
-					"the template in the central repository. If a STEERSPEC marker is broken (unclosed, unpaired or " +
-					"nested), fix it by hand first: sync cannot render a file it cannot parse."
+					"sync: expected hash %s, got %s", templateID, expected, actual)
+				entry.SuggestedResolution = forceResolution
 			}
 		}
 		entries = append(entries, entry)

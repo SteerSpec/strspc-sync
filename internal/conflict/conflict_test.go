@@ -296,17 +296,25 @@ func TestTier1_ManagedSectionMismatchType(t *testing.T) {
 		marker   bool
 		wantType ConflictType
 		wantSev  Severity
+		content  string // the file in the target; empty means edited
 	}{
-		{"no sync PR", 0, "", true, TypeManualOverride, SeverityWarning},
-		{"sync PR merged", 7, "merged", true, TypeManualOverride, SeverityWarning},
-		{"sync PR open", 7, "open", true, TypeVersionDrift, SeverityCritical},
-		{"sync PR closed unmerged", 7, "closed", true, TypeVersionDrift, SeverityCritical},
-		{"status without a PR number", 0, "open", true, TypeManualOverride, SeverityWarning},
-		{"whole-file record, PR merged", 7, "merged", false, TypeVersionDrift, SeverityCritical},
+		{"no sync PR", 0, "", true, TypeManualOverride, SeverityWarning, ""},
+		{"sync PR merged", 7, "merged", true, TypeManualOverride, SeverityWarning, ""},
+		{"sync PR open", 7, "open", true, TypeVersionDrift, SeverityCritical, ""},
+		{"sync PR closed unmerged", 7, "closed", true, TypeVersionDrift, SeverityCritical, ""},
+		{"status without a PR number", 0, "open", true, TypeManualOverride, SeverityWarning, ""},
+		{"whole-file record, PR merged", 7, "merged", false, TypeVersionDrift, SeverityCritical, ""},
+		// A missing or unreadable section is not an edit inside it, and sync cannot render the file: critical.
+		{"section missing, PR merged", 7, "merged", true, TypeVersionDrift, SeverityCritical, "# no sections\n"},
+		{"broken marker, no PR", 0, "", true, TypeVersionDrift, SeverityCritical, "<!-- STEERSPEC:BEGIN:org -->\nunclosed\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte(edited)}}
+			content := tt.content
+			if content == "" {
+				content = edited
+			}
+			repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": []byte(content)}}
 			ts := state.TemplateState{
 				Version: "1.1.0", Hash: hash.HashBytes([]byte(managed)), Timestamp: time.Now(),
 				PRNumber: tt.prNumber, PRStatus: tt.prStatus,
