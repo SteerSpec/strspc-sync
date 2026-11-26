@@ -225,6 +225,10 @@ func (s *repoService) ListFiles(ctx context.Context, owner, repo, dir, ref strin
 	}
 	dir = strings.Trim(dir, "/")
 	treeish := ref + ":" + dir
+	prefix := ""
+	if dir != "" {
+		prefix = dir + "/"
+	}
 	u := fmt.Sprintf("%s/repos/%s/%s/git/trees/%s?recursive=1", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(treeish))
 	resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -253,7 +257,7 @@ func (s *repoService) ListFiles(ctx context.Context, owner, repo, dir, ref strin
 	var files []string
 	for _, e := range tree.Tree {
 		if e.Type == "blob" { // files and symlinks; "tree" is a directory and "commit" a submodule
-			files = append(files, dir+"/"+e.Path)
+			files = append(files, prefix+e.Path)
 		}
 	}
 	return files, nil

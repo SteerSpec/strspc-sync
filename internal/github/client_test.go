@@ -666,6 +666,12 @@ func TestRepoListFiles(t *testing.T) {
 			},
 		})
 	})
+	mux.HandleFunc("/repos/o/r/git/trees/main:", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck // test handler write
+			"truncated": false,
+			"tree":      []map[string]string{{"path": "README.md", "type": "blob"}, {"path": "docs", "type": "tree"}},
+		})
+	})
 	mux.HandleFunc("/repos/o/r/git/trees/main:none", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprint(w, `{"message":"Not Found"}`) //nolint:errcheck // test handler write
@@ -681,6 +687,9 @@ func TestRepoListFiles(t *testing.T) {
 	}
 	if want := []string{".claude/agents/review.md", ".claude/settings.json"}; !slices.Equal(got, want) {
 		t.Errorf("ListFiles = %v, want %v", got, want)
+	}
+	if got, err := c.Repos.ListFiles(context.Background(), "o", "r", "", "main"); err != nil || !slices.Equal(got, []string{"README.md"}) {
+		t.Errorf("the repository root must list root-relative paths, got %v, %v", got, err)
 	}
 	if got, err := c.Repos.ListFiles(context.Background(), "o", "r", "none", "main"); err != nil || len(got) != 0 {
 		t.Errorf("a missing directory must be an empty list, got %v, %v", got, err)
