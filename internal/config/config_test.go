@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -584,6 +585,50 @@ func TestSyncPRGrouping(t *testing.T) {
 		}
 		if cfg.Sync.PRGrouping != tc.value {
 			t.Errorf("%q: got %q", tc.value, cfg.Sync.PRGrouping)
+		}
+	}
+}
+
+// With pr-grouping "repo", templates sharing a destination are rendered onto one file, which only the marker
+// strategy supports.
+func TestSharedDestinationNeedsMarkerInRepoMode(t *testing.T) {
+	const tmpl = `
+  - id: %s
+    version: "1.0.0"
+    type: claude-md
+    source: templates/%s.md
+    destination: CLAUDE.md
+    strategy: %s`
+	build := func(grouping, strategyB string) string {
+		return `
+version: "1.0.0"
+auth:
+  method: pat
+  token: "t"
+templates:` + fmt.Sprintf(tmpl, "a", "a", "marker") + fmt.Sprintf(tmpl, "b", "b", strategyB) + `
+targets:
+  include: ["org/*"]
+sync:
+  pr-grouping: ` + grouping + "\n"
+	}
+	for _, tc := range []struct {
+		grouping, strategyB string
+		wantErr             bool
+	}{
+		{"repo", "marker", false},
+		{"repo", "full-replace", true},
+		{"repo", "mustache", true},
+		{"template", "full-replace", false}, // each template keeps its own PR
+	} {
+		_, err := Load(writeConfig(t, build(tc.grouping, tc.strategyB)))
+		if tc.wantErr {
+			if err == nil || !strings.Contains(err.Error(), "marker strategy") {
+				t.Errorf("%s/%s: got %v, want a marker-strategy error", tc.grouping, tc.strategyB, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%s/%s: unexpected error: %v", tc.grouping, tc.strategyB, err)
 		}
 	}
 }

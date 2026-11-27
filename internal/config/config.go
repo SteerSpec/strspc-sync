@@ -192,6 +192,28 @@ func checkTemplateID(id string) error {
 	return nil
 }
 
+// checkSharedDestinations rejects, with pr-grouping "repo", a destination shared by templates that cannot be
+// rendered one onto the other in a single file. Only the marker strategy keeps the content it is rendered onto;
+// mustache and full-replace overwrite it, so the bundle could not hold both templates.
+func checkSharedDestinations(cfg *SyncConfig) error {
+	if cfg.Sync.PRGrouping != PRGroupingRepo {
+		return nil
+	}
+	byDest := make(map[string][]int)
+	for i, tmpl := range cfg.Templates {
+		byDest[tmpl.Destination] = append(byDest[tmpl.Destination], i)
+	}
+	for i, tmpl := range cfg.Templates {
+		shared := byDest[tmpl.Destination]
+		if len(shared) > 1 && tmpl.Strategy != "marker" {
+			return fmt.Errorf("templates[%d] (%s) shares destination %s with %d other template(s): with "+
+				"sync.pr-grouping %q, templates sharing a destination must all use the marker strategy",
+				i, tmpl.ID, tmpl.Destination, len(shared)-1, PRGroupingRepo)
+		}
+	}
+	return nil
+}
+
 func Load(path string) (*SyncConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -353,6 +375,9 @@ func Validate(cfg *SyncConfig) error {
 		if !validStrategies[tmpl.Strategy] {
 			return fmt.Errorf("templates[%d].strategy %q is not valid", i, tmpl.Strategy)
 		}
+	}
+	if err := checkSharedDestinations(cfg); err != nil {
+		return err
 	}
 
 	if len(cfg.Targets.Include) == 0 {

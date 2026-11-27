@@ -69,13 +69,24 @@ func (s *Syncer) syncBundle(ctx context.Context, target registry.ResolvedTarget,
 			results = append(results, *failed)
 			continue
 		}
-		if r.inSync() {
+		_, chained := rendered[tmpl.Destination]
+		// Whether the repository already holds the template is judged on the default branch, as in template mode.
+		// A template rendered onto an earlier member's output would otherwise match what is only staged, and be
+		// recorded as deployed before the bundle is merged.
+		onDefault := r
+		if chained {
+			if onDefault, failed = s.render(ctx, target, tmpl, nil); failed != nil {
+				results = append(results, *failed)
+				continue
+			}
+		}
+		if onDefault.inSync() {
 			rr := RepoResult{Repo: target.Repo, TemplateID: tmpl.ID}
-			s.markInSync(ctx, target, tmpl, r, dryRun, &rr)
+			s.markInSync(ctx, target, tmpl, onDefault, dryRun, &rr)
 			results = append(results, rr)
 			continue
 		}
-		if _, seen := rendered[tmpl.Destination]; !seen {
+		if !chained {
 			paths = append(paths, tmpl.Destination)
 		}
 		rendered[tmpl.Destination] = r.rendered

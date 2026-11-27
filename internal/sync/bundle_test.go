@@ -457,6 +457,33 @@ func TestBundleCommitFailureDropsBranch(t *testing.T) {
 	}
 }
 
+// A template rendered onto an earlier member's staged output is judged in sync against the default branch, not the
+// staged content: a second template that matches only the staged file is carried, not recorded as deployed. (Config
+// validation rejects this full-replace pair in repo mode; the run is tested here without it.)
+func TestBundleJudgesChainedTemplateOnDefaultBranch(t *testing.T) {
+	repoSvc := newMockRepoService()
+	setupBundleRepos(repoSvc)
+	repoSvc.files["testorg/central/templates/a.md/"] = []byte("same")
+	repoSvc.files["testorg/central/templates/b.md/"] = []byte("same")
+	prSvc := newBundlePRService()
+	cfg := makeTestConfig()
+	cfg.Sync.PRGrouping = config.PRGroupingRepo
+	cfg.Templates = []config.TemplateConfig{
+		{ID: "a", Version: "1.0.0", Source: "templates/a.md", Destination: "NOTES.md", Strategy: "full-replace"},
+		{ID: "b", Version: "1.0.0", Source: "templates/b.md", Destination: "NOTES.md", Strategy: "full-replace"},
+	}
+
+	result := runSync(t, cfg, repoSvc, prSvc, Options{})
+	for _, rr := range result.RepoResults {
+		if rr.Status != "created" {
+			t.Errorf("%s: status %s, want created (carried by the bundle)", rr.TemplateID, rr.Status)
+		}
+	}
+	if ts := savedState(t, repoSvc).GetTemplateState("testorg/repo-a", "b"); ts == nil || ts.PRNumber != 1 {
+		t.Errorf("state of b = %+v, want carried on PR #1, not recorded in sync", ts)
+	}
+}
+
 // SYNCOP-009: a dry run over a bundle that has nothing new looks the PR up but records nothing, not even in memory.
 func TestBundleDryRunRecordsNoPRStatus(t *testing.T) {
 	repoSvc := newMockRepoService()
