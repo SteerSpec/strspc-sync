@@ -73,10 +73,13 @@ A conflict issue an earlier version filed in a target is closed once the central
 pointing to it. That happens even with `auto-close` off, since it would be a duplicate. When the token cannot reach the
 target's issues, it is logged and skipped. The report counts those in `issues_moved`.
 
-A public central repository's issues are public, so a conflict about a private or internal repository gets no issue
-there. The report counts it in `issues_withheld`, and a warning that names no repository is logged. Make the central
-repository private or internal to file them. Note that the report itself, printed to the job log and the `report`
-output, still lists every conflict.
+A public central repository's issues are public, so a conflict about a private or internal repository gets only a
+stub there: `[SteerSpec Conflict] <type>: non-public repository`, naming no repository or file. Its full issue is kept
+in the repository it concerns, where only that repository's readers see it, and points to the stub. A duplicate skill
+involving a non-public repository gets the stub only; the run's report holds its details. The report counts stubs in
+`issues_redacted`. Warnings about issues the token cannot reach in a target name no repository, since the central
+repository's job logs are public too. Make the central repository private or internal to keep the details there.
+The report itself, printed to the job log and the `report` output, still lists every conflict (#274).
 
 **Action usage:**
 

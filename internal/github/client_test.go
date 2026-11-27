@@ -1544,3 +1544,33 @@ func TestNewClient_GithubApp_RetriesRateLimit(t *testing.T) {
 		t.Fatalf("token exchange calls = %d, want 2", got)
 	}
 }
+
+func TestGetVisibility(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, want string
+	}{
+		{"visibility field", `{"visibility":"internal","private":true}`, "internal"},
+		{"public", `{"visibility":"public","private":false}`, "public"},
+		{"private flag only", `{"private":true}`, "private"},
+		{"public flag only", `{"private":false}`, "public"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/repos/o/r", func(w http.ResponseWriter, _ *http.Request) {
+				fmt.Fprint(w, tc.body) //nolint:errcheck // test handler write
+			})
+			got, err := testClient(t, mux).Repos.GetVisibility(context.Background(), "o", "r")
+			if err != nil || got != tc.want {
+				t.Errorf("GetVisibility = %q, %v; want %q", got, err, tc.want)
+			}
+		})
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, `{"message":"Resource not accessible by integration"}`) //nolint:errcheck // test handler write
+	})
+	if _, err := testClient(t, mux).Repos.GetVisibility(context.Background(), "o", "r"); err == nil {
+		t.Error("want an error for a 403")
+	}
+}
