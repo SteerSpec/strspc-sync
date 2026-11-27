@@ -73,17 +73,18 @@ func (s *Syncer) syncBundle(ctx context.Context, target registry.ResolvedTarget,
 		// Marker templates sharing a file each own their sections. A second template managing the same section
 		// would overwrite the first's in the one file the bundle commits, and one of them would drift after merge.
 		if other, section := sectionOwner(owners, tmpl, r.managed.names); other != "" {
+			what := fmt.Sprintf("section %q of %s", section, tmpl.Destination)
+			if section == "" {
+				what = tmpl.Destination
+			}
 			results = append(results, RepoResult{
 				Repo: target.Repo, TemplateID: tmpl.ID, Status: "error",
-				Error: fmt.Sprintf("section %q of %s is also managed by template %q; with pr-grouping %q, "+
-					"templates sharing a destination must manage different sections",
-					section, tmpl.Destination, other, config.PRGroupingRepo),
+				Error: fmt.Sprintf("%s is also managed by template %q; with pr-grouping %q, templates sharing a "+
+					"destination must manage different sections", what, other, config.PRGroupingRepo),
 			})
 			continue
 		}
-		for _, name := range r.managed.names {
-			owners[tmpl.Destination+"\x00"+name] = tmpl.ID
-		}
+		claimSections(owners, tmpl, r.managed.names)
 		_, chained := rendered[tmpl.Destination]
 		// Whether the repository already holds the template is judged on the default branch, as in template mode.
 		// A template rendered onto an earlier member's output would otherwise match what is only staged, and be
@@ -113,15 +114,41 @@ func (s *Syncer) syncBundle(ctx context.Context, target registry.ResolvedTarget,
 	return append(results, s.deliverBundle(ctx, target, members, rendered, paths, dryRun, force)...)
 }
 
-// sectionOwner returns the template that already manages one of names in tmpl's destination, and that section, or
-// "" when none does.
+// sectionOwner returns the template that already manages part of what tmpl would write in its destination, and the
+// section it manages there ("" for the whole file), or "" when none does. A template with no sections writes the
+// whole file: the marker strategy replaces a file with a template that has no markers, and the other strategies
+// always do.
 func sectionOwner(owners map[string]string, tmpl config.TemplateConfig, names []string) (owner, section string) {
+	prefix := tmpl.Destination + "\x00"
+	if other, ok := owners[prefix]; ok { // the whole file is already claimed
+		return other, ""
+	}
+	if len(names) == 0 {
+		for key, other := range owners {
+			if strings.HasPrefix(key, prefix) {
+				return other, strings.TrimPrefix(key, prefix)
+			}
+		}
+		return "", ""
+	}
 	for _, name := range names {
-		if other, ok := owners[tmpl.Destination+"\x00"+name]; ok && other != tmpl.ID {
+		if other, ok := owners[prefix+name]; ok {
 			return other, name
 		}
 	}
 	return "", ""
+}
+
+// claimSections records that tmpl manages names in its destination, or the whole file when names is empty.
+func claimSections(owners map[string]string, tmpl config.TemplateConfig, names []string) {
+	prefix := tmpl.Destination + "\x00"
+	if len(names) == 0 {
+		owners[prefix] = tmpl.ID
+		return
+	}
+	for _, name := range names {
+		owners[prefix+name] = tmpl.ID
+	}
 }
 
 // deliverBundle opens or updates the SyncPullRequest carrying members, and records it for each of them.

@@ -457,10 +457,10 @@ func TestBundleCommitFailureDropsBranch(t *testing.T) {
 	}
 }
 
-// A template rendered onto an earlier member's staged output is judged in sync against the default branch, not the
-// staged content: a second template that matches only the staged file is carried, not recorded as deployed. (Config
-// validation rejects this full-replace pair in repo mode; the run is tested here without it.)
-func TestBundleJudgesChainedTemplateOnDefaultBranch(t *testing.T) {
+// Two whole-file templates on one destination: the second matches the first's staged output, but it is neither
+// recorded as deployed nor carried. It is reported, as it would overwrite the first. (Config validation rejects this
+// full-replace pair in repo mode; the run is tested here without it.)
+func TestBundleRejectsSecondWholeFileTemplate(t *testing.T) {
 	repoSvc := newMockRepoService()
 	setupBundleRepos(repoSvc)
 	repoSvc.files["testorg/central/templates/a.md/"] = []byte("same")
@@ -475,12 +475,38 @@ func TestBundleJudgesChainedTemplateOnDefaultBranch(t *testing.T) {
 
 	result := runSync(t, cfg, repoSvc, prSvc, Options{})
 	for _, rr := range result.RepoResults {
-		if rr.Status != "created" {
-			t.Errorf("%s: status %s, want created (carried by the bundle)", rr.TemplateID, rr.Status)
+		want := "created"
+		if rr.TemplateID == "b" {
+			want = "error"
+			if !strings.Contains(rr.Error, `NOTES.md is also managed by template "a"`) {
+				t.Errorf("b: error %q, want NOTES.md claimed by a", rr.Error)
+			}
+		}
+		if rr.Status != want {
+			t.Errorf("%s: status %s, want %s", rr.TemplateID, rr.Status, want)
 		}
 	}
-	if ts := savedState(t, repoSvc).GetTemplateState("testorg/repo-a", "b"); ts == nil || ts.PRNumber != 1 {
-		t.Errorf("state of b = %+v, want carried on PR #1, not recorded in sync", ts)
+	if ts := savedState(t, repoSvc).GetTemplateState("testorg/repo-a", "b"); ts != nil {
+		t.Errorf("state of b = %+v, want none: not recorded in sync", ts)
+	}
+}
+
+// A marker template without sections writes the whole file, so it cannot share a destination with one that has.
+func TestBundleRejectsMarkerTemplateWithoutSectionsOnSharedFile(t *testing.T) {
+	repoSvc := newMockRepoService()
+	setupBundleRepos(repoSvc)
+	repoSvc.files["testorg/central/templates/team.md/"] = []byte("no markers here\n")
+	prSvc := newBundlePRService()
+
+	result := runSync(t, bundleConfig(config.PRGroupingRepo), repoSvc, prSvc, Options{})
+	for _, rr := range result.RepoResults {
+		if rr.TemplateID == "team" && !strings.Contains(rr.Error, `is also managed by template "org"`) {
+			t.Errorf("team: error %q, want a conflict with org", rr.Error)
+		}
+	}
+	claude := string(repoSvc.files["testorg/repo-a/CLAUDE.md/"+prSvc.created[0].Head])
+	if !strings.Contains(claude, "org v1") || strings.Contains(claude, "no markers here") {
+		t.Errorf("CLAUDE.md on the bundle branch = %q, want org's section kept", claude)
 	}
 }
 
