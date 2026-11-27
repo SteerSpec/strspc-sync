@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.47.0",
-    "timestamp": "2026-11-27T07:32:43Z",
-    "hash": "blake3:f8f19001a4c55ba0ee009ef547bb87c7bd7c309828e271946ffefc718ce21ecd"
+    "version": "0.47.1",
+    "timestamp": "2026-11-27T16:58:00Z",
+    "hash": "blake3:5b68ffecc0247bc9e83f6073798ea75e2f2af5c804658bd4c1633c4b220e0da0"
   },
   "rules": [
     {
@@ -279,6 +279,15 @@
       "body": "The `conflicts` section MAY define `severity-threshold` as one of \"critical\", \"warning\", \"info\" (default: \"warning\"), the lowest severity of a conflict that gets a GitHub issue.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-26",
+      "supersedes": null
+    },
+    {
+      "id": "SYNCCFG-031",
+      "revision": 0,
+      "state": "D",
+      "body": "The `sync` section MAY define `pr-grouping` as one of \"template\", \"repo\" (default: \"template\"): with \"template\" a target repository gets one SyncPullRequest per template, with \"repo\" one SyncPullRequest for all of its templates.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-27",
       "supersedes": null
     }
   ],
