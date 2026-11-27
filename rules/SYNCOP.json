@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.17.13",
-    "timestamp": "2026-11-27T20:13:10Z",
-    "hash": "blake3:67a357871ce5c22f0d714c5f3a45ef4f634d1c5c857080555d56c4dc9db84c76"
+    "version": "0.17.17",
+    "timestamp": "2026-11-27T20:14:04Z",
+    "hash": "blake3:2825d5839bc43e2869c6d253932d81621a542a5952729b09e5c0f4e9d15b57d9"
   },
   "rules": [
     {
@@ -112,9 +112,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.20.0",
-        "timestamp": "2026-11-27T20:13:10Z",
-        "hash": "blake3:2b4e5ae4636787fc43bdeb836f358c9b0fbb2681f7818260ece0d2ac9c1bfafb"
+        "version": "0.24.0",
+        "timestamp": "2026-11-27T20:14:04Z",
+        "hash": "blake3:815970410cdd9ca4924dd06fae6a825ff7ad15935d922711e036f8a7d8884c35"
       },
       "rules": [
         {
@@ -183,7 +183,7 @@
         {
           "id": "SYNCPR-008",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "MUST use a branch name in the format `steerspec-sync/<template-id>/<version>` when `pr-grouping` is \"template\", and `steerspec-sync/repo/<hash>` when it is \"repo\", where `<hash>` is the first 8 lowercase hex characters of the Blake3 hash of the UTF-8 bytes of the `<template-id>@<version>` entries of the templates the PR carries, sorted bytewise and joined by a single newline (U+000A) with no trailing newline.",
           "added_by": "github:pleberre",
           "added_at": "2026-11-27",
@@ -192,7 +192,7 @@
         {
           "id": "SYNCPR-009",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "MUST update an existing open PR on the same branch rather than creating a duplicate.",
           "added_by": "github:pleberre",
           "added_at": "2026-11-27",
@@ -201,7 +201,7 @@
         {
           "id": "SYNCPR-010",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "When `close-stale-prs` is true, opening or updating a sync PR MUST close the other open sync PRs in that repository that it replaces: with `pr-grouping` \"template\", those for the same template and every PR on a `steerspec-sync/repo/` branch; with \"repo\", every other PR on a `steerspec-sync/repo/` branch and those for a template it carries.",
           "added_by": "github:pleberre",
           "added_at": "2026-11-27",
@@ -210,7 +210,7 @@
         {
           "id": "SYNCPR-011",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "With `pr-grouping` \"repo\", each sync run that opens or updates a SyncPullRequest MUST add exactly one commit to it containing every template that is out of date for its repository and renders without error, and the SyncPullRequest body MUST have one section per template it carries with the fields of SYNCPR-003.",
           "added_by": "github:pleberre",
           "added_at": "2026-11-27",

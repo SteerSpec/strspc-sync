@@ -1,0 +1,49 @@
+{
+  "rule_id": "SYNCPR-010",
+  "revision": 0,
+  "body_hash": "blake3:c2d5cd7b7627d69a65dae185fad891341d4c2ab6a4b5b6b650b3e1dc5de75636",
+  "promoted_at": "2026-11-27T20:14:04Z",
+  "entity_version": "0.23.0",
+  "scope": "all tracked files",
+  "files": 151,
+  "files_hash": "93dac5efdfaccd7d7c26a877fbe136a45dbc0bac0490e7d342a6361621dc641c",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a3+v9/effort=medium/split=100000,40,2/1,plan=2",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.8,
+  "explanation": "Both template and repo (bundle) modes call closeStalePRs when close-stale-prs is enabled, closing replaced PRs (same-template PRs, repo-branch PRs, carried-template PRs), skipping the current PR, and tests cover each case including mode switching and the disabled flag.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 568,
+      "excerpt": "if s.closeStale() {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 203,
+      "excerpt": "if s.closeStale() {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 997,
+      "excerpt": "if pr.Number == currentPR || !replaces(pr, prefix, templateIDs) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle_test.go",
+      "line": 354,
+      "excerpt": "func TestTemplateModeSupersedesBundle",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle_test.go",
+      "line": 332,
+      "excerpt": "func TestBundleClosesPerTemplatePRs",
+      "line_confirmed": true
+    }
+  ]
+}

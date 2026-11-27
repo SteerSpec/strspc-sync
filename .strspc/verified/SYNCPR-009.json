@@ -1,0 +1,49 @@
+{
+  "rule_id": "SYNCPR-009",
+  "revision": 0,
+  "body_hash": "blake3:213a671897fbb63dfc3258754bee6f935b922d7218edb2d77c466956a0548233",
+  "promoted_at": "2026-11-27T20:14:04Z",
+  "entity_version": "0.22.0",
+  "scope": "all tracked files",
+  "files": 151,
+  "files_hash": "93dac5efdfaccd7d7c26a877fbe136a45dbc0bac0490e7d342a6361621dc641c",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a3+v9/effort=medium/split=100000,40,2/1,plan=2",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.92,
+  "explanation": "Both template and bundle modes call upsertPR, which lists open PRs by head branch and updates the existing one, creating only when none is found. An already-existing branch is tolerated and reused. Unit and e2e tests assert that updates occur instead of duplicates.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 598,
+      "excerpt": "existingPRs, err := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 617,
+      "excerpt": "err = s.ghClient.PullRequests.Update(ctx, owner, repo, pr.Number, &gh.PullRequestUpdate{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 635,
+      "excerpt": "pr, err = s.ghClient.PullRequests.Create(ctx, owner, repo, &gh.PullRequestCreate{",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 155,
+      "excerpt": "if createErr != nil && !isAlreadyExists(createErr) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync_test.go",
+      "line": 992,
+      "excerpt": "func TestSYNCPR005_NoDuplicatePRs(t *testing.T) {",
+      "line_confirmed": true
+    }
+  ]
+}
