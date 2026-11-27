@@ -2019,8 +2019,35 @@ func TestStubNeedsHashKey(t *testing.T) {
 	if !errors.Is(err, errNoHashKey) {
 		t.Fatalf("err = %v, want errNoHashKey", err)
 	}
-	if !slices.Equal(issues.createdIn, []string{"org/central"}) || strings.Contains(issues.created[0].Title, "repo1") {
-		t.Errorf("created %v (%+v); want only org/repo2's issue", issues.createdIn, issues.created)
+	if !slices.Equal(issues.createdIn, []string{"org/repo1", "org/central"}) && !slices.Equal(issues.createdIn, []string{"org/central", "org/repo1"}) {
+		t.Fatalf("created in %v; want org/repo1's private issue and org/repo2's central one", issues.createdIn)
+	}
+	for i, in := range issues.createdIn {
+		if in == "org/central" && strings.Contains(issues.created[i].Title, "repo1") {
+			t.Errorf("central issue names the private repository: %q", issues.created[i].Title)
+		}
+	}
+}
+
+// Without the hash key, a full central issue that must hide its details is still closed: leaving it open would keep
+// the exposure. The private issue is kept, and only the stub is missing.
+func TestNoHashKeyStillClosesExposedIssue(t *testing.T) {
+	repos, ds := driftSetup("org/repo1")
+	repos.visibility = map[string]string{"org/central": "public"}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+		Number: 95, Title: "[SteerSpec Conflict] version-drift: org/repo1/CLAUDE.md", State: "open",
+		Labels: []string{"steerspec-conflict"},
+		Body:   "details\n\n" + fingerprintPrefix + fp + fingerprintSuffix + "\n" + reposPrefix + "org/repo1" + fingerprintSuffix,
+	}}}}
+	report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+		Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+	if !errors.Is(err, errNoHashKey) {
+		t.Fatalf("err = %v, want errNoHashKey", err)
+	}
+	if !slices.Equal(issues.closed, []int{95}) || !slices.Equal(issues.createdIn, []string{"org/repo1"}) || report.IssuesReplaced != 1 {
+		t.Errorf("closed %v, created in %v, replaced %d; want #95 closed and the private issue opened",
+			issues.closed, issues.createdIn, report.IssuesReplaced)
 	}
 }
 
@@ -2042,7 +2069,7 @@ func TestFullIssueReplacedByFreshStub(t *testing.T) {
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {target}, "org/central": {central}}}
 	report := runKeyed(t, repos, issues, ds, []string{"org/repo1"}, 1)
 	if !slices.Equal(issues.closed, []int{51}) || !slices.Equal(issues.createdIn, []string{"org/central"}) ||
-		len(issues.updated) != 1 || report.IssuesMoved != 1 || report.IssuesRedacted != 1 {
+		len(issues.updated) != 1 || report.IssuesReplaced != 1 || report.IssuesMoved != 0 || report.IssuesRedacted != 1 {
 		t.Fatalf("closed %v, created in %v, updated %d, report %+v; want #51 closed, a stub opened, #50 updated",
 			issues.closed, issues.createdIn, len(issues.updated), report)
 	}
@@ -2143,7 +2170,8 @@ func TestAggregateRedactedForRetainedPrivateParticipant(t *testing.T) {
 	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {issue}}}
 	// org/c is not scanned this run, so the marker keeps it.
 	report := runKeyed(t, repos, issues, state.NewDeploymentState(), []string{"org/a", "org/b"}, 2)
-	if !slices.Equal(issues.closed, []int{70}) || !slices.Equal(issues.createdIn, []string{"org/central"}) || report.IssuesRedacted != 1 {
+	if !slices.Equal(issues.closed, []int{70}) || !slices.Equal(issues.createdIn, []string{"org/central"}) ||
+		report.IssuesRedacted != 1 || report.IssuesReplaced != 1 {
 		t.Fatalf("closed %v, created in %v, redacted %d; want #70 replaced by a stub", issues.closed, issues.createdIn, report.IssuesRedacted)
 	}
 	if strings.Contains(issues.created[0].Body, "org/") {

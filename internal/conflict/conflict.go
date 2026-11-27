@@ -354,7 +354,7 @@ func (s *Scanner) mayPublish(ctx context.Context, repos []string) (bool, error) 
 // errNoHashKey stops a conflict that needs a stub when no key is set.
 var errNoHashKey = errors.New("a conflict about a private or internal repository needs a stub in the public central " +
 	"repository, and stubs need the conflict hash key (the action's hash-key input, STEERSPEC_CONFLICT_HASH_KEY); " +
-	"it was not filed")
+	"the stub was not opened, though its issue in the repository concerned is kept")
 
 // keyed returns the HMAC-SHA256 of parts under the conflict hash key, truncated like a fingerprint. A stub in a public
 // central repository carries only keyed values: an unkeyed hash of a guessable repository name or path would let anyone
@@ -565,10 +565,6 @@ entries:
 			skipped = append(skipped, err) // remembered above, so its issues are kept; nothing is written for it
 			continue
 		}
-		if !publishable && len(s.hashKey) == 0 {
-			skipped = append(skipped, errNoHashKey)
-			continue
-		}
 
 		// Before CNFLDTS-009 a duplicate-skill finding was keyed by the skill's bare filename. An open issue still
 		// keyed that way describes the same conflict, so it is updated and retitled to the full path rather than
@@ -663,10 +659,6 @@ entries:
 			case stub:
 				publish = publishable && !s.centralPublic(ctx)
 			}
-			if !publish && len(s.hashKey) == 0 {
-				skipped = append(skipped, errNoHashKey)
-				continue entries
-			}
 			redacted = !publish
 
 			switch {
@@ -689,6 +681,9 @@ entries:
 					issue.Title = title
 				}
 				number = issue.Number
+			case stub && len(s.hashKey) == 0:
+				// Without the key, a stub cannot be rewritten: it is left as is, and not duplicated.
+				number = issue.Number
 			case stub:
 				if hashes == nil {
 					hashes = s.stubRepoHashes(participants)
@@ -705,18 +700,23 @@ entries:
 				number = issue.Number
 			default:
 				// A full issue whose details must now be hidden. Editing it would keep them in its title and body
-				// history, so it is closed and a fresh stub opened; an organization owner can delete the old one.
+				// history, so it is closed and a fresh stub opened; an organization owner can delete the old one. It is
+				// closed even without the hash key, which only the stub needs.
 				if err := s.ghClient.Issues.Close(ctx, s.centralOwner, s.centralRepo, issue.Number); err != nil {
 					return fmt.Errorf("closing issue #%d in %s: %w", issue.Number, central, err)
 				}
 				issue.Body, issue.Title = "", "" // no later entry claims it
-				report.IssuesMoved++
+				report.IssuesReplaced++
 				replace = true
 			}
 			break
 		}
 
-		if number == 0 && (mayCreate || replace) {
+		if number == 0 && (mayCreate || replace) && redacted && len(s.hashKey) == 0 {
+			// The stub needs the hash key. The conflict's full issue in its private or internal repository needs
+			// none, so it is still kept below; the run reports the missing stub.
+			skipped = append(skipped, errNoHashKey)
+		} else if number == 0 && (mayCreate || replace) {
 			create := &gh.IssueCreate{Title: title, Body: fullBody(fp, "", participants), Labels: []string{label}}
 			if redacted {
 				create.Title, create.Body = hidden, stubBody(s.stubRepoHashes(participants))

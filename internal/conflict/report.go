@@ -51,6 +51,9 @@ type ConflictReport struct {
 	// repository is public and the conflict concerns a private or internal repository. A conflict about one such
 	// repository is described in an issue in that repository.
 	IssuesRedacted int `json:"issues_redacted"`
+	// IssuesReplaced counts the full central issues this run closed because their details must now be hidden: their
+	// title and body history would keep them, so a fresh stub replaces them.
+	IssuesReplaced int `json:"issues_replaced"`
 }
 
 // ConflictEntry describes a single detected conflict.
