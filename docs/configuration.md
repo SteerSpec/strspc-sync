@@ -31,3 +31,16 @@ status checks, the identity running sync must be allowed to bypass it, for examp
 GitHub App as a bypass actor (`always`) on that ruleset. Otherwise the run fails with
 `deployment state not saved: ... rejected the commit` and records nothing, so the next run
 proposes the same changes again.
+
+## Pull requests
+
+These `sync` keys shape the pull requests sync opens. See
+[Reviewing and merging sync pull requests](how-it-works.md#reviewing-and-merging-sync-pull-requests) for how many to
+expect and how to merge them.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `pr-label` | `steerspec-sync` | Label added to every sync pull request. |
+| `close-stale-prs` | `true` | When a template's version changes, closes the open pull request for its older version. |
+| `commit-prefix` | `chore(steerspec-sync)` | Conventional-commit `type(scope)` of the commit messages. |
+| `pr-title-prefix` | `chore(steerspec-sync)` | The same for pull request titles. |
