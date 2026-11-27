@@ -1,0 +1,43 @@
+{
+  "rule_id": "CNFLENT-009",
+  "revision": 0,
+  "body_hash": "blake3:8bcd5bf563df1e7ec580651bc2cd0a528b55708c1dd2c00b330cb4522e51ab3d",
+  "promoted_at": "2026-11-27T07:16:15Z",
+  "entity_version": "0.20.0",
+  "scope": "all tracked files",
+  "files": 149,
+  "files_hash": "a66b9fd4696bcbf36c82acf3e93aa88e57364144b3ebae0dfe87c666ab594300",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "Tier 1 classifies a managed-section edit made outside sync as manual-override with warning severity, and the tests confirm this mapping. Section overlap now has its own type, so manual-override is not used for it going forward.",
+  "evidence": [
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 105,
+      "excerpt": "entry.Type = TypeManualOverride",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 104,
+      "excerpt": "entry.Severity = SeverityWarning",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict_test.go",
+      "line": 302,
+      "excerpt": "if tt.drifted && (entries[0].Type != TypeManualOverride || entries[0].Severity != SeverityWarning) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict_test.go",
+      "line": 1572,
+      "excerpt": "{TypeManualOverride, SeverityWarning},",
+      "line_confirmed": true
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "rule_id": "CNFLENT-005",
+  "revision": 0,
+  "body_hash": "blake3:1ac7332c9014505891c86bfce1f31adc04a49ebf5a64aee9cc1e781867c45c9c",
+  "promoted_at": "2026-11-27T07:15:49Z",
+  "entity_version": "0.18.0",
+  "scope": "all tracked files",
+  "files": 149,
+  "files_hash": "a66b9fd4696bcbf36c82acf3e93aa88e57364144b3ebae0dfe87c666ab594300",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "The conflict entry type has a FilePath field, and every producer in tier1 and tier2 fills it with a repo-root-relative path (template destination, ref from repo root, skill destination). The e2e tests check these values against repo-relative paths.",
+  "evidence": [
+    {
+      "file": "internal/conflict/report.go",
+      "line": 68,
+      "excerpt": "FilePath            string   `json:\"file_path\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 78,
+      "excerpt": "FilePath:            tmplCfg.Destination,",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier1.go",
+      "line": 162,
+      "excerpt": "FilePath:            ref,",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 86,
+      "excerpt": "FilePath:            path,",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/e2e/monitor_conflict_test.go",
+      "line": 247,
+      "excerpt": "e.FilePath != skillPath || !slices.Contains(e.Repos, env.Org+\"/\"+pub)",
+      "line_confirmed": true
+    }
+  ]
+}

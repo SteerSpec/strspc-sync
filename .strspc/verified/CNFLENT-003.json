@@ -1,0 +1,43 @@
+{
+  "rule_id": "CNFLENT-003",
+  "revision": 1,
+  "body_hash": "blake3:1bb69f16aca9a6b884b413a08d90bdca628ab5a7c1b002a4808eb3506c6a0f94",
+  "promoted_at": "2026-11-27T07:15:29Z",
+  "entity_version": "0.16.0",
+  "scope": "all tracked files",
+  "files": 149,
+  "files_hash": "a66b9fd4696bcbf36c82acf3e93aa88e57364144b3ebae0dfe87c666ab594300",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "Conflict entries carry a Type field of the ConflictType enum, which defines exactly the seven allowed values. Parsing validates through Valid(), and every entry creation uses one of the defined constants.",
+  "evidence": [
+    {
+      "file": "internal/conflict/report.go",
+      "line": 28,
+      "excerpt": "func (t ConflictType) Valid() bool {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 62,
+      "excerpt": "Type     ConflictType `json:\"type\"`",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/report.go",
+      "line": 24,
+      "excerpt": "TypeSectionOverlap           ConflictType = \"section-overlap\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 121,
+      "excerpt": "if t := ConflictType(strings.TrimSpace(rest[:end])); t.Valid() {",
+      "line_confirmed": true
+    }
+  ]
+}
