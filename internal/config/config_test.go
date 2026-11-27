@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -555,5 +556,120 @@ conflicts:
 		if cfg.Conflicts.SeverityThreshold != tc.value {
 			t.Errorf("%q: got %q", tc.value, cfg.Conflicts.SeverityThreshold)
 		}
+	}
+}
+
+// SYNCCFG-031: sync.pr-grouping is "template" (the default) or "repo".
+func TestSyncPRGrouping(t *testing.T) {
+	cfg, err := Load(writeConfig(t, validConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sync.PRGrouping != PRGroupingTemplate {
+		t.Errorf("default pr-grouping = %q, want %q", cfg.Sync.PRGrouping, PRGroupingTemplate)
+	}
+	for _, tc := range []struct {
+		value   string
+		wantErr bool
+	}{{"template", false}, {"repo", false}, {"Repo", true}, {"org", true}} {
+		cfg, err := Load(writeConfig(t, validConfig+"sync:\n  pr-grouping: "+tc.value+"\n"))
+		if tc.wantErr {
+			if err == nil || !strings.Contains(err.Error(), "pr-grouping") {
+				t.Errorf("%q: got %v, want a pr-grouping error", tc.value, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", tc.value, err)
+			continue
+		}
+		if cfg.Sync.PRGrouping != tc.value {
+			t.Errorf("%q: got %q", tc.value, cfg.Sync.PRGrouping)
+		}
+	}
+}
+
+// With pr-grouping "repo", templates sharing a destination are rendered onto one file, which only the marker
+// strategy supports.
+func TestSharedDestinationNeedsMarkerInRepoMode(t *testing.T) {
+	const tmpl = `
+  - id: %s
+    version: "1.0.0"
+    type: claude-md
+    source: templates/%s.md
+    destination: CLAUDE.md
+    strategy: %s`
+	build := func(grouping, strategyB string) string {
+		return `
+version: "1.0.0"
+auth:
+  method: pat
+  token: "t"
+templates:` + fmt.Sprintf(tmpl, "a", "a", "marker") + fmt.Sprintf(tmpl, "b", "b", strategyB) + `
+targets:
+  include: ["org/*"]
+sync:
+  pr-grouping: ` + grouping + "\n"
+	}
+	for _, tc := range []struct {
+		grouping, strategyB string
+		wantErr             bool
+	}{
+		{"repo", "marker", false},
+		{"repo", "full-replace", true},
+		{"repo", "mustache", true},
+		{"template", "full-replace", false}, // each template keeps its own PR
+	} {
+		_, err := Load(writeConfig(t, build(tc.grouping, tc.strategyB)))
+		if tc.wantErr {
+			if err == nil || !strings.Contains(err.Error(), "marker strategy") {
+				t.Errorf("%s/%s: got %v, want a marker-strategy error", tc.grouping, tc.strategyB, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%s/%s: unexpected error: %v", tc.grouping, tc.strategyB, err)
+		}
+	}
+}
+
+// A template id is part of its sync branch name (SYNCPR-002, SYNCPR-008), so it must be valid in a git ref.
+func TestValidationTemplateIDIsRefSafe(t *testing.T) {
+	for _, tc := range []struct {
+		id      string
+		wantErr bool
+	}{
+		{"claude-md", false},
+		{"guide/team", false},
+		{"repo", false},
+		{"v1.2_x@y", false},
+		{"two words", true},
+		{"line\nbreak", true},
+		{"a..b", true},
+		{"a@{b", true},
+		{"/lead", true},
+		{"trail/", true},
+		{"a//b", true},
+		{".hidden", true},
+		{"a/.hidden", true},
+		{"x.lock", true},
+		{"release.", true},
+		{"release./team", true},
+		{"a:b", true},
+		{"a~b", true},
+		{"a^b", true},
+		{"a?b", true},
+		{"a*b", true},
+		{"a[b", true},
+		{`a\b`, true},
+	} {
+		err := checkTemplateID(tc.id)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("checkTemplateID(%q) = %v, wantErr %v", tc.id, err, tc.wantErr)
+		}
+	}
+	bad := strings.Replace(validConfig, "id: claude-md", `id: "a b"`, 1)
+	if _, err := Load(writeConfig(t, bad)); err == nil || !strings.Contains(err.Error(), "templates[0].id") {
+		t.Errorf("Load with id %q: got %v, want a templates[0].id error", "a b", err)
 	}
 }

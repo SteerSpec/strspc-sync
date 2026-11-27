@@ -1,0 +1,55 @@
+{
+  "rule_id": "SYNCPR-008",
+  "revision": 0,
+  "body_hash": "blake3:6d61a4a40447c137446684f5b5fe23785669c8af075fa7528211218205b104bb",
+  "promoted_at": "2026-11-27T20:57:31Z",
+  "entity_version": "0.21.0",
+  "scope": "all tracked files",
+  "files": 151,
+  "files_hash": "a736077669307e04ee3690039aac09eeeb25a4d239cf8f5327065154bd1cd714",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a3+v9/effort=medium/split=100000,40,2/1,plan=2",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.88,
+  "explanation": "Template mode builds steerspec-sync/<id>/<version>; repo mode builds steerspec-sync/repo/ plus the first 8 chars of the BLAKE3 hash of the bytewise-sorted id@version entries joined by newline with no trailing newline, as required.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 508,
+      "excerpt": "branchName := fmt.Sprintf(\"steerspec-sync/%s/%s\", tmpl.ID, tmpl.Version)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 19,
+      "excerpt": "const bundleBranchPrefix = \"steerspec-sync/repo/\"",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 26,
+      "excerpt": "slices.Sort(sorted) // Go orders strings by their bytes",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 27,
+      "excerpt": "sum := strings.TrimPrefix(hash.HashString(strings.Join(sorted, \"\\n\")), \"b3_\")",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 28,
+      "excerpt": "return bundleBranchPrefix + sum[:8]",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 164,
+      "excerpt": "entries[i] = m.tmpl.ID + \"@\" + m.tmpl.Version",
+      "line_confirmed": true
+    }
+  ]
+}

@@ -38,8 +38,8 @@ contradictions across the fleet.
 
 Sync opens one pull request per template in each target repo. Its branch is `steerspec-sync/<template-id>/<version>`
 and it carries the `steerspec-sync` label (`sync.pr-label`). So a first run across an org opens about as many pull
-requests as there are repos times templates: 30 repos and 6 templates is 180. No option groups them into one pull
-request per repo.
+requests as there are repos times templates: 30 repos and 6 templates is 180. To get one pull request per repo
+instead, set `sync.pr-grouping: repo` (see [One pull request per repo](#one-pull-request-per-repo)).
 
 After that, the count stays small:
 
@@ -79,3 +79,31 @@ label=steerspec-sync   # your sync.pr-label
 gh search prs --owner ORG --label "$label" --state open --limit 1000 \
   --json repository -q '.[].repository.nameWithOwner' | sort -u
 ```
+
+### One pull request per repo
+
+With `sync.pr-grouping: repo`, a run opens or updates one pull request per target repo. It carries every template
+that is out of date for that repo and renders without error:
+
+- **Branch:** `steerspec-sync/repo/<hash>`. The hash is the first 8 hex characters of the BLAKE3 hash of the sorted
+  `<template-id>@<version>` list, joined by newlines.
+  - New content at the same versions adds a commit to the open pull request.
+  - A version change opens a new pull request, which carries the unchanged templates too, and closes the old one.
+- **Commit:** each run that opens or updates the pull request adds one commit with every file it carries. Templates
+  that share a `destination` are rendered onto the same file one after another, so they don't conflict with each
+  other. They must all use the `marker` strategy, since `mustache` and `full-replace` overwrite the file; config
+  validation rejects anything else. They must also manage different sections, and each must have at least one: a
+  marker template without sections replaces the whole file. A template that would overwrite another one's section is
+  reported as an error and left out of the pull request.
+- **Title and body:** the title is `<pr-title-prefix>: update <n> templates`, or the usual per-template title for a
+  single template. The body has one section per template, with its previous and new version, changelog and diff link.
+- **One template fails:** a template that can't be read or rendered is reported in the run result, and the pull
+  request ships the others. When it renders again, the version set changes and a new pull request replaces the old
+  one.
+- **Filtered runs:** a run with `--template-filter` builds its bundle from the matching templates only, so it replaces
+  an open bundle that carries more. The templates it leaves out are proposed again by the next unfiltered run.
+- **Switching modes:** with `close-stale-prs` on, the first bundle closes the open per-template pull requests for the
+  templates it carries. Back in `template` mode, the first per-template pull request closes the open bundle, and sync
+  proposes the bundle's other templates again on its next run.
+
+The trade-off is that a repo takes the bundle as a whole: it can't merge one template and hold back another.

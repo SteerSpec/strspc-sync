@@ -314,3 +314,64 @@ func TestNewClientReadsGraphQLURL(t *testing.T) {
 		t.Errorf("graphqlURL = %q", c.graphqlURL)
 	}
 }
+
+// A repo-mode SyncPullRequest writes all of its templates in one commit (SYNCPR-011).
+func TestCommitFilesSendsOneMutationWithEveryFile(t *testing.T) {
+	srv := newCommitServer()
+	c := testClient(t, srv.handler(t))
+
+	files := []FileChange{
+		{Path: "CLAUDE.md", Content: []byte("one")},
+		{Path: ".claude/settings.json", Content: []byte("two")},
+	}
+	err := c.Repos.CommitFiles(context.Background(), "o", "r", "steerspec-sync/repo/0123abcd", "headbundle", files,
+		"chore(sync): update 2 templates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(srv.mutations) != 1 {
+		t.Fatalf("GraphQL calls = %d, want 1", len(srv.mutations))
+	}
+	in := srv.mutations[0]
+	if got := field(t, in, "branch", "branchName"); got != "steerspec-sync/repo/0123abcd" {
+		t.Errorf("branchName = %v", got)
+	}
+	// The caller's head is the guard: a branch that moved since it was read refuses the commit.
+	if got := field(t, in, "expectedHeadOid"); got != "headbundle" {
+		t.Errorf("expectedHeadOid = %v, want headbundle", got)
+	}
+	adds, ok := field(t, in, "fileChanges", "additions").([]any)
+	if !ok || len(adds) != 2 {
+		t.Fatalf("additions = %v, want two entries", field(t, in, "fileChanges", "additions"))
+	}
+	for i, f := range files {
+		if got := field(t, adds[i], "path"); got != f.Path {
+			t.Errorf("additions[%d].path = %v, want %s", i, got, f.Path)
+		}
+		if got := field(t, adds[i], "contents"); got != base64.StdEncoding.EncodeToString(f.Content) {
+			t.Errorf("additions[%d].contents = %v", i, got)
+		}
+	}
+}
+
+func TestCommitFilesRejectsNoFiles(t *testing.T) {
+	srv := newCommitServer()
+	c := testClient(t, srv.handler(t))
+	if err := c.Repos.CommitFiles(context.Background(), "o", "r", "main", "headmain", nil, "x"); err == nil {
+		t.Fatal("CommitFiles with no files: want an error")
+	}
+	if len(srv.mutations) != 0 {
+		t.Errorf("GraphQL calls = %d, want 0", len(srv.mutations))
+	}
+}
+
+func TestCommitFilesReportsGraphQLFailure(t *testing.T) {
+	srv := newCommitServer()
+	srv.graphqlBody = `{"errors":[{"message":"Expected branch to point to \"headbundle\""}]}`
+	c := testClient(t, srv.handler(t))
+	err := c.Repos.CommitFiles(context.Background(), "o", "r", "main", "stale",
+		[]FileChange{{Path: "f", Content: []byte("x")}}, "x")
+	if err == nil || !strings.Contains(err.Error(), "commit files o/r@main") {
+		t.Fatalf("err = %v, want a wrapped commit failure", err)
+	}
+}

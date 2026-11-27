@@ -1,0 +1,55 @@
+{
+  "rule_id": "SYNCPR-010",
+  "revision": 0,
+  "body_hash": "blake3:c2d5cd7b7627d69a65dae185fad891341d4c2ab6a4b5b6b650b3e1dc5de75636",
+  "promoted_at": "2026-11-27T20:57:52Z",
+  "entity_version": "0.22.0",
+  "scope": "all tracked files",
+  "files": 151,
+  "files_hash": "a736077669307e04ee3690039aac09eeeb25a4d239cf8f5327065154bd1cd714",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a3+v9/effort=medium/split=100000,40,2/1,plan=2",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.85,
+  "explanation": "Both template-mode and repo-mode delivery close replaced open sync PRs when close-stale-prs is enabled, including bundle and per-template PRs across mode switches, and tests assert this. The skip on nothing-new returns before closing, but that is not an open or update of a PR.",
+  "evidence": [
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 262,
+      "excerpt": "if s.closeStale() {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 263,
+      "excerpt": "s.closeStalePRs(ctx, owner, repo, target.Repo, ids, pr.Number)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 568,
+      "excerpt": "if s.closeStale() {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 1012,
+      "excerpt": "func replaces(pr *gh.PullRequest, prefix string, templateIDs []string) bool {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle_test.go",
+      "line": 351,
+      "excerpt": "if !slices.Equal(closed, []int{1, 2, 3}) {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle_test.go",
+      "line": 370,
+      "excerpt": "if !slices.Equal(prSvc.closed, []int{1}) {",
+      "line_confirmed": true
+    }
+  ]
+}

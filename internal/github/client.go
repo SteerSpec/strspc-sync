@@ -34,6 +34,9 @@ type RepoService interface {
 	GetBranchSHA(ctx context.Context, owner, repo, branch string) (string, error)
 	GetFileContent(ctx context.Context, owner, repo, path, ref string) ([]byte, string, error) // content, sha, error
 	CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha, message string) error
+	// CommitFiles commits every file in files to branch in one commit, refused unless the branch head is still
+	// head.
+	CommitFiles(ctx context.Context, owner, repo, branch, head string, files []FileChange, message string) error
 	// IsSymlink reports whether path is a symlink at ref. GetFileContent cannot tell: the Contents API follows
 	// a working in-repo link and returns the target's content as a regular file.
 	IsSymlink(ctx context.Context, owner, repo, path, ref string) (bool, error)
@@ -88,6 +91,12 @@ type PullRequest struct {
 	// Merged is true for a closed pull request that was merged rather
 	// than closed unmerged.
 	Merged bool
+}
+
+// FileChange is one file of a CommitFiles commit: its repository path and its new content.
+type FileChange struct {
+	Path    string
+	Content []byte
 }
 
 type PullRequestCreate struct {

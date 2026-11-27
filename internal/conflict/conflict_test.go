@@ -100,6 +100,10 @@ func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, _, _, _, _ strin
 	return nil
 }
 
+func (m *mockRepoService) CommitFiles(_ context.Context, _, _, _, _ string, _ []gh.FileChange, _ string) error {
+	return nil
+}
+
 type mockIssueService struct {
 	issues []*gh.Issue
 	// repoIssues, when set, scopes List to the "owner/repo" asked for, as the
@@ -329,6 +333,8 @@ func TestTier1_ManagedSectionMismatchType(t *testing.T) {
 		{"sync PR merged", 7, "merged", true, TypeManualOverride, SeverityWarning, ""},
 		{"sync PR open", 7, "open", true, TypeVersionDrift, SeverityCritical, ""},
 		{"sync PR closed unmerged", 7, "closed", true, TypeVersionDrift, SeverityCritical, ""},
+		// Sync closed the PR as stale and proposes the version again on its next run.
+		{"sync PR superseded", 7, "superseded", true, TypeVersionDrift, SeverityCritical, ""},
 		{"status without a PR number", 0, "open", true, TypeManualOverride, SeverityWarning, ""},
 		{"whole-file record, PR merged", 7, "merged", false, TypeVersionDrift, SeverityCritical, ""},
 		// A missing or unreadable section is not an edit inside it, and sync cannot render the file: critical.

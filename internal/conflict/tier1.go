@@ -115,10 +115,11 @@ func (s *Scanner) checkVersionDrift(ctx context.Context, deployState *state.Depl
 }
 
 // syncPRPending reports whether the record's version was proposed by a sync PR that has not been merged: still open,
-// or closed unmerged (it may be reopened). The file in the default branch then holds another version. With a merged PR
-// or none (the file was found in sync), the file was last confirmed at the recorded version.
+// closed unmerged (it may be reopened), or superseded (sync closed it as stale and proposes the version again on its
+// next run). The file in the default branch then holds another version. With a merged PR or none (the file was found
+// in sync), the file was last confirmed at the recorded version.
 func syncPRPending(ts state.TemplateState) bool {
-	return ts.PRNumber != 0 && (ts.PRStatus == "open" || ts.PRStatus == "closed")
+	return ts.PRNumber != 0 && (ts.PRStatus == "open" || ts.PRStatus == "closed" || ts.PRStatus == "superseded")
 }
 
 // actualOrNone names a missing hash in a drift description.

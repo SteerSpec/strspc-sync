@@ -1,0 +1,43 @@
+{
+  "rule_id": "SYNCCFG-031",
+  "revision": 0,
+  "body_hash": "blake3:4de86f3ce14f5bdb7e515b38d288739ac59655fe9605c03be19d6d7f4eea723a",
+  "promoted_at": "2026-11-27T20:58:44Z",
+  "entity_version": "0.49.0",
+  "scope": "all tracked files",
+  "files": 151,
+  "files_hash": "a736077669307e04ee3690039aac09eeeb25a4d239cf8f5327065154bd1cd714",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a3+v9/effort=medium/split=100000,40,2/1,plan=2",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "The code accepts only \"template\" and \"repo\", defaults to \"template\", and opens one PR per template or per repo accordingly. In repo mode it bundles only out-of-date templates that render, and opens no PR when none qualify.",
+  "evidence": [
+    {
+      "file": "internal/config/config.go",
+      "line": 312,
+      "excerpt": "case \"\", PRGroupingTemplate, PRGroupingRepo:",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/config/config.go",
+      "line": 255,
+      "excerpt": "cfg.Sync.PRGrouping = PRGroupingTemplate",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 197,
+      "excerpt": "bundled := s.cfg.Sync.PRGrouping == config.PRGroupingRepo",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/bundle.go",
+      "line": 110,
+      "excerpt": "if len(members) == 0 {",
+      "line_confirmed": true
+    }
+  ]
+}
