@@ -333,6 +333,8 @@ func TestTier1_ManagedSectionMismatchType(t *testing.T) {
 		{"sync PR merged", 7, "merged", true, TypeManualOverride, SeverityWarning, ""},
 		{"sync PR open", 7, "open", true, TypeVersionDrift, SeverityCritical, ""},
 		{"sync PR closed unmerged", 7, "closed", true, TypeVersionDrift, SeverityCritical, ""},
+		// Sync closed the PR as stale and proposes the version again on its next run.
+		{"sync PR superseded", 7, "superseded", true, TypeVersionDrift, SeverityCritical, ""},
 		{"status without a PR number", 0, "open", true, TypeManualOverride, SeverityWarning, ""},
 		{"whole-file record, PR merged", 7, "merged", false, TypeVersionDrift, SeverityCritical, ""},
 		// A missing or unreadable section is not an edit inside it, and sync cannot render the file: critical.

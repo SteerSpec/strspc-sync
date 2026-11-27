@@ -102,6 +102,9 @@ sync:
   concurrency: 5
   pr-label: steerspec-sync
   close-stale-prs: true
+  # One pull request per template in each repo (template), or one per repo
+  # carrying all of its out-of-date templates (repo).
+  # pr-grouping: template
   # Commit messages and PR titles are conventional commits:
   #   <prefix>: update <template-id> to <version>
   # Change the type(scope) if your target repos' commitlint rules need it.

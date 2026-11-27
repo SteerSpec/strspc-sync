@@ -41,6 +41,7 @@ expect and how to merge them.
 | Key | Default | Description |
 | --- | --- | --- |
 | `pr-label` | `steerspec-sync` | Label added to every sync pull request. |
-| `close-stale-prs` | `true` | When a template's version changes, closes the open pull request for its older version. |
+| `close-stale-prs` | `true` | Closes the open pull requests a new one replaces: older versions, the other mode's. |
+| `pr-grouping` | `template` | `template`: one pull request per template in each repo. `repo`: one per repo. |
 | `commit-prefix` | `chore(steerspec-sync)` | Conventional-commit `type(scope)` of the commit messages. |
 | `pr-title-prefix` | `chore(steerspec-sync)` | The same for pull request titles. |
