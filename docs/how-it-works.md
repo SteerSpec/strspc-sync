@@ -54,7 +54,7 @@ bulk, one repo at a time:
 ```bash
 repo=OWNER/REPO
 label=steerspec-sync   # your sync.pr-label
-gh pr list -R "$repo" --label "$label" --state open --json number,headRefName \
+gh pr list -R "$repo" --label "$label" --state open --limit 1000 --json number,headRefName \
   -q '.[] | select(.headRefName | startswith("steerspec-sync/")) | .number' |
 while read -r n; do
   gh pr merge "$n" -R "$repo" --squash --auto --delete-branch
@@ -66,6 +66,7 @@ done
   merge and the loop moves on to the next.
 - Use a merge method the repo allows: `--squash`, `--merge` or `--rebase`.
 - Set `label` to your `sync.pr-label` if you changed it. With the wrong label, the loop finds nothing to merge.
+- `--limit` raises `gh`'s default of 30 results, which would leave the rest unmerged.
 - The branch check skips pull requests that carry the label but weren't opened by sync.
 - Templates with different `destination`s change different files, so their pull requests don't conflict. Two
   templates with the same `destination`, such as two marker sections of `CLAUDE.md`, can: once one is merged, the
