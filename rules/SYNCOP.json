@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.17.5",
-    "timestamp": "2026-11-27T17:01:37Z",
-    "hash": "blake3:306f14b22b00105e0c433a017c144eb010edf2792fced6da09cd2f852a93ccae"
+    "version": "0.17.6",
+    "timestamp": "2026-11-27T17:15:25Z",
+    "hash": "blake3:dfd48646dace106656c0b541715f11065b145726af31572a691b27b90bfe580c"
   },
   "rules": [
     {
@@ -112,9 +112,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.13.5",
-        "timestamp": "2026-11-27T17:01:37Z",
-        "hash": "blake3:1c902cbc0a6a8c0f6ec1dbdc87ae83ad7d39b9e8191c6b3b5f793bb9639ca655"
+        "version": "0.13.6",
+        "timestamp": "2026-11-27T17:15:25Z",
+        "hash": "blake3:d46495211aec4daa0bf7c4fb1a93aeb7874a9f809aa86e42ad760d919e50eb1c"
       },
       "rules": [
         {
@@ -211,7 +211,7 @@
           "id": "SYNCPR-011",
           "revision": 0,
           "state": "D",
-          "body": "With `pr-grouping` \"repo\", a SyncPullRequest MUST carry, in a single commit, every template that is out of date for its repository and renders without error, and its body MUST have one section per template with the fields of SYNCPR-003.",
+          "body": "With `pr-grouping` \"repo\", each sync run that opens or updates a SyncPullRequest MUST add exactly one commit to it containing every template that is out of date for its repository and renders without error, and the SyncPullRequest body MUST have one section per template it carries with the fields of SYNCPR-003.",
           "added_by": "github:pleberre",
           "added_at": "2026-11-27",
           "supersedes": null
