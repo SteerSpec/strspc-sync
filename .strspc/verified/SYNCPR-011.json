@@ -2,41 +2,41 @@
   "rule_id": "SYNCPR-011",
   "revision": 0,
   "body_hash": "blake3:ff20fa811b1f2646aa13d86d6498d7b2a62d7ffd2997f4f35423a45e6654fd3d",
-  "promoted_at": "2026-11-27T20:49:37Z",
-  "entity_version": "0.24.0",
+  "promoted_at": "2026-11-27T20:58:02Z",
+  "entity_version": "0.23.0",
   "scope": "all tracked files",
   "files": 151,
-  "files_hash": "5378c3dbb4366ed0aa38b7d0f71b74b279c035630c73cdd583104a31ac96eec5",
+  "files_hash": "a736077669307e04ee3690039aac09eeeb25a4d239cf8f5327065154bd1cd714",
   "provider": "claude",
   "model": "claude-sonnet-5-5",
   "audit_prompt": "audit-a3+v9/effort=medium/split=100000,40,2/1,plan=2",
   "min_confidence": 0.8,
   "verdict": "compliant",
   "confidence": 0.8,
-  "explanation": "In repo mode, syncBundle gathers every out-of-date template that renders, ships them in one CommitFiles call (one commit) and builds a PR body with one SYNCPR-003 section per member. Render failures and section overlaps are excluded and reported, and unchanged bundles are skipped. Tests cover these behaviours.",
+  "explanation": "In bundle mode each run makes a single CommitFiles call with all out-of-date templates that render without error, and the body has one SYNCPR-003 section per member. Render failures and section conflicts are excluded, and up-to-date templates are skipped, as the rule requires.",
   "evidence": [
     {
       "file": "internal/sync/bundle.go",
-      "line": 253,
-      "excerpt": "err := s.ghClient.Repos.CommitFiles(ctx, owner, repo, branch, head, files, bundleMessage(s.commitPrefix(), members))",
+      "line": 242,
+      "excerpt": "if err := s.ghClient.Repos.CommitFiles(ctx, owner, repo, branch, head, files,",
       "line_confirmed": true
     },
     {
       "file": "internal/sync/bundle.go",
-      "line": 109,
+      "line": 108,
       "excerpt": "members = append(members, bundleMember{tmpl: tmpl, r: r})",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 892,
+      "excerpt": "func bundleBody(members []bundleMember) string {",
       "line_confirmed": true
     },
     {
       "file": "internal/sync/sync.go",
       "line": 898,
       "excerpt": "writeTemplateSection(&b, m.tmpl, m.r.src, m.r.previousVersion, m.r.contentHash)",
-      "line_confirmed": true
-    },
-    {
-      "file": "internal/sync/bundle_test.go",
-      "line": 152,
-      "excerpt": "func TestBundleOpensOnePRWithOneCommit(t *testing.T) {",
       "line_confirmed": true
     }
   ]
