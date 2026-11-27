@@ -1,0 +1,43 @@
+{
+  "rule_id": "CNFLACT-006",
+  "revision": 0,
+  "body_hash": "blake3:80530ac4531cb3f7a2b416159fab6754d40c0cfb656337a6031b399e9dd6f671",
+  "promoted_at": "2026-11-27T07:32:32Z",
+  "entity_version": "0.25.0",
+  "scope": "all tracked files",
+  "files": 149,
+  "files_hash": "a66b9fd4696bcbf36c82acf3e93aa88e57364144b3ebae0dfe87c666ab594300",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.8,
+  "explanation": "Conflicts at or above the configured threshold (default warning) produce issues in the central repository, and unit and e2e tests assert this. An extra copy goes to a non-public target, but a central issue is still created, so the requirement holds.",
+  "evidence": [
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 724,
+      "excerpt": "created, err := s.ghClient.Issues.Create(ctx, s.centralOwner, s.centralRepo, create)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 562,
+      "excerpt": "mayCreate := severityRank[entry.Severity] >= severityRank[threshold]",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/e2e/monitor_conflict_test.go",
+      "line": 167,
+      "excerpt": "issues := mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, driftTitle, 1)",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/conflict.go",
+      "line": 457,
+      "excerpt": "created, err := s.ghClient.Issues.Create(ctx, owner, name, &gh.IssueCreate{",
+      "line_confirmed": true
+    }
+  ]
+}
