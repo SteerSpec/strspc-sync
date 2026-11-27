@@ -100,6 +100,8 @@ that is out of date for that repo and renders without error:
 - **One template fails:** a template that can't be read or rendered is reported in the run result, and the pull
   request ships the others. When it renders again, the version set changes and a new pull request replaces the old
   one.
+- **Filtered runs:** a run with `--template-filter` builds its bundle from the matching templates only, so it replaces
+  an open bundle that carries more. The templates it leaves out are proposed again by the next unfiltered run.
 - **Switching modes:** with `close-stale-prs` on, the first bundle closes the open per-template pull requests for the
   templates it carries. Back in `template` mode, the first per-template pull request closes the open bundle, and sync
   proposes the bundle's other templates again on its next run.

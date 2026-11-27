@@ -437,6 +437,39 @@ func TestBundleTemplateFilter(t *testing.T) {
 	}
 }
 
+// A filtered run that changes one template replaces the open full bundle with a bundle of that template alone. The
+// full bundle's other templates are superseded, and the next unfiltered run proposes them again.
+func TestBundleTemplateFilterSupersedesFullBundle(t *testing.T) {
+	repoSvc := newMockRepoService()
+	setupBundleRepos(repoSvc)
+	prSvc := newBundlePRService()
+	cfg := bundleConfig(config.PRGroupingRepo)
+	runSync(t, cfg, repoSvc, prSvc, Options{})
+
+	cfg.Templates[2].Version = "1.1.0"
+	repoSvc.files["testorg/central/templates/settings.json/"] = []byte(`{"v":2}`)
+	runSync(t, cfg, repoSvc, prSvc, Options{TemplateFilter: "settings"})
+	if len(prSvc.created) != 2 || prSvc.created[1].Head != bundleBranch([]string{"settings@1.1.0"}) {
+		t.Fatalf("created = %+v, want a second bundle of settings alone", prSvc.created)
+	}
+	if !slices.Equal(prSvc.closed, []int{1}) {
+		t.Fatalf("closed = %v, want the full bundle [1]", prSvc.closed)
+	}
+	for _, id := range []string{"org", "team"} {
+		if ts := savedState(t, repoSvc).GetTemplateState("testorg/repo-a", id); ts == nil || ts.PRStatus != prSuperseded {
+			t.Errorf("state of %s = %+v, want superseded", id, ts)
+		}
+	}
+
+	runSync(t, cfg, repoSvc, prSvc, Options{})
+	if len(prSvc.created) != 3 {
+		t.Fatalf("PRs opened = %d, want a third bundle carrying all three", len(prSvc.created))
+	}
+	if got := prSvc.created[2].Head; got != bundleBranch([]string{"org@1.0.0", "team@1.0.0", "settings@1.1.0"}) {
+		t.Errorf("third bundle head = %s, want all three templates", got)
+	}
+}
+
 // A failed commit on a branch this run created deletes the branch and opens no PR.
 func TestBundleCommitFailureDropsBranch(t *testing.T) {
 	repoSvc := newMockRepoService()
