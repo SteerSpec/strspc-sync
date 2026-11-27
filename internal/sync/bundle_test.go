@@ -484,6 +484,33 @@ func TestBundleJudgesChainedTemplateOnDefaultBranch(t *testing.T) {
 	}
 }
 
+// Two marker templates managing the same section of one file would overwrite each other in the bundle: the second
+// is reported and left out, and the first ships.
+func TestBundleRejectsSharedSection(t *testing.T) {
+	repoSvc := newMockRepoService()
+	setupBundleRepos(repoSvc)
+	repoSvc.files["testorg/central/templates/team.md/"] = []byte("<!-- STEERSPEC:BEGIN:org -->\nteam's org\n<!-- STEERSPEC:END:org -->\n")
+	prSvc := newBundlePRService()
+
+	result := runSync(t, bundleConfig(config.PRGroupingRepo), repoSvc, prSvc, Options{})
+	var teamErr string
+	for _, rr := range result.RepoResults {
+		if rr.TemplateID == "team" {
+			teamErr = rr.Error
+		}
+	}
+	if !strings.Contains(teamErr, `section "org" of CLAUDE.md is also managed by template "org"`) {
+		t.Errorf("team error = %q, want a shared-section error", teamErr)
+	}
+	if len(prSvc.created) != 1 || prSvc.created[0].Head != bundleBranch([]string{"org@1.0.0", "settings@1.0.0"}) {
+		t.Fatalf("created = %+v, want one bundle of org and settings", prSvc.created)
+	}
+	claude := string(repoSvc.files["testorg/repo-a/CLAUDE.md/"+prSvc.created[0].Head])
+	if !strings.Contains(claude, "org v1") || strings.Contains(claude, "team's org") {
+		t.Errorf("CLAUDE.md on the bundle branch = %q, want org's section only", claude)
+	}
+}
+
 // SYNCOP-009: a dry run over a bundle that has nothing new looks the PR up but records nothing, not even in memory.
 func TestBundleDryRunRecordsNoPRStatus(t *testing.T) {
 	repoSvc := newMockRepoService()

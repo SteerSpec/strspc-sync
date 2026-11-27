@@ -62,12 +62,27 @@ func (s *Syncer) syncBundle(ctx context.Context, target registry.ResolvedTarget,
 	var members []bundleMember
 	rendered := make(map[string][]byte) // destination -> content after the members rendered so far
 	var paths []string                  // destinations, in the order they were first rendered
+	owners := make(map[string]string)   // "destination\x00section" -> the template managing that section
 	for _, tmpl := range tmpls {
 		r, failed := s.render(ctx, target, tmpl, rendered)
 		if failed != nil {
 			// Ship the rest: a template that cannot be rendered is reported and keeps its state (SYNCPR-011).
 			results = append(results, *failed)
 			continue
+		}
+		// Marker templates sharing a file each own their sections. A second template managing the same section
+		// would overwrite the first's in the one file the bundle commits, and one of them would drift after merge.
+		if other, section := sectionOwner(owners, tmpl, r.managed.names); other != "" {
+			results = append(results, RepoResult{
+				Repo: target.Repo, TemplateID: tmpl.ID, Status: "error",
+				Error: fmt.Sprintf("section %q of %s is also managed by template %q; with pr-grouping %q, "+
+					"templates sharing a destination must manage different sections",
+					section, tmpl.Destination, other, config.PRGroupingRepo),
+			})
+			continue
+		}
+		for _, name := range r.managed.names {
+			owners[tmpl.Destination+"\x00"+name] = tmpl.ID
 		}
 		_, chained := rendered[tmpl.Destination]
 		// Whether the repository already holds the template is judged on the default branch, as in template mode.
@@ -96,6 +111,17 @@ func (s *Syncer) syncBundle(ctx context.Context, target registry.ResolvedTarget,
 		return results
 	}
 	return append(results, s.deliverBundle(ctx, target, members, rendered, paths, dryRun, force)...)
+}
+
+// sectionOwner returns the template that already manages one of names in tmpl's destination, and that section, or
+// "" when none does.
+func sectionOwner(owners map[string]string, tmpl config.TemplateConfig, names []string) (owner, section string) {
+	for _, name := range names {
+		if other, ok := owners[tmpl.Destination+"\x00"+name]; ok && other != tmpl.ID {
+			return other, name
+		}
+	}
+	return "", ""
 }
 
 // deliverBundle opens or updates the SyncPullRequest carrying members, and records it for each of them.
