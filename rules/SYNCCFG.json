@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.47.4",
-    "timestamp": "2026-11-27T17:08:02Z",
-    "hash": "blake3:ffbe5a80c056e1cb835a60750fa6276e149c1b78efef36d88f4ee0372fec7824"
+    "version": "0.47.6",
+    "timestamp": "2026-11-27T17:11:25Z",
+    "hash": "blake3:6fcc34779f537c8590b85c892e8aa08c80f1c287c8e32d6aa961550eb05a7ab2"
   },
   "rules": [
     {
@@ -285,7 +285,7 @@
       "id": "SYNCCFG-031",
       "revision": 0,
       "state": "D",
-      "body": "The `sync` section MAY define `pr-grouping` as one of \"template\", \"repo\" (default: \"template\"): with \"template\" a sync run opens or updates a SyncPullRequest per template for a target repository, with \"repo\" one per target repository that has at least one template SYNCPR-011 includes, carrying those templates.",
+      "body": "The `sync` section MAY define `pr-grouping` as one of \"template\", \"repo\" (default: \"template\"): with \"template\" a sync run opens or updates a SyncPullRequest per template for a target repository, and with \"repo\" it opens or updates one SyncPullRequest for a target repository when at least one template is out of date for it and renders without error, with the contents SYNCPR-011 defines.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-27",
       "supersedes": null
