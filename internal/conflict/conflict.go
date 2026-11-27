@@ -359,27 +359,34 @@ func (s *Scanner) visibilityOf(ctx context.Context, repo string) string {
 	return v
 }
 
+// errVisibility reports a repository visibility that could not be read. It names no repository: the central
+// repository's job logs may be public.
+var errVisibility = errors.New("a repository's visibility could not be read, so its conflicts were not filed")
+
 // centralPublic reports whether the central repository's issues and logs are public: it is public, or its
-// visibility cannot be read.
+// visibility cannot be read (filing stops then, see createIssuesForConflicts; logging stays cautious).
 func (s *Scanner) centralPublic(ctx context.Context) bool {
 	v := s.visibilityOf(ctx, s.centralOwner+"/"+s.centralRepo)
 	return v == "public" || v == ""
 }
 
-// mayPublish reports whether a conflict about repos may be filed in the central repository. A public central
-// repository's issues are public, so they must not name a private or internal repository or its files: such a
-// conflict is withheld. A visibility that cannot be read counts as public for the central repository and as non-public
-// for the others.
-func (s *Scanner) mayPublish(ctx context.Context, repos []string) bool {
+// mayPublish reports whether the details of a conflict about repos may be shown in the central repository. A public
+// central repository's issues are public, so they must not name a private or internal repository or its files. A
+// target visibility that cannot be read is an error, not a guess: either guess would rewrite issues wrongly.
+func (s *Scanner) mayPublish(ctx context.Context, repos []string) (bool, error) {
 	if !s.centralPublic(ctx) {
-		return true
+		return true, nil
 	}
 	for _, r := range repos {
-		if s.visibilityOf(ctx, r) != "public" {
-			return false
+		switch s.visibilityOf(ctx, r) {
+		case "":
+			return false, errVisibility
+		case "public":
+		default:
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 
 // withheldTitle is the title of an issue whose details a public central repository does not show.
@@ -494,6 +501,15 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 	listed := false
 	threshold := s.threshold()
 
+	// The central repository's visibility decides how every issue is written. When it cannot be read, nothing is
+	// written or closed: treating it as public would redact every issue about a private target and open their
+	// copies there, and treating it as private could publish private details.
+	if s.visibilityOf(ctx, central) == "" {
+		return errVisibility
+	}
+	var visErr error
+
+entries:
 	for _, entry := range report.Entries {
 		if _, _, err := splitRepo(entry.Repo); err != nil {
 			continue
@@ -521,7 +537,12 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		mayCreate := severityRank[entry.Severity] >= severityRank[threshold]
 		// redacted is set when the central issue is a stub: the central repository is public and the conflict
 		// concerns a private or internal repository. Its details then live in an issue in that repository.
-		redacted := !s.mayPublish(ctx, participants)
+		publishable, err := s.mayPublish(ctx, participants)
+		if err != nil {
+			visErr = err // remembered above, so its issues are kept; nothing is written for it
+			continue
+		}
+		redacted := !publishable
 
 		// Before CNFLDTS-009 a duplicate-skill finding was keyed by the skill's bare filename. An open issue still
 		// keyed that way describes the same conflict, so it is updated and retitled to the full path rather than
@@ -603,9 +624,14 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 			var publish bool
 			switch {
 			case names != nil:
-				publish = s.mayPublish(ctx, names)
+				ok, err := s.mayPublish(ctx, names)
+				if err != nil {
+					visErr = err
+					continue entries
+				}
+				publish = ok
 			case hashes == nil:
-				publish = s.mayPublish(ctx, participants)
+				publish = publishable
 			default:
 				publish = !s.centralPublic(ctx)
 			}
@@ -670,7 +696,7 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 	}
 
 	autoClose := s.cfg.Conflicts.AutoClose == nil || *s.cfg.Conflicts.AutoClose
-	return s.closeResolvedIssues(ctx, report, targets, current, moved, ran, autoClose)
+	return errors.Join(s.closeResolvedIssues(ctx, report, targets, current, moved, ran, autoClose), visErr)
 }
 
 // closeResolvedIssues closes the open issues carrying the conflict label whose conflict is gone, when autoClose is

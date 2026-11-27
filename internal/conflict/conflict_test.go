@@ -84,7 +84,9 @@ func (m *mockRepoService) GetVisibility(_ context.Context, owner, repo string) (
 	if m.visibilityErr != nil {
 		return "", m.visibilityErr
 	}
-	if v := m.visibility[owner+"/"+repo]; v != "" {
+	if v := m.visibility[owner+"/"+repo]; v == "!err" {
+		return "", errors.New("403 resource not accessible")
+	} else if v != "" {
 		return v, nil
 	}
 	return "private", nil
@@ -1926,7 +1928,6 @@ func TestConflictRedactedInPublicCentral(t *testing.T) {
 		{"public central, private target", map[string]string{"org/central": "public"}, nil, []string{"org/central", "org/repo1"}, 1},
 		{"public central, internal target", map[string]string{"org/central": "public", "org/repo1": "internal"}, nil, []string{"org/central", "org/repo1"}, 1},
 		{"public central, public target", map[string]string{"org/central": "public", "org/repo1": "public"}, nil, []string{"org/central"}, 0},
-		{"visibility unreadable", nil, errors.New("403"), []string{"org/central", "org/repo1"}, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repos, ds := driftSetup("org/repo1")
@@ -2052,5 +2053,38 @@ func TestRedactedIssueClosedByHashCoverage(t *testing.T) {
 		if got := slices.Contains(issues.closed, 80); got != tc.wantClose {
 			t.Errorf("targets %v: closed %v, want closed %v", tc.targets, issues.closed, tc.wantClose)
 		}
+	}
+}
+
+// A visibility that cannot be read is not guessed. Unreadable central visibility writes and closes nothing; an
+// unreadable target, with a public central repository, leaves that conflict's issues as they are. Either way the run
+// returns an error that names no repository.
+func TestUnreadableVisibilityWritesNothing(t *testing.T) {
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	for _, tc := range []struct {
+		name       string
+		visibility map[string]string
+	}{
+		{"central unreadable", map[string]string{"org/central": "!err"}},
+		{"target unreadable", map[string]string{"org/central": "public", "org/repo1": "!err"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repos, ds := driftSetup("org/repo1")
+			repos.visibility = tc.visibility
+			full := &gh.Issue{
+				Number: 90, Title: "[SteerSpec Conflict] version-drift: org/repo1/CLAUDE.md", State: "open",
+				Labels: []string{"steerspec-conflict"},
+				Body:   "details\n\n" + fingerprintPrefix + fp + fingerprintSuffix + "\n" + reposPrefix + "org/repo1" + fingerprintSuffix,
+			}
+			issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {full}}}
+			_, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+				Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
+			if err == nil || strings.Contains(err.Error(), "repo1") || strings.Contains(err.Error(), "central") {
+				t.Errorf("err = %v, want a visibility error naming no repository", err)
+			}
+			if len(issues.updated) != 0 || len(issues.created) != 0 || len(issues.closed) != 0 {
+				t.Errorf("updated %d, created %d, closed %v; want nothing written", len(issues.updated), len(issues.created), issues.closed)
+			}
+		})
 	}
 }
