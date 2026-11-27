@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.17.4",
-    "timestamp": "2026-11-27T16:58:00Z",
-    "hash": "blake3:1ed31e20b7f47616b9983d79632a2aa27951ea7c13a5337ed3526371c10ef39a"
+    "version": "0.17.5",
+    "timestamp": "2026-11-27T17:01:37Z",
+    "hash": "blake3:306f14b22b00105e0c433a017c144eb010edf2792fced6da09cd2f852a93ccae"
   },
   "rules": [
     {
@@ -112,9 +112,9 @@
         "parent": "SYNCOP"
       },
       "rule_set": {
-        "version": "0.13.4",
-        "timestamp": "2026-11-27T16:58:00Z",
-        "hash": "blake3:d841c5a08f8a754504b3dbe9cfc1359af8414b8ec523eb545c2489fa4b433882"
+        "version": "0.13.5",
+        "timestamp": "2026-11-27T17:01:37Z",
+        "hash": "blake3:1c902cbc0a6a8c0f6ec1dbdc87ae83ad7d39b9e8191c6b3b5f793bb9639ca655"
       },
       "rules": [
         {
@@ -184,7 +184,7 @@
           "id": "SYNCPR-008",
           "revision": 0,
           "state": "D",
-          "body": "MUST use a branch name in the format `steerspec-sync/<template-id>/<version>` when `pr-grouping` is \"template\", and `steerspec-sync/repo/<hash>` when it is \"repo\", where `<hash>` is the first 8 hex characters of the Blake3 hash of the sorted `<template-id>@<version>` list of the templates the PR carries.",
+          "body": "MUST use a branch name in the format `steerspec-sync/<template-id>/<version>` when `pr-grouping` is \"template\", and `steerspec-sync/repo/<hash>` when it is \"repo\", where `<hash>` is the first 8 lowercase hex characters of the Blake3 hash of the UTF-8 bytes of the `<template-id>@<version>` entries of the templates the PR carries, sorted bytewise and joined by a single newline (U+000A) with no trailing newline.",
           "added_by": "github:pleberre",
           "added_at": "2026-11-27",
           "supersedes": "SYNCPR-002"
