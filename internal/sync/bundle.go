@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"slices"
@@ -234,29 +233,18 @@ func (s *Syncer) deliverBundle(ctx context.Context, target registry.ResolvedTarg
 		}
 	}
 
-	// One commit per run with every file that changes (SYNCPR-011). On an existing branch, files already holding
-	// their render are left out; when none changes, there is no commit.
-	var files []gh.FileChange
+	// Exactly one commit per run that opens or updates the PR, with every file the bundle carries (SYNCPR-011). As in
+	// template mode, a file the branch already holds is written again rather than left out.
+	files := make([]gh.FileChange, 0, len(paths))
 	for _, p := range paths {
-		if !createdBranch {
-			current, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, p, branch)
-			if err != nil && !isNotFound(err) {
-				return fail("reading %s on %s: %v", p, branch, err)
-			}
-			if err == nil && bytes.Equal(current, rendered[p]) {
-				continue
-			}
-		}
 		files = append(files, gh.FileChange{Path: p, Content: rendered[p]})
 	}
-	if len(files) > 0 {
-		err := s.ghClient.Repos.CommitFiles(ctx, owner, repo, branch, head, files, bundleMessage(s.commitPrefix(), members))
-		if err != nil {
-			if createdBranch {
-				s.deleteEmptyBranch(ctx, owner, repo, target.Repo, branch, baseSHA)
-			}
-			return fail("committing files: %v", err)
+	if err := s.ghClient.Repos.CommitFiles(ctx, owner, repo, branch, head, files,
+		bundleMessage(s.commitPrefix(), members)); err != nil {
+		if createdBranch {
+			s.deleteEmptyBranch(ctx, owner, repo, target.Repo, branch, baseSHA)
 		}
+		return fail("committing files: %v", err)
 	}
 
 	pr, status, errMsg := s.upsertPR(ctx, owner, repo, branch, target.DefaultBranch,

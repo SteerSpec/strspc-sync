@@ -89,12 +89,12 @@ that is out of date for that repo and renders without error:
   `<template-id>@<version>` list, joined by newlines.
   - New content at the same versions adds a commit to the open pull request.
   - A version change opens a new pull request, which carries the unchanged templates too, and closes the old one.
-- **Commit:** each run adds one commit with every file that changed. Templates that share a `destination` are rendered
-  onto the same file one after another, so they don't conflict with each other. They must all use the `marker`
-  strategy, since `mustache` and `full-replace` overwrite the file; config validation rejects anything else. They
-  must also manage different sections, and each must have at least one: a marker template without sections replaces
-  the whole file. A template that would overwrite another one's section is reported as an error and left out of the
-  pull request.
+- **Commit:** each run that opens or updates the pull request adds one commit with every file it carries. Templates
+  that share a `destination` are rendered onto the same file one after another, so they don't conflict with each
+  other. They must all use the `marker` strategy, since `mustache` and `full-replace` overwrite the file; config
+  validation rejects anything else. They must also manage different sections, and each must have at least one: a
+  marker template without sections replaces the whole file. A template that would overwrite another one's section is
+  reported as an error and left out of the pull request.
 - **Title and body:** the title is `<pr-title-prefix>: update <n> templates`, or the usual per-template title for a
   single template. The body has one section per template, with its previous and new version, changelog and diff link.
 - **One template fails:** a template that can't be read or rendered is reported in the run result, and the pull

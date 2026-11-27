@@ -247,7 +247,8 @@ func TestBundleRerunIsSkipped(t *testing.T) {
 	}
 }
 
-// SYNCPR-009: new content at the same versions adds one commit to the open bundle, with only the changed file.
+// SYNCPR-009, SYNCPR-011: new content at the same versions adds exactly one commit to the open bundle, with every
+// file the bundle carries.
 func TestBundleSameVersionsUpdatesOpenPR(t *testing.T) {
 	repoSvc := newMockRepoService()
 	setupBundleRepos(repoSvc)
@@ -264,8 +265,11 @@ func TestBundleSameVersionsUpdatesOpenPR(t *testing.T) {
 	if len(repoSvc.commits) != 2 {
 		t.Fatalf("commits = %d, want 2", len(repoSvc.commits))
 	}
-	if got := repoSvc.commits[1].paths; !slices.Equal(got, []string{".claude/settings.json"}) {
-		t.Errorf("second commit paths = %v, want only .claude/settings.json", got)
+	if got := repoSvc.commits[1].paths; !slices.Equal(got, []string{"CLAUDE.md", ".claude/settings.json"}) {
+		t.Errorf("second commit paths = %v, want both files", got)
+	}
+	if got := string(repoSvc.files["testorg/repo-a/.claude/settings.json/"+prSvc.created[0].Head]); got != `{"v":2}` {
+		t.Errorf("settings on the bundle branch = %q, want the new content", got)
 	}
 	if len(prSvc.closed) != 0 {
 		t.Errorf("closed = %v, want none", prSvc.closed)
