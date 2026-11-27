@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.47.1",
-    "timestamp": "2026-11-27T16:58:00Z",
-    "hash": "blake3:5b68ffecc0247bc9e83f6073798ea75e2f2af5c804658bd4c1633c4b220e0da0"
+    "version": "0.47.3",
+    "timestamp": "2026-11-27T17:04:51Z",
+    "hash": "blake3:06bb2fdde4e1225a1c7a2af45b900126972b5dead47ea7b715c3357365fa7ff2"
   },
   "rules": [
     {
@@ -285,7 +285,7 @@
       "id": "SYNCCFG-031",
       "revision": 0,
       "state": "D",
-      "body": "The `sync` section MAY define `pr-grouping` as one of \"template\", \"repo\" (default: \"template\"): with \"template\" a target repository gets one SyncPullRequest per template, with \"repo\" one SyncPullRequest for all of its templates.",
+      "body": "The `sync` section MAY define `pr-grouping` as one of \"template\", \"repo\" (default: \"template\"): with \"template\" a sync run opens or updates a SyncPullRequest per template for a target repository, with \"repo\" one per target repository, carrying the templates SYNCPR-011 defines.",
       "added_by": "github:pleberre",
       "added_at": "2026-11-27",
       "supersedes": null
