@@ -2,18 +2,18 @@
   "rule_id": "SYNCPR-008",
   "revision": 0,
   "body_hash": "blake3:6d61a4a40447c137446684f5b5fe23785669c8af075fa7528211218205b104bb",
-  "promoted_at": "2026-11-27T20:14:04Z",
+  "promoted_at": "2026-11-27T20:49:04Z",
   "entity_version": "0.21.0",
   "scope": "all tracked files",
   "files": 151,
-  "files_hash": "93dac5efdfaccd7d7c26a877fbe136a45dbc0bac0490e7d342a6361621dc641c",
+  "files_hash": "5378c3dbb4366ed0aa38b7d0f71b74b279c035630c73cdd583104a31ac96eec5",
   "provider": "claude",
   "model": "claude-sonnet-5-5",
   "audit_prompt": "audit-a3+v9/effort=medium/split=100000,40,2/1,plan=2",
   "min_confidence": 0.8,
   "verdict": "compliant",
   "confidence": 0.85,
-  "explanation": "Template mode builds steerspec-sync/<id>/<version>. Repo mode builds entries as id@version, sorts them bytewise, joins them with a newline and no trailing newline, hashes them with BLAKE3 and takes the first 8 hex characters after the prefix, as the rule requires.",
+  "explanation": "Template mode builds steerspec-sync/<id>/<version>. Repo mode builds steerspec-sync/repo/ plus the first 8 characters of the Blake3 hash of bytewise-sorted id@version entries joined by newline, with no trailing newline. Whether the hash output is lowercase hex is assumed but not shown.",
   "evidence": [
     {
       "file": "internal/sync/sync.go",
@@ -35,8 +35,8 @@
     },
     {
       "file": "internal/sync/bundle.go",
-      "line": 101,
-      "excerpt": "entries[i] = m.tmpl.ID + \"@\" + m.tmpl.Version",
+      "line": 27,
+      "excerpt": "slices.Sort(sorted) // Go orders strings by their bytes",
       "line_confirmed": true
     }
   ]

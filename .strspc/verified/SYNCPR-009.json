@@ -2,18 +2,18 @@
   "rule_id": "SYNCPR-009",
   "revision": 0,
   "body_hash": "blake3:213a671897fbb63dfc3258754bee6f935b922d7218edb2d77c466956a0548233",
-  "promoted_at": "2026-11-27T20:14:04Z",
+  "promoted_at": "2026-11-27T20:49:14Z",
   "entity_version": "0.22.0",
   "scope": "all tracked files",
   "files": 151,
-  "files_hash": "93dac5efdfaccd7d7c26a877fbe136a45dbc0bac0490e7d342a6361621dc641c",
+  "files_hash": "5378c3dbb4366ed0aa38b7d0f71b74b279c035630c73cdd583104a31ac96eec5",
   "provider": "claude",
   "model": "claude-sonnet-5-5",
   "audit_prompt": "audit-a3+v9/effort=medium/split=100000,40,2/1,plan=2",
   "min_confidence": 0.8,
   "verdict": "compliant",
-  "confidence": 0.92,
-  "explanation": "Both template and bundle modes call upsertPR, which lists open PRs by head branch and updates the existing one, creating only when none is found. An already-existing branch is tolerated and reused. Unit and e2e tests assert that updates occur instead of duplicates.",
+  "confidence": 0.93,
+  "explanation": "Both template and bundle modes go through upsertPR, which lists open PRs by head branch, updates the existing one, and creates only when none is found. Unit and e2e tests assert that no duplicate is created.",
   "evidence": [
     {
       "file": "internal/sync/sync.go",
@@ -35,8 +35,8 @@
     },
     {
       "file": "internal/sync/bundle.go",
-      "line": 155,
-      "excerpt": "if createErr != nil && !isAlreadyExists(createErr) {",
+      "line": 262,
+      "excerpt": "pr, status, errMsg := s.upsertPR(ctx, owner, repo, branch, target.DefaultBranch,",
       "line_confirmed": true
     },
     {
