@@ -608,6 +608,8 @@ func TestValidationTemplateIDIsRefSafe(t *testing.T) {
 		{".hidden", true},
 		{"a/.hidden", true},
 		{"x.lock", true},
+		{"release.", true},
+		{"release./team", true},
 		{"a:b", true},
 		{"a~b", true},
 		{"a^b", true},

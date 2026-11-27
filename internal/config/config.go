@@ -170,8 +170,8 @@ func checkRepoPath(p string) error {
 }
 
 // checkTemplateID reports why id cannot name a template. Sync branches embed the id (SYNCPR-002, SYNCPR-008), so it
-// must be valid inside a git ref name. "/" is allowed between non-empty segments; a segment may not start with "."
-// or end with ".lock", and the id may not hold "..", "@{", a space, a control character or any of ~^:?*[\.
+// must be valid inside a git ref name. "/" is allowed between non-empty segments; a segment may not start or end with
+// "." or end with ".lock", and the id may not hold "..", "@{", a space, a control character or any of ~^:?*[\.
 func checkTemplateID(id string) error {
 	switch {
 	case strings.ContainsFunc(id, func(r rune) bool { return unicode.IsControl(r) || unicode.IsSpace(r) }):
@@ -185,8 +185,8 @@ func checkTemplateID(id string) error {
 		switch {
 		case seg == "":
 			return fmt.Errorf("must not have an empty segment (a leading, doubled or trailing /)")
-		case strings.HasPrefix(seg, "."), strings.HasSuffix(seg, ".lock"):
-			return fmt.Errorf(`must not have a segment starting with "." or ending with ".lock"`)
+		case strings.HasPrefix(seg, "."), strings.HasSuffix(seg, "."), strings.HasSuffix(seg, ".lock"):
+			return fmt.Errorf(`must not have a segment starting or ending with "." or ending with ".lock"`)
 		}
 	}
 	return nil
