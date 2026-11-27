@@ -65,6 +65,34 @@ issue instead of opening another, conflict finds it by fingerprint or title, not
 the cleanup that closes resolved conflict issues still only considers issues carrying the label. As for
 monitor, an issue without the label counts only when a bot, or an owner, member or collaborator, opened it.
 
+Every conflict issue is filed in the central repository, like monitor's drift issues. Its title names the target
+(`[SteerSpec Conflict] version-drift: org/repo/CLAUDE.md`), and a cross-repository conflict such as a duplicate skill
+lists its repositories in the body. Only conflicts at or above `conflicts.severity-threshold` get an issue: `critical`,
+`warning` (the default) or `info`. Raising the threshold leaves the issue of a conflict still detected below it open.
+A conflict issue an earlier version filed in a target is closed once the central issue tracks its conflict, with a line
+pointing to it. That happens even with `auto-close` off, since it would be a duplicate. When the token cannot reach the
+target's issues, it is logged and skipped. The report counts those in `issues_moved`.
+
+A public central repository's issues are public, so a conflict about a private or internal repository gets only a
+stub there: `[SteerSpec Conflict] <type>: non-public repository`. The stub names no repository or file. Its
+fingerprint and participant list are keyed hashes under the action's `hash-key` input (`conflict-hash-key` on the
+root action, `STEERSPEC_CONFLICT_HASH_KEY` for the CLI). Pass it from a secret and keep it stable: changing it opens
+new stubs. Without it, those conflicts are not filed and the run fails with an error saying so.
+
+The full issue lives in each private or internal repository the conflict concerns, where only that repository's
+readers see it, and points to the stub. A duplicate skill's copy names its own repository and the public ones, and
+only counts the other non-public ones. The report counts stubs in `issues_redacted`.
+
+A full central issue whose details must become hidden is closed, not edited, and a fresh stub replaces it. GitHub
+keeps an issue's earlier titles and bodies in its timeline and edit history, so editing would not hide them. An
+organization owner can delete the closed issue to remove them. When the central repository stops being public, a stub
+shows its details again, and the private copies are closed as duplicates.
+
+Warnings about a target's issues name no repository, since the central repository's job logs are public too. A
+repository whose visibility cannot be read stops the filing of the conflicts that depend on it, with an error that
+names no repository. The report itself, printed to the job log and the `report` output, still lists every conflict
+(#274).
+
 **Action usage:**
 
 ```yaml

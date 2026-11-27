@@ -6,9 +6,9 @@
     "description": "The schema for the steerspec-sync.yml configuration file."
   },
   "rule_set": {
-    "version": "0.45.0",
-    "timestamp": "2026-11-25T11:06:10Z",
-    "hash": "blake3:ecff09c71c798c3811b71a1c73db4dbaa568b53fcc4a5023e24c547b56bf8b84"
+    "version": "0.45.1",
+    "timestamp": "2026-11-26T18:27:28Z",
+    "hash": "blake3:1592809a0ba00eeefddd9b8cd132e75dcf4c1e496ca605fad58b8cfba4d595b3"
   },
   "rules": [
     {
@@ -271,6 +271,15 @@
       "added_by": "github:pleberre",
       "added_at": "2026-11-21",
       "supersedes": "SYNCCFG-022"
+    },
+    {
+      "id": "SYNCCFG-030",
+      "revision": 0,
+      "state": "D",
+      "body": "The `conflicts` section MAY define `severity-threshold` as one of \"critical\", \"warning\", \"info\" (default: \"warning\"), the lowest severity of a conflict that gets a GitHub issue.",
+      "added_by": "github:pleberre",
+      "added_at": "2026-11-26",
+      "supersedes": null
     }
   ],
   "notes": [

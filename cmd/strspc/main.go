@@ -399,6 +399,7 @@ func runConflict(args []string, out, errOut io.Writer) error {
 	report, runErr := scanner.Run(ctx, deployState, targets, conflict.Options{
 		ConfigPath: common.configPath,
 		Tiers:      tiers,
+		HashKey:    os.Getenv("STEERSPEC_CONFLICT_HASH_KEY"),
 	})
 	if report == nil {
 		return fmt.Errorf("conflict detection error: %w", runErr)

@@ -107,6 +107,23 @@ func (s *repoService) GetDefaultBranch(ctx context.Context, owner, repo string) 
 	return r.DefaultBranch, nil
 }
 
+func (s *repoService) GetVisibility(ctx context.Context, owner, repo string) (string, error) {
+	u := fmt.Sprintf("%s/repos/%s/%s", s.client.baseURL, url.PathEscape(owner), url.PathEscape(repo))
+	resp, err := s.client.doRequest(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "", err
+	}
+	if err := checkResponse(resp); err != nil {
+		return "", fmt.Errorf("get repo %s/%s: %w", owner, repo, err)
+	}
+
+	var r apiRepo
+	if err := decodeBody(resp, &r); err != nil {
+		return "", err
+	}
+	return r.visibility(), nil
+}
+
 // GetBranchSHA resolves a branch name to the commit SHA it points at. Callers
 // that need a base for a new ref must use this rather than the branch name —
 // the git/refs endpoint takes a SHA and rejects a name.

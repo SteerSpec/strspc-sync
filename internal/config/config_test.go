@@ -75,6 +75,9 @@ func TestDefaultsApplied(t *testing.T) {
 	if len(cfg.Conflicts.Tiers) != 2 || cfg.Conflicts.Tiers[0] != 1 || cfg.Conflicts.Tiers[1] != 2 {
 		t.Errorf("expected default tiers [1,2], got %v", cfg.Conflicts.Tiers)
 	}
+	if cfg.Conflicts.SeverityThreshold != "warning" {
+		t.Errorf("expected conflicts severity-threshold warning, got %q", cfg.Conflicts.SeverityThreshold)
+	}
 }
 
 // A `schedule` key in the monitor or conflicts section is ignored (SYNCCFG-028 and -029, which supersede
@@ -513,5 +516,44 @@ func TestQuickstartTemplateSourcesExist(t *testing.T) {
 					tmpl.ID, tmpl.Destination)
 			}
 		})
+	}
+}
+
+// CNFLACT-006: conflicts.severity-threshold is critical, warning or info.
+func TestConflictSeverityThreshold(t *testing.T) {
+	const base = `
+version: "1.0.0"
+auth:
+  method: pat
+  token: "test"
+templates:
+  - id: t1
+    version: "1.0.0"
+    type: claude-md
+    source: s
+    destination: d
+    strategy: mustache
+targets:
+  include: ["org/*"]
+conflicts:
+  severity-threshold: `
+	for _, tc := range []struct {
+		value   string
+		wantErr bool
+	}{{"critical", false}, {"warning", false}, {"info", false}, {"Critical", true}, {"error", true}} {
+		cfg, err := Load(writeConfig(t, base+tc.value+"\n"))
+		if tc.wantErr {
+			if err == nil || !strings.Contains(err.Error(), "severity-threshold") {
+				t.Errorf("%q: got %v, want a severity-threshold error", tc.value, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", tc.value, err)
+			continue
+		}
+		if cfg.Conflicts.SeverityThreshold != tc.value {
+			t.Errorf("%q: got %q", tc.value, cfg.Conflicts.SeverityThreshold)
+		}
 	}
 }

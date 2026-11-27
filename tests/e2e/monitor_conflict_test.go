@@ -124,17 +124,19 @@ func TestMonitorDriftLifecycle(t *testing.T) {
 }
 
 // TestConflictTier1Lifecycle: tier 1 finds version drift and a broken cross-reference in a target, opens one issue
-// per finding in that target, exits 1 (critical), does not duplicate on rerun, and closes the issues once fixed.
+// per finding in the central repo titled with the target (CNFLACT-006), exits 1 (critical), does not duplicate on
+// rerun, and closes the issues once fixed.
 func TestConflictTier1Lifecycle(t *testing.T) {
 	env := harness.New(t)
 	repo := harness.RepoPublic
 	full := env.Org + "/" + repo
 	synced := mcSyncedContent(env.Org)
 	// refPath is reported as written in CLAUDE.md; neither agents/ nor .claude/agents/ holds the file.
-	const (
-		driftTitle = "[SteerSpec Conflict] version-drift: CLAUDE.md"
-		refPath    = "agents/e2e-missing.md"
-		refTitle   = "[SteerSpec Conflict] cross-reference-broken: " + refPath
+	const refPath = "agents/e2e-missing.md"
+	var (
+		driftTitle = "[SteerSpec Conflict] version-drift: " + full + "/CLAUDE.md"
+		refTitle   = "[SteerSpec Conflict] cross-reference-broken: " + full + "/" + refPath
+		anyTitle   = ": " + full + "/" // every conflict issue of this target, and no other scenario's
 	)
 
 	mcSeedSynced(t, env, repo)
@@ -162,7 +164,7 @@ func TestConflictTier1Lifecycle(t *testing.T) {
 			t.Errorf("version-drift entry = %+v, want repo %s file %s", e, full, mcClaudePath)
 		}
 	}
-	issues := mcWaitIssues(t, env, repo, mcConflictLabel, driftTitle, 1)
+	issues := mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, driftTitle, 1)
 	if !strings.Contains(issues[0].Body, "steerspec-conflict-type: version-drift") {
 		t.Errorf("conflict issue body lacks the type marker:\n%s", issues[0].Body)
 	}
@@ -172,7 +174,7 @@ func TestConflictTier1Lifecycle(t *testing.T) {
 	if rep.SeveritySummary.Critical != 1 || rep.IssuesCreated != 0 || rep.IssuesClosed != 0 {
 		t.Fatalf("rerun report = %+v, want critical 1, issues_created 0, issues_closed 0", rep)
 	}
-	mcWaitIssues(t, env, repo, mcConflictLabel, driftTitle, 1)
+	mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, driftTitle, 1)
 
 	// 4. A reference to a missing agent file adds a second tier 1 finding on top of the drift.
 	broken := append(append([]byte{}, synced...), []byte("\nSee agents/e2e-missing.md for details.\n")...)
@@ -189,8 +191,8 @@ func TestConflictTier1Lifecycle(t *testing.T) {
 			t.Errorf("cross-reference entry = %+v, want repo %s file %s", e, full, refPath)
 		}
 	}
-	mcWaitIssues(t, env, repo, mcConflictLabel, driftTitle, 1)
-	mcWaitIssues(t, env, repo, mcConflictLabel, refTitle, 1)
+	mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, driftTitle, 1)
+	mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, refTitle, 1)
 
 	// 5. Fix: restore the managed content. Both findings go away, both issues close, exit 0.
 	mcWriteAndWait(t, env, repo, mcClaudePath, synced)
@@ -198,12 +200,13 @@ func TestConflictTier1Lifecycle(t *testing.T) {
 	if rep.SeveritySummary.Critical != 0 || rep.IssuesCreated != 0 || rep.IssuesClosed != 2 {
 		t.Fatalf("fixed report = %+v, want critical 0, issues_closed 2", rep)
 	}
-	mcWaitIssues(t, env, repo, mcConflictLabel, "[SteerSpec Conflict]", 0)
+	mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, anyTitle, 0)
+	mcWaitIssues(t, env, repo, mcConflictLabel, "[SteerSpec Conflict]", 0) // nothing is filed in the target
 }
 
 // TestConflictTier2Lifecycle: tier 2 duplicate-skill (same skill file, different content in two targets; issue in the
 // central repo) and section-overlap (one STEERSPEC section in two marker-managed files of a target; issue in the
-// target). Both are warnings, so the command exits 0. The fixture has no skill or marker templates, so the scenario
+// central repo too, titled with the target, CNFLACT-006). Both are warnings, so the command exits 0. The fixture has no skill or marker templates, so the scenario
 // adds them to its own copy of the run config.
 func TestConflictTier2Lifecycle(t *testing.T) {
 	env := harness.New(t)
@@ -213,9 +216,9 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 		markerA    = ".steerspec-e2e/marker-a.md"
 		markerB    = ".steerspec-e2e/marker-b.md"
 		dupTitle   = "[SteerSpec Conflict] duplicate-skill: " + skillPath
-		overTitle  = "[SteerSpec Conflict] section-overlap: " + markerB
 		markerText = "<!-- STEERSPEC:BEGIN:e2e-shared -->\nshared section\n<!-- STEERSPEC:END:e2e-shared -->\n"
 	)
+	overTitle := "[SteerSpec Conflict] section-overlap: " + env.Org + "/" + pub + "/" + markerB
 	mcAddTemplates(t, env,
 		config.TemplateConfig{
 			ID: env.TemplateID("skill-dup"), Version: "1.0.0", Type: "skill", Strategy: "full-replace",
@@ -282,13 +285,13 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 	if rep.IssuesCreated != 1 || rep.IssuesClosed != 0 {
 		t.Fatalf("overlap report = %+v, want issues_created 1", rep)
 	}
-	mcWaitIssues(t, env, pub, mcConflictLabel, overTitle, 1)
+	mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, overTitle, 1)
 
 	rep = mcConflict(t, env, "2", 0)
 	if rep.IssuesCreated != 0 || rep.IssuesClosed != 0 {
 		t.Fatalf("overlap rerun = %+v, want no issues created or closed", rep)
 	}
-	mcWaitIssues(t, env, pub, mcConflictLabel, overTitle, 1)
+	mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, overTitle, 1)
 
 	// Fix: drop the duplicate section from the second file.
 	mcWriteAndWait(t, env, pub, markerB, []byte("no markers here\n"))
@@ -296,5 +299,5 @@ func TestConflictTier2Lifecycle(t *testing.T) {
 	if rep.IssuesCreated != 0 || rep.IssuesClosed != 1 || len(rep.Entries) != 0 {
 		t.Fatalf("overlap fixed = %+v, want no entries and issues_closed 1", rep)
 	}
-	mcWaitIssues(t, env, pub, mcConflictLabel, overTitle, 0)
+	mcWaitIssues(t, env, harness.RepoCentral, mcConflictLabel, overTitle, 0)
 }

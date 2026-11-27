@@ -53,6 +53,12 @@ inputs:
     description: 'GitHub App installation ID (optional; auto-discovered from org if omitted)'
     required: false
     default: ''
+  conflict-hash-key:
+    description: >-
+      Conflict only: secret key for the stubs a public central repository gets for conflicts about
+      private or internal repositories; pass it from a secret. Without it those conflicts are not filed.
+    required: false
+    default: ''
 
 outputs:
   # Sync outputs
@@ -147,6 +153,7 @@ runs:
         STEERSPEC_APP_ID: ${{ inputs.app-id }}
         STEERSPEC_PRIVATE_KEY: ${{ inputs.private-key }}
         STEERSPEC_INSTALLATION_ID: ${{ inputs.installation-id }}
+        STEERSPEC_CONFLICT_HASH_KEY: ${{ inputs.conflict-hash-key }}
         # Inputs reach the script as environment variables, never interpolated
         # into it, so a value cannot inject shell syntax.
         STRSPC_INPUT_CONFIG_PATH: ${{ inputs.config-path }}

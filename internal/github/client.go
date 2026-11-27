@@ -29,6 +29,8 @@ type RepoService interface {
 	ListByOrg(ctx context.Context, org string) ([]*Repository, error)
 	ListByTopic(ctx context.Context, topic, org string) ([]*Repository, error)
 	GetDefaultBranch(ctx context.Context, owner, repo string) (string, error)
+	// GetVisibility returns the repository's visibility: "public", "internal" or "private".
+	GetVisibility(ctx context.Context, owner, repo string) (string, error)
 	GetBranchSHA(ctx context.Context, owner, repo, branch string) (string, error)
 	GetFileContent(ctx context.Context, owner, repo, path, ref string) ([]byte, string, error) // content, sha, error
 	CreateOrUpdateFile(ctx context.Context, owner, repo, path, branch string, content []byte, sha, message string) error
