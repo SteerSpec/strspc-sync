@@ -6,9 +6,9 @@
     "description": "The result of a conflict detection scan across target repositories."
   },
   "rule_set": {
-    "version": "0.9.23",
-    "timestamp": "2026-11-26T20:01:43Z",
-    "hash": "blake3:4c78567a52e3424e17554ed7572f931a46f0f022bac6e8a3a22b2bc6a9af5633"
+    "version": "0.9.29",
+    "timestamp": "2026-11-27T07:16:26Z",
+    "hash": "blake3:97faceb113ca401ba4941377a1b0daae1cd8fa9832206890a740198de65c3495"
   },
   "rules": [
     {
@@ -67,9 +67,9 @@
         "parent": "CNFLRPT"
       },
       "rule_set": {
-        "version": "0.15.0",
-        "timestamp": "2026-11-26T20:01:43Z",
-        "hash": "blake3:b4ed779829d4e3e2f76144b0699c9051d1f15b133f4bb9a07bf74cbfe8074660"
+        "version": "0.21.0",
+        "timestamp": "2026-11-27T07:16:26Z",
+        "hash": "blake3:f36ba47643be5d538861b4ea52c8a834e98e4f5891d52d98176cc976975a288f"
       },
       "rules": [
         {
@@ -93,7 +93,7 @@
         {
           "id": "CNFLENT-003",
           "revision": 1,
-          "state": "P",
+          "state": "I",
           "body": "HAS a type which MUST be one of: \"version-drift\", \"manual-override\", \"cross-reference-broken\", \"duplicate-skill\", \"contradictory-instruction\", \"unmanaged-file\", \"section-overlap\".",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -102,7 +102,7 @@
         {
           "id": "CNFLENT-004",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "HAS a repository identifier in `owner/repo` format.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -111,7 +111,7 @@
         {
           "id": "CNFLENT-005",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "HAS a file path relative to the repository root.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -138,7 +138,7 @@
         {
           "id": "CNFLENT-008",
           "revision": 1,
-          "state": "P",
+          "state": "I",
           "body": "`version-drift` IS a managed file whose content differs from what DeploymentState records for its expected version, unless the difference is a `manual-override`; severity: critical.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -147,7 +147,7 @@
         {
           "id": "CNFLENT-009",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "`manual-override` IS a modification to managed sections (between STEERSPEC markers) outside of the sync process; severity: warning.",
           "added_by": "github:pleberre",
           "added_at": "2026-03-07",
@@ -192,7 +192,7 @@
         {
           "id": "CNFLENT-014",
           "revision": 0,
-          "state": "P",
+          "state": "I",
           "body": "`section-overlap` IS a STEERSPEC section that appears in more than one managed file of the same repository; severity: warning.",
           "added_by": "github:pleberre",
           "added_at": "2026-11-26",

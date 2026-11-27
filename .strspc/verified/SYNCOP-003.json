@@ -1,0 +1,49 @@
+{
+  "rule_id": "SYNCOP-003",
+  "revision": 0,
+  "body_hash": "blake3:18a26b25adc24a501cfc19c2e8b696237abd032a43a83e4f52280d9f18b64c20",
+  "promoted_at": "2026-11-27T07:15:14Z",
+  "entity_version": "0.17.0",
+  "scope": "all tracked files",
+  "files": 149,
+  "files_hash": "a66b9fd4696bcbf36c82acf3e93aa88e57364144b3ebae0dfe87c666ab594300",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.93,
+  "explanation": "A sync run has a Trigger type restricted to push, manual and schedule. Valid() enforces this and Run rejects anything else, except that an empty value defaults to manual. The trigger is recorded in the result, and tests confirm both the accepted and the refused values.",
+  "evidence": [
+    {
+      "file": "internal/sync/sync.go",
+      "line": 39,
+      "excerpt": "type Trigger string",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 51,
+      "excerpt": "func (t Trigger) Valid() bool {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 132,
+      "excerpt": "if !trigger.Valid() {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/sync/sync.go",
+      "line": 139,
+      "excerpt": "Trigger:   trigger,",
+      "line_confirmed": true
+    },
+    {
+      "file": "cmd/strspc/main.go",
+      "line": 432,
+      "excerpt": "func detectTrigger() sync.Trigger {",
+      "line_confirmed": true
+    }
+  ]
+}

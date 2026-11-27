@@ -1,0 +1,49 @@
+{
+  "rule_id": "CNFLENT-014",
+  "revision": 0,
+  "body_hash": "blake3:7f114f8607f4828a68a4e528ef3d3f75f48ce2c7a874372f37694c5b92c346a2",
+  "promoted_at": "2026-11-27T07:16:26Z",
+  "entity_version": "0.21.0",
+  "scope": "all tracked files",
+  "files": 149,
+  "files_hash": "a66b9fd4696bcbf36c82acf3e93aa88e57364144b3ebae0dfe87c666ab594300",
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "audit_prompt": "audit-a2+v8/effort=medium/split=100000,40,2/1",
+  "min_confidence": 0.8,
+  "verdict": "compliant",
+  "confidence": 0.9,
+  "explanation": "The section-overlap type is detected when the same section name appears in more than one marker-managed file of the same target repo, and entries are emitted with warning severity, as the rule requires.",
+  "evidence": [
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 101,
+      "excerpt": "func (s *Scanner) checkSectionOverlap(ctx context.Context, targets []string) []ConflictEntry {",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 120,
+      "excerpt": "first, ok := owners[name]",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 126,
+      "excerpt": "Severity:    SeverityWarning,",
+      "line_confirmed": true
+    },
+    {
+      "file": "internal/conflict/tier2.go",
+      "line": 127,
+      "excerpt": "Type:        TypeSectionOverlap,",
+      "line_confirmed": true
+    },
+    {
+      "file": "tests/e2e/monitor_conflict_test.go",
+      "line": 277,
+      "excerpt": "if got := mcEntryTypes(rep, conflict.SeverityWarning); got[conflict.TypeSectionOverlap] != 1 || len(got) != 1 {",
+      "line_confirmed": true
+    }
+  ]
+}

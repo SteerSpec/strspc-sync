@@ -6,9 +6,9 @@
     "description": "A single execution of the synchronization process."
   },
   "rule_set": {
-    "version": "0.16.0",
-    "timestamp": "2026-11-26T20:01:43Z",
-    "hash": "blake3:ac47ecdc6377b05c4d0c846e1f1e70cd960a3611410a034a73600c2745887eab"
+    "version": "0.17.0",
+    "timestamp": "2026-11-27T07:15:14Z",
+    "hash": "blake3:becb29537d1ba6be7b427df6bcef8d916823cbdedb28220a0df954738058f45a"
   },
   "rules": [
     {
@@ -32,7 +32,7 @@
     {
       "id": "SYNCOP-003",
       "revision": 0,
-      "state": "P",
+      "state": "I",
       "body": "HAS a trigger type which MUST be one of: \"push\", \"manual\", \"schedule\".",
       "added_by": "github:pleberre",
       "added_at": "2026-03-07",
