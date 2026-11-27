@@ -24,7 +24,7 @@ const bundleBranchPrefix = "steerspec-sync/repo/"
 // and joined by "\n" with no trailing newline.
 func bundleBranch(entries []string) string {
 	sorted := slices.Clone(entries)
-	slices.Sort(sorted)
+	slices.Sort(sorted) // Go orders strings by their bytes: a bytewise sort of the UTF-8 entries
 	sum := strings.TrimPrefix(hash.HashString(strings.Join(sorted, "\n")), "b3_")
 	return bundleBranchPrefix + sum[:8]
 }
