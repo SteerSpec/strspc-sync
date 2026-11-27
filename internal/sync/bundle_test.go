@@ -456,3 +456,30 @@ func TestBundleCommitFailureDropsBranch(t *testing.T) {
 		t.Errorf("errors = %d status = %s, want 3 errors, failed", result.Errors, result.Status)
 	}
 }
+
+// SYNCOP-009: a dry run over a bundle that has nothing new looks the PR up but records nothing, not even in memory.
+func TestBundleDryRunRecordsNoPRStatus(t *testing.T) {
+	repoSvc := newMockRepoService()
+	setupBundleRepos(repoSvc)
+	prSvc := newBundlePRService()
+	cfg := bundleConfig(config.PRGroupingRepo)
+	runSync(t, cfg, repoSvc, prSvc, Options{})
+	prSvc.prs["testorg/repo-a"][0].State = "closed"
+
+	s := New(cfg, &gh.Client{Repos: repoSvc, PullRequests: prSvc}, "testorg", "central")
+	result, err := s.Run(context.Background(), Options{Trigger: TriggerManual, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"org", "team", "settings"} {
+		if ts := s.state.GetTemplateState("testorg/repo-a", id); ts == nil || ts.PRStatus != "open" {
+			t.Errorf("dry run changed the record of %s: %+v", id, ts)
+		}
+	}
+	// The run still reports what a real run would.
+	for _, rr := range result.RepoResults {
+		if !strings.Contains(rr.Error, "closed without merging") {
+			t.Errorf("%s: error %q, want closed without merging", rr.TemplateID, rr.Error)
+		}
+	}
+}

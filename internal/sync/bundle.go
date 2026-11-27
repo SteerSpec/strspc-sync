@@ -114,7 +114,14 @@ func (s *Syncer) deliverBundle(ctx context.Context, target registry.ResolvedTarg
 		var status string
 		var pr *gh.PullRequest
 		for i, m := range members {
-			st, p := s.refreshPRStatus(ctx, owner, repo, target.Repo, m.tmpl.ID, m.r.prev)
+			var st string
+			var p *gh.PullRequest
+			if dryRun {
+				// A dry run writes nothing (SYNCOP-009): the PR is looked up, the records are left as they are.
+				st, p = s.lookupPRStatus(ctx, owner, repo, m.r.prev)
+			} else {
+				st, p = s.refreshPRStatus(ctx, owner, repo, target.Repo, m.tmpl.ID, m.r.prev)
+			}
 			if i == 0 {
 				status, pr = st, p
 			}
@@ -220,6 +227,26 @@ func (s *Syncer) deliverBundle(ctx context.Context, target registry.ResolvedTarg
 	}
 	s.stateMu.Unlock()
 	return results
+}
+
+// lookupPRStatus is the status of prev's PR as refreshPRStatus would record it, without recording it: the recorded
+// status when it is final ("merged", "superseded") or the PR cannot be read, otherwise the PR's current one.
+func (s *Syncer) lookupPRStatus(ctx context.Context, owner, repo string, prev *state.TemplateState,
+) (string, *gh.PullRequest) {
+	if prev == nil {
+		return "", nil
+	}
+	if prev.PRNumber == 0 || prev.PRStatus == "merged" || prev.PRStatus == prSuperseded {
+		return prev.PRStatus, nil
+	}
+	pr, err := s.ghClient.PullRequests.Get(ctx, owner, repo, prev.PRNumber)
+	if err != nil || pr == nil {
+		return prev.PRStatus, nil
+	}
+	if pr.State == "closed" && pr.Merged {
+		return "merged", pr
+	}
+	return pr.State, pr
 }
 
 // recordedOnOnePR reports whether every member renders as its record says, and all records name the same sync PR
