@@ -1913,149 +1913,6 @@ func TestTargetCleanupWarningRedactedForPublicCentral(t *testing.T) {
 	}
 }
 
-// A public central repository's issues are public. A conflict about a private or internal repository gets a stub
-// there, naming nothing, and its full issue in that repository; a public target, or a non-public central repository,
-// gets the full issue centrally.
-func TestConflictRedactedInPublicCentral(t *testing.T) {
-	for _, tc := range []struct {
-		name         string
-		visibility   map[string]string
-		visErr       error
-		wantIn       []string
-		wantRedacted int
-	}{
-		{"private central", map[string]string{"org/central": "private"}, nil, []string{"org/central"}, 0},
-		{"public central, private target", map[string]string{"org/central": "public"}, nil, []string{"org/central", "org/repo1"}, 1},
-		{"public central, internal target", map[string]string{"org/central": "public", "org/repo1": "internal"}, nil, []string{"org/central", "org/repo1"}, 1},
-		{"public central, public target", map[string]string{"org/central": "public", "org/repo1": "public"}, nil, []string{"org/central"}, 0},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			repos, ds := driftSetup("org/repo1")
-			repos.visibility, repos.visibilityErr = tc.visibility, tc.visErr
-			issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
-			report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
-				Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !slices.Equal(issues.createdIn, tc.wantIn) || report.IssuesRedacted != tc.wantRedacted {
-				t.Fatalf("created in %v, redacted %d; want %v, %d", issues.createdIn, report.IssuesRedacted, tc.wantIn, tc.wantRedacted)
-			}
-			central := issues.created[0]
-			if tc.wantRedacted == 0 {
-				return
-			}
-			if central.Title != "[SteerSpec Conflict] version-drift: non-public repository" ||
-				strings.Contains(central.Title+central.Body, "repo1") || strings.Contains(central.Body, reposPrefix) ||
-				!strings.Contains(central.Body, repoHashesPrefix+repoHash("org/repo1")) {
-				t.Errorf("central stub names the repository or lacks its hash:\n%s\n%s", central.Title, central.Body)
-			}
-			private := issues.created[1]
-			if private.Title != "[SteerSpec Conflict] version-drift: CLAUDE.md" ||
-				!strings.Contains(private.Body, "has drifted") || !strings.Contains(private.Body, "org/central#1") {
-				t.Errorf("private issue lacks the details or the pointer to the stub:\n%s\n%s", private.Title, private.Body)
-			}
-		})
-	}
-}
-
-// A conflict whose central issue becomes a stub keeps both issues current (CNFLACT-016): the central one is retitled
-// and redacted, and its issue in the private repository is updated with the details, not moved or closed.
-func TestRedactedConflictKeepsBothIssuesCurrent(t *testing.T) {
-	repos, ds := driftSetup("org/repo1")
-	repos.visibility = map[string]string{"org/central": "public"}
-	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
-	target := &gh.Issue{
-		Number: 50, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
-		Labels: []string{"steerspec-conflict"}, Body: fingerprintPrefix + fp + fingerprintSuffix,
-	}
-	central := &gh.Issue{
-		Number: 51, Title: "[SteerSpec Conflict] version-drift: org/repo1/CLAUDE.md", State: "open",
-		Labels: []string{"steerspec-conflict"},
-		Body:   "old details\n\n" + fingerprintPrefix + fp + fingerprintSuffix + "\n" + reposPrefix + "org/repo1" + fingerprintSuffix,
-	}
-	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {target}, "org/central": {central}}}
-	report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
-		Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(issues.closed) != 0 || len(issues.created) != 0 || len(issues.updated) != 2 || report.IssuesRedacted != 1 {
-		t.Fatalf("closed %v, created %d, updated %d, redacted %d; want both issues updated, none closed or created",
-			issues.closed, len(issues.created), len(issues.updated), report.IssuesRedacted)
-	}
-	if central.Title != "[SteerSpec Conflict] version-drift: non-public repository" || strings.Contains(central.Body, "repo1") {
-		t.Errorf("central issue not redacted:\n%s\n%s", central.Title, central.Body)
-	}
-	if !strings.Contains(target.Body, "has drifted") || !strings.Contains(target.Body, "org/central#51") {
-		t.Errorf("private issue lacks the details or the pointer:\n%s", target.Body)
-	}
-}
-
-// An aggregate issue's marker keeps participants this run did not scan. In a public central repository, publication
-// is decided on that merged list: a retained private participant turns the update into a stub instead of republishing
-// its name, and the retained participant's hash is kept for cleanup.
-func TestAggregateRedactedForRetainedPrivateParticipant(t *testing.T) {
-	repos := &mockRepoService{
-		files: map[string][]byte{
-			"org/a/.claude/skills/test.md": []byte("v1"),
-			"org/b/.claude/skills/test.md": []byte("v2"),
-		},
-		visibility: map[string]string{"org/central": "public", "org/a": "public", "org/b": "public", "org/c": "private"},
-	}
-	fp := hash.Fingerprint(string(TypeDuplicateSkill), "org/central", ".claude/skills/test.md")
-	issue := &gh.Issue{
-		Number: 70, Title: "[SteerSpec Conflict] duplicate-skill: .claude/skills/test.md", State: "open",
-		Labels: []string{"steerspec-conflict"},
-		Body: fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix +
-			"\n" + reposPrefix + "org/a, org/b, org/c" + fingerprintSuffix,
-	}
-	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {issue}}}
-	// org/c is not scanned this run, so the marker keeps it.
-	report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
-		Run(context.Background(), state.NewDeploymentState(), []string{"org/a", "org/b"}, Options{Tiers: []int{2}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(issues.created) != 0 || len(issues.closed) != 0 || report.IssuesRedacted != 1 {
-		t.Fatalf("created %d, closed %v, redacted %d; want the issue redacted in place",
-			len(issues.created), issues.closed, report.IssuesRedacted)
-	}
-	if strings.Contains(issue.Body, "org/c") || !strings.Contains(issue.Body, repoHash("org/c")) {
-		t.Errorf("stub must drop the names and keep org/c's hash:\n%s", issue.Body)
-	}
-}
-
-// A stub holds hashes only: cleanup checks its coverage through them, so it closes once every hashed repository was
-// scanned cleanly and the conflict is gone, and keeps it while one was not scanned.
-func TestRedactedIssueClosedByHashCoverage(t *testing.T) {
-	content := []byte("# In sync")
-	repos := &mockRepoService{files: map[string][]byte{"org/repo1/CLAUDE.md": content, "org/repo2/CLAUDE.md": content}}
-	ds := state.NewDeploymentState()
-	for _, r := range []string{"org/repo1", "org/repo2"} {
-		ds.SetTemplateState(r, "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
-	}
-	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
-	for _, tc := range []struct {
-		targets   []string
-		wantClose bool
-	}{{[]string{"org/repo2"}, false}, {[]string{"org/repo1", "org/repo2"}, true}} {
-		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
-			Number: 80, Title: "[SteerSpec Conflict] version-drift: non-public repository", State: "open",
-			Labels: []string{"steerspec-conflict"},
-			Body: withheldNotice + "\n\n" + fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix +
-				string(TypeVersionDrift) + fingerprintSuffix + "\n" + repoHashesPrefix + repoHash("org/repo1") + fingerprintSuffix,
-		}}}}
-		if _, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
-			Run(context.Background(), ds, tc.targets, Options{Tiers: []int{1}}); err != nil {
-			t.Fatal(err)
-		}
-		if got := slices.Contains(issues.closed, 80); got != tc.wantClose {
-			t.Errorf("targets %v: closed %v, want closed %v", tc.targets, issues.closed, tc.wantClose)
-		}
-	}
-}
-
 // A visibility that cannot be read is not guessed. Unreadable central visibility writes and closes nothing; an
 // unreadable target, with a public central repository, leaves that conflict's issues as they are. Either way the run
 // returns an error that names no repository.
@@ -2086,5 +1943,293 @@ func TestUnreadableVisibilityWritesNothing(t *testing.T) {
 				t.Errorf("updated %d, created %d, closed %v; want nothing written", len(issues.updated), len(issues.created), issues.closed)
 			}
 		})
+	}
+}
+
+const testHashKey = "test-key"
+
+// keyedScanner returns a scanner holding testHashKey, to compute the keyed values a stub carries.
+func keyedScanner() *Scanner { return &Scanner{hashKey: []byte(testHashKey)} }
+
+// runKeyed runs tier tiers with testHashKey, as the action does with its hash-key input.
+func runKeyed(t *testing.T, repos *mockRepoService, issues *mockIssueService, ds *state.DeploymentState, targets []string,
+	tiers ...int,
+) *ConflictReport {
+	t.Helper()
+	report, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+		Run(context.Background(), ds, targets, Options{Tiers: tiers, HashKey: testHashKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return report
+}
+
+// A public central repository's issues are public. A conflict about a private or internal repository gets a stub
+// there, naming nothing and carrying only keyed values, and its full issue in that repository; a public target, or a
+// non-public central repository, gets the full issue centrally.
+func TestConflictRedactedInPublicCentral(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		visibility   map[string]string
+		wantIn       []string
+		wantRedacted int
+	}{
+		{"private central", map[string]string{"org/central": "private"}, []string{"org/central"}, 0},
+		{"public central, private target", map[string]string{"org/central": "public"}, []string{"org/central", "org/repo1"}, 1},
+		{"public central, internal target", map[string]string{"org/central": "public", "org/repo1": "internal"}, []string{"org/central", "org/repo1"}, 1},
+		{"public central, public target", map[string]string{"org/central": "public", "org/repo1": "public"}, []string{"org/central"}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repos, ds := driftSetup("org/repo1")
+			repos.visibility = tc.visibility
+			issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+			report := runKeyed(t, repos, issues, ds, []string{"org/repo1"}, 1)
+			if !slices.Equal(issues.createdIn, tc.wantIn) || report.IssuesRedacted != tc.wantRedacted {
+				t.Fatalf("created in %v, redacted %d; want %v, %d", issues.createdIn, report.IssuesRedacted, tc.wantIn, tc.wantRedacted)
+			}
+			if tc.wantRedacted == 0 {
+				return
+			}
+			k := keyedScanner()
+			stub := issues.created[0]
+			unkeyed := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+			if stub.Title != "[SteerSpec Conflict] version-drift: non-public repository" ||
+				strings.Contains(stub.Title+stub.Body, "repo1") || strings.Contains(stub.Body, "CLAUDE.md") ||
+				strings.Contains(stub.Body, unkeyed) || strings.Contains(stub.Body, reposPrefix) ||
+				!strings.Contains(stub.Body, k.stubFP(TypeVersionDrift, "org/repo1", "CLAUDE.md")) ||
+				!strings.Contains(stub.Body, repoHashesPrefix+k.stubRepoHash("org/repo1")) {
+				t.Errorf("stub names something or lacks its keyed values:\n%s\n%s", stub.Title, stub.Body)
+			}
+			private := issues.created[1]
+			if private.Title != "[SteerSpec Conflict] version-drift: CLAUDE.md" ||
+				!strings.Contains(private.Body, "has drifted") || !strings.Contains(private.Body, "org/central#1") {
+				t.Errorf("private issue lacks the details or the pointer to the stub:\n%s\n%s", private.Title, private.Body)
+			}
+		})
+	}
+}
+
+// Without the hash key, a conflict that needs a stub is not filed, and the run says why; a publishable one still is.
+func TestStubNeedsHashKey(t *testing.T) {
+	repos, ds := driftSetup("org/repo1", "org/repo2")
+	repos.visibility = map[string]string{"org/central": "public", "org/repo2": "public"}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+	_, err := New(testConfig(), newTestClient(repos, issues), "org", "central").
+		Run(context.Background(), ds, []string{"org/repo1", "org/repo2"}, Options{Tiers: []int{1}})
+	if !errors.Is(err, errNoHashKey) {
+		t.Fatalf("err = %v, want errNoHashKey", err)
+	}
+	if !slices.Equal(issues.createdIn, []string{"org/central"}) || strings.Contains(issues.created[0].Title, "repo1") {
+		t.Errorf("created %v (%+v); want only org/repo2's issue", issues.createdIn, issues.created)
+	}
+}
+
+// A full central issue whose details must now be hidden is closed, not edited, since its title and body history
+// would keep them: a fresh stub replaces it, and the private issue is kept current (CNFLACT-016).
+func TestFullIssueReplacedByFreshStub(t *testing.T) {
+	repos, ds := driftSetup("org/repo1")
+	repos.visibility = map[string]string{"org/central": "public"}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	target := &gh.Issue{
+		Number: 50, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+		Labels: []string{"steerspec-conflict"}, Body: fingerprintPrefix + fp + fingerprintSuffix,
+	}
+	central := &gh.Issue{
+		Number: 51, Title: "[SteerSpec Conflict] version-drift: org/repo1/CLAUDE.md", State: "open",
+		Labels: []string{"steerspec-conflict"},
+		Body:   "old details\n\n" + fingerprintPrefix + fp + fingerprintSuffix + "\n" + reposPrefix + "org/repo1" + fingerprintSuffix,
+	}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/repo1": {target}, "org/central": {central}}}
+	report := runKeyed(t, repos, issues, ds, []string{"org/repo1"}, 1)
+	if !slices.Equal(issues.closed, []int{51}) || !slices.Equal(issues.createdIn, []string{"org/central"}) ||
+		len(issues.updated) != 1 || report.IssuesMoved != 1 || report.IssuesRedacted != 1 {
+		t.Fatalf("closed %v, created in %v, updated %d, report %+v; want #51 closed, a stub opened, #50 updated",
+			issues.closed, issues.createdIn, len(issues.updated), report)
+	}
+	if issues.created[0].Title != "[SteerSpec Conflict] version-drift: non-public repository" || issues.updated[0].number == 51 {
+		t.Errorf("the old issue must be closed unedited and the new one a stub: updated #%d, new %q",
+			issues.updated[0].number, issues.created[0].Title)
+	}
+	if !strings.Contains(target.Body, "has drifted") || !strings.Contains(target.Body, "org/central#1") {
+		t.Errorf("private issue lacks the details or the pointer:\n%s", target.Body)
+	}
+
+	// The next run updates the stub in place and creates nothing more.
+	issues.closed, issues.created, issues.createdIn, issues.updated = nil, nil, nil, nil
+	stub := &gh.Issue{Number: 1, Title: withheldTitle(TypeVersionDrift), State: "open", Labels: []string{"steerspec-conflict"}}
+	stub.Body = keyedStubBody(TypeVersionDrift, "org/repo1", "CLAUDE.md")
+	issues.repoIssues["org/central"] = []*gh.Issue{stub}
+	runKeyed(t, repos, issues, ds, []string{"org/repo1"}, 1)
+	if len(issues.created) != 0 || len(issues.closed) != 0 || len(issues.updated) != 2 {
+		t.Errorf("rerun: created %d, closed %v, updated %d; want the stub and the private issue updated",
+			len(issues.created), issues.closed, len(issues.updated))
+	}
+}
+
+// keyedStubBody is the stub body a run with testHashKey writes for a conflict about repo.
+func keyedStubBody(typ ConflictType, repo, path string) string {
+	k := keyedScanner()
+	return withheldNotice + "\n\n" + fingerprintPrefix + k.stubFP(typ, repo, path) + fingerprintSuffix + "\n" + typePrefix +
+		string(typ) + fingerprintSuffix + "\n" + repoHashesPrefix + k.stubRepoHash(repo) + fingerprintSuffix
+}
+
+// A stub shows its details again once the central repository is not public: it is updated in place and retitled, and
+// the private issue, now a duplicate, is closed with a pointer to it.
+func TestStubRestoredWhenCentralNotPublic(t *testing.T) {
+	repos, ds := driftSetup("org/repo1")
+	repos.visibility = map[string]string{"org/central": "private"}
+	fp := hash.Fingerprint(string(TypeVersionDrift), "org/repo1", "CLAUDE.md")
+	stub := &gh.Issue{
+		Number: 60, Title: withheldTitle(TypeVersionDrift), State: "open", Labels: []string{"steerspec-conflict"},
+		Body: keyedStubBody(TypeVersionDrift, "org/repo1", "CLAUDE.md"),
+	}
+	private := &gh.Issue{
+		Number: 61, Title: "[SteerSpec Conflict] version-drift: CLAUDE.md", State: "open",
+		Labels: []string{"steerspec-conflict"}, Body: "details\n\n" + fingerprintPrefix + fp + fingerprintSuffix,
+	}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {stub}, "org/repo1": {private}}}
+	report := runKeyed(t, repos, issues, ds, []string{"org/repo1"}, 1)
+	if len(issues.created) != 0 || !slices.Equal(issues.closed, []int{61}) || report.IssuesMoved != 1 {
+		t.Fatalf("created %d, closed %v, report %+v; want the stub restored and #61 moved", len(issues.created), issues.closed, report)
+	}
+	if stub.Title != "[SteerSpec Conflict] version-drift: org/repo1/CLAUDE.md" || !strings.Contains(stub.Body, "has drifted") {
+		t.Errorf("stub not restored:\n%s\n%s", stub.Title, stub.Body)
+	}
+}
+
+// A duplicate skill involving private repositories gets a stub centrally and a full issue in each private
+// participant, naming itself and the public participants only.
+func TestAggregatePrivateCopies(t *testing.T) {
+	repos := &mockRepoService{
+		files: map[string][]byte{
+			"org/a/.claude/skills/test.md": []byte("v1"),
+			"org/b/.claude/skills/test.md": []byte("v2"),
+			"org/c/.claude/skills/test.md": []byte("v3"),
+		},
+		visibility: map[string]string{"org/central": "public", "org/a": "public", "org/b": "private", "org/c": "internal"},
+	}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+	report := runKeyed(t, repos, issues, state.NewDeploymentState(), []string{"org/a", "org/b", "org/c"}, 2)
+	if !slices.Equal(issues.createdIn, []string{"org/central", "org/b", "org/c"}) || report.IssuesRedacted != 1 {
+		t.Fatalf("created in %v, redacted %d; want a stub and copies in org/b and org/c", issues.createdIn, report.IssuesRedacted)
+	}
+	for i, self := range map[int]string{1: "org/b", 2: "org/c"} {
+		other := map[string]string{"org/b": "org/c", "org/c": "org/b"}[self]
+		body := issues.created[i].Body
+		if !strings.Contains(body, self+" (this repository), org/a, and 1 other private or internal repositories.") ||
+			strings.Contains(strings.ReplaceAll(body, "org/central", ""), other) {
+			t.Errorf("%s copy must name itself and org/a only:\n%s", self, body)
+		}
+	}
+}
+
+// An aggregate issue's marker keeps participants this run did not scan. In a public central repository, publication
+// is decided on that merged list: a retained private participant turns the issue into a stub.
+func TestAggregateRedactedForRetainedPrivateParticipant(t *testing.T) {
+	repos := &mockRepoService{
+		files: map[string][]byte{
+			"org/a/.claude/skills/test.md": []byte("v1"),
+			"org/b/.claude/skills/test.md": []byte("v2"),
+		},
+		visibility: map[string]string{"org/central": "public", "org/a": "public", "org/b": "public", "org/c": "private"},
+	}
+	fp := hash.Fingerprint(string(TypeDuplicateSkill), "org/central", ".claude/skills/test.md")
+	issue := &gh.Issue{
+		Number: 70, Title: "[SteerSpec Conflict] duplicate-skill: .claude/skills/test.md", State: "open",
+		Labels: []string{"steerspec-conflict"},
+		Body: fingerprintPrefix + fp + fingerprintSuffix + "\n" + typePrefix + string(TypeDuplicateSkill) + fingerprintSuffix +
+			"\n" + reposPrefix + "org/a, org/b, org/c" + fingerprintSuffix,
+	}
+	issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {issue}}}
+	// org/c is not scanned this run, so the marker keeps it.
+	report := runKeyed(t, repos, issues, state.NewDeploymentState(), []string{"org/a", "org/b"}, 2)
+	if !slices.Equal(issues.closed, []int{70}) || !slices.Equal(issues.createdIn, []string{"org/central"}) || report.IssuesRedacted != 1 {
+		t.Fatalf("closed %v, created in %v, redacted %d; want #70 replaced by a stub", issues.closed, issues.createdIn, report.IssuesRedacted)
+	}
+	if strings.Contains(issues.created[0].Body, "org/") {
+		t.Errorf("stub names a repository:\n%s", issues.created[0].Body)
+	}
+}
+
+// A stub holds keyed hashes only: cleanup checks its coverage through them, so it closes once every repository it
+// concerns was scanned cleanly and the conflict is gone, and keeps it while one was not scanned.
+func TestRedactedIssueClosedByHashCoverage(t *testing.T) {
+	content := []byte("# In sync")
+	repos := &mockRepoService{
+		files:      map[string][]byte{"org/repo1/CLAUDE.md": content, "org/repo2/CLAUDE.md": content},
+		visibility: map[string]string{"org/central": "public"},
+	}
+	ds := state.NewDeploymentState()
+	for _, r := range []string{"org/repo1", "org/repo2"} {
+		ds.SetTemplateState(r, "claude-md", state.TemplateState{Version: "1.0.0", Hash: hash.HashBytes(content), Timestamp: time.Now()})
+	}
+	for _, tc := range []struct {
+		targets   []string
+		wantClose bool
+	}{{[]string{"org/repo2"}, false}, {[]string{"org/repo1", "org/repo2"}, true}} {
+		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{"org/central": {{
+			Number: 80, Title: withheldTitle(TypeVersionDrift), State: "open", Labels: []string{"steerspec-conflict"},
+			Body: keyedStubBody(TypeVersionDrift, "org/repo1", "CLAUDE.md"),
+		}}}}
+		runKeyed(t, repos, issues, ds, tc.targets, 1)
+		if got := slices.Contains(issues.closed, 80); got != tc.wantClose {
+			t.Errorf("targets %v: closed %v, want closed %v", tc.targets, issues.closed, tc.wantClose)
+		}
+	}
+}
+
+// A conflict below the threshold about a private repository opens nothing, but its open stub and private issue are
+// still updated (CNFLACT-016).
+func TestRedactedBelowThresholdUpdatesOnly(t *testing.T) {
+	repos := &mockRepoService{
+		files:      map[string][]byte{"org/repo1/CLAUDE.md": []byte("<!-- STEERSPEC:BEGIN:org -->\nedited\n<!-- STEERSPEC:END:org -->\n")},
+		visibility: map[string]string{"org/central": "public"},
+	}
+	ds := state.NewDeploymentState()
+	ds.SetTemplateState("org/repo1", "claude-md", state.TemplateState{
+		Version: "1.0.0", Hash: "h", Sections: []string{"org"}, SectionsHash: "s", Timestamp: time.Now(),
+	})
+	cfg := testConfig()
+	cfg.Conflicts.SeverityThreshold = "critical"
+	for _, existing := range []bool{false, true} {
+		issues := &mockIssueService{repoIssues: map[string][]*gh.Issue{}}
+		if existing {
+			issues.repoIssues["org/central"] = []*gh.Issue{{
+				Number: 85, Title: withheldTitle(TypeManualOverride), State: "open",
+				Labels: []string{"steerspec-conflict"}, Body: keyedStubBody(TypeManualOverride, "org/repo1", "CLAUDE.md"),
+			}}
+		}
+		if _, err := New(cfg, newTestClient(repos, issues), "org", "central").
+			Run(context.Background(), ds, []string{"org/repo1"}, Options{Tiers: []int{1}, HashKey: testHashKey}); err != nil {
+			t.Fatal(err)
+		}
+		wantUpdated := 0
+		if existing {
+			wantUpdated = 1
+		}
+		if len(issues.created) != 0 || len(issues.updated) != wantUpdated || len(issues.closed) != 0 {
+			t.Errorf("existing %v: created %d, updated %d, closed %v; want only the open stub updated",
+				existing, len(issues.created), len(issues.updated), issues.closed)
+		}
+	}
+}
+
+// A private issue the token cannot open does not fail the run, and its warning names nothing.
+func TestPrivateIssueFailureIsQuiet(t *testing.T) {
+	var buf bytes.Buffer
+	sslog.InitTo(&buf, slog.LevelInfo, sslog.FormatText)
+	defer sslog.InitTo(os.Stderr, slog.LevelInfo, sslog.FormatText)
+	repos, ds := driftSetup("org/secret")
+	repos.visibility = map[string]string{"org/central": "public"}
+	issues := &mockIssueService{
+		repoIssues: map[string][]*gh.Issue{},
+		listErr:    map[string]error{"org/secret": errors.New("403 on org/secret")},
+	}
+	report := runKeyed(t, repos, issues, ds, []string{"org/secret"}, 1)
+	if !slices.Equal(issues.createdIn, []string{"org/central"}) || report.IssuesRedacted != 1 {
+		t.Errorf("created in %v, redacted %d; want the stub only", issues.createdIn, report.IssuesRedacted)
+	}
+	if out := buf.String(); !strings.Contains(out, "non-public repository") || strings.Contains(out, "secret") {
+		t.Errorf("warning must exist and name nothing:\n%s", out)
 	}
 }

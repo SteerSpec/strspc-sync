@@ -2,6 +2,9 @@ package conflict
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -30,8 +33,8 @@ const (
 	// reposPrefix lists the repositories an aggregate (multi-repo) finding
 	// involves, so cleanup only closes it once every one of them was scanned.
 	reposPrefix = "<!-- steerspec-conflict-repos: "
-	// repoHashesPrefix lists the participants as repoHash values. Every issue carries it, so cleanup can check the
-	// coverage of an issue whose names are withheld from a public central repository.
+	// repoHashesPrefix lists a stub's participants as keyed hashes (stubRepoHash), so cleanup can check its
+	// coverage without their names.
 	repoHashesPrefix = "<!-- steerspec-conflict-repo-hashes: "
 )
 
@@ -39,6 +42,9 @@ const (
 type Options struct {
 	ConfigPath string
 	Tiers      []int
+	// HashKey keys the fingerprint and participant hashes of a stub, the central issue of a conflict about a private
+	// or internal repository when the central repository is public. Without it such conflicts are not filed.
+	HashKey string
 }
 
 // Scanner orchestrates conflict detection across target repositories.
@@ -61,6 +67,8 @@ type Scanner struct {
 	visibility map[string]string
 	// targetIssues caches the open issues of a target listed this run to keep a conflict's full issue there.
 	targetIssues map[string][]*gh.Issue
+	// hashKey keys the values a stub carries (Options.HashKey).
+	hashKey []byte
 }
 
 // noteMissingTracked records that a tracked destination was absent.
@@ -148,18 +156,6 @@ func (s *Scanner) mergeParticipants(current, previous, targets []string) []strin
 // whose names are withheld).
 func issueRepos(issue *gh.Issue) []string { return markerList(issue.Body, reposPrefix) }
 
-// issueRepoHashes recovers the participants of an issue as repoHash values: from the hashes marker, else from the
-// names marker; nil when it has neither, so its coverage is unknown.
-func issueRepoHashes(issue *gh.Issue) []string {
-	if hashes := markerList(issue.Body, repoHashesPrefix); hashes != nil {
-		return hashes
-	}
-	if names := issueRepos(issue); names != nil {
-		return repoHashes(names)
-	}
-	return nil
-}
-
 // markerList returns the comma-separated values of the marker starting with prefix in body, or nil.
 func markerList(body, prefix string) []string {
 	idx := strings.Index(body, prefix)
@@ -178,41 +174,6 @@ func markerList(body, prefix string) []string {
 		}
 	}
 	return values
-}
-
-// repoHash stands for a repository in an issue marker without naming it. Repository names are guessable, so it
-// hides a name from a casual reader, like the fingerprint, not from someone who tries candidates.
-func repoHash(repo string) string { return hash.Fingerprint("repo", repo) }
-
-func repoHashes(repos []string) []string {
-	hashes := make([]string, len(repos))
-	for i, r := range repos {
-		hashes[i] = repoHash(r)
-	}
-	return hashes
-}
-
-// mergeRepoHashes is mergeParticipants on repoHash values: current, plus every previous hash this run cannot vouch
-// for because no target scanned cleanly hashes to it.
-func (s *Scanner) mergeRepoHashes(current, previous, targets []string) []string {
-	vouched := make(map[string]bool, len(targets))
-	for _, t := range targets {
-		if !s.incomplete[t] {
-			vouched[repoHash(t)] = true
-		}
-	}
-	merged := repoHashes(current)
-	have := make(map[string]bool, len(merged))
-	for _, h := range merged {
-		have[h] = true
-	}
-	for _, h := range previous {
-		if !have[h] && !vouched[h] {
-			merged = append(merged, h)
-			have[h] = true
-		}
-	}
-	return merged
 }
 
 // typeFromTitle recovers the conflict type from an issue title of the form
@@ -290,6 +251,7 @@ func (s *Scanner) Run(ctx context.Context, deployState *state.DeploymentState, t
 	s.incomplete = make(map[string]bool)
 	s.missingTracked = make(map[string]map[string]bool)
 	s.targetIssues = make(map[string][]*gh.Issue)
+	s.hashKey = []byte(opts.HashKey)
 	ran := make(map[int]bool, len(tiers))
 	var tierErrs []error
 
@@ -389,49 +351,95 @@ func (s *Scanner) mayPublish(ctx context.Context, repos []string) (bool, error) 
 	return true, nil
 }
 
-// withheldTitle is the title of an issue whose details a public central repository does not show.
+// errNoHashKey stops a conflict that needs a stub when no key is set.
+var errNoHashKey = errors.New("a conflict about a private or internal repository needs a stub in the public central " +
+	"repository, and stubs need the conflict hash key (the action's hash-key input, STEERSPEC_CONFLICT_HASH_KEY); " +
+	"it was not filed")
+
+// keyed returns the HMAC-SHA256 of parts under the conflict hash key, truncated like a fingerprint. A stub in a public
+// central repository carries only keyed values: an unkeyed hash of a guessable repository name or path would let anyone
+// who tries candidates learn what the stub is about.
+func (s *Scanner) keyed(parts ...string) string {
+	m := hmac.New(sha256.New, s.hashKey)
+	for _, p := range parts {
+		m.Write([]byte(p))
+		m.Write([]byte{0})
+	}
+	return hex.EncodeToString(m.Sum(nil)[:16])
+}
+
+// stubFP is the fingerprint a stub carries for the conflict of type typ about path in repo.
+func (s *Scanner) stubFP(typ ConflictType, repo, path string) string {
+	return s.keyed("fingerprint", string(typ), repo, path)
+}
+
+// stubRepoHash stands for a participant in a stub's marker, so cleanup can check its coverage without its name.
+func (s *Scanner) stubRepoHash(repo string) string { return s.keyed("repo", repo) }
+
+func (s *Scanner) stubRepoHashes(repos []string) []string {
+	hashes := make([]string, len(repos))
+	for i, r := range repos {
+		hashes[i] = s.stubRepoHash(r)
+	}
+	return hashes
+}
+
+// mergeStubHashes is mergeParticipants on stub hashes: current, plus every previous hash this run cannot vouch for
+// because no target scanned cleanly hashes to it.
+func (s *Scanner) mergeStubHashes(current, previous, targets []string) []string {
+	vouched := make(map[string]bool, len(targets))
+	for _, t := range targets {
+		if !s.incomplete[t] {
+			vouched[s.stubRepoHash(t)] = true
+		}
+	}
+	merged := s.stubRepoHashes(current)
+	have := make(map[string]bool, len(merged))
+	for _, h := range merged {
+		have[h] = true
+	}
+	for _, h := range previous {
+		if !have[h] && !vouched[h] {
+			merged = append(merged, h)
+			have[h] = true
+		}
+	}
+	return merged
+}
+
+// isStub reports whether a central issue is a stub: details withheld from a public central repository.
+func isStub(issue *gh.Issue) bool { return strings.HasPrefix(issue.Body, withheldNotice) }
+
+// withheldTitle is the title of a stub.
 func withheldTitle(typ ConflictType) string {
 	return fmt.Sprintf("[SteerSpec Conflict] %s: non-public repository", typ)
 }
 
-// withheldNotice replaces the description of an issue whose details a public central repository does not show.
+// withheldNotice opens the body of a stub.
 const withheldNotice = "**Details withheld.** This conflict concerns a private or internal repository, and this " +
-	"repository is public, so the repository, its files and the description are not shown here. A conflict about " +
-	"one repository is described in an issue in that repository; the conflict report of the run lists every " +
-	"conflict. Make this repository private or internal to show the details here."
+	"repository is public, so the repositories, files and description are not shown here. They are in an issue in " +
+	"each private or internal repository concerned, and in the conflict report of the run. Make this repository " +
+	"private or internal to show them here."
 
-// fileInTarget keeps the full issue of a conflict whose central issue is a stub in the repository it concerns, where
-// only that repository's readers see it: the open issue is updated (CNFLACT-016), or one is opened when mayCreate is
-// set. It points to the central stub. It is best-effort, since the token may be scoped to the central repository,
-// and its warnings name nothing: the central repository's job logs are public.
-func (s *Scanner) fileInTarget(ctx context.Context, report *ConflictReport, entry ConflictEntry, fp, title string,
-	centralNumber int, mayCreate bool,
-) {
-	owner, name, err := splitRepo(entry.Repo)
+// fileInTarget keeps a conflict's full issue in a private or internal repository while its central issue is a stub:
+// the open issue matching fp or title is updated (CNFLACT-016), or one is opened when mayCreate is set. It is
+// best-effort, since the token may be scoped to the central repository, and its warnings name nothing: the central
+// repository's job logs are public.
+func (s *Scanner) fileInTarget(ctx context.Context, report *ConflictReport, repo, fp, title, body string, mayCreate bool) {
+	owner, name, err := splitRepo(repo)
 	if err != nil {
 		return
 	}
 	warn := func(msg string) { sslog.L().Warn("conflict: "+msg, "operation", "conflict") }
-	existing, listed := s.targetIssues[entry.Repo]
+	existing, listed := s.targetIssues[repo]
 	if !listed {
 		existing, err = s.ghClient.Issues.List(ctx, owner, name, &gh.IssueListOptions{State: "open"})
 		if err != nil {
 			warn("could not list the issues of a non-public repository to describe its conflict there")
 			return
 		}
-		s.targetIssues[entry.Repo] = existing
+		s.targetIssues[repo] = existing
 	}
-	body := entry.Description
-	if entry.SuggestedResolution != "" {
-		body += "\n\n**Suggested resolution:** " + entry.SuggestedResolution
-	}
-	if centralNumber != 0 {
-		body += fmt.Sprintf("\n\nTracked in %s/%s#%d without its details, since that repository is public.",
-			s.centralOwner, s.centralRepo, centralNumber)
-	}
-	body += "\n\n" + fingerprintPrefix + fp + fingerprintSuffix
-	body += "\n" + typePrefix + string(entry.Type) + fingerprintSuffix
-	body += "\n" + reposPrefix + entry.Repo + fingerprintSuffix
 	for _, issue := range existing {
 		if !issue.Trusted(s.cfg.Conflicts.IssueLabel) || (extractFingerprint(issue.Body) != fp && issue.Title != title) {
 			continue
@@ -454,7 +462,7 @@ func (s *Scanner) fileInTarget(ctx context.Context, report *ConflictReport, entr
 		return
 	}
 	if created != nil {
-		s.targetIssues[entry.Repo] = append(existing, created)
+		s.targetIssues[repo] = append(existing, created)
 	}
 	report.IssuesCreated++
 }
@@ -470,12 +478,19 @@ func (s *Scanner) threshold() Severity {
 	return SeverityWarning
 }
 
+// createIssuesForConflicts files every conflict at or above the threshold in the central repository (CNFLACT-006)
+// and updates the open issue of every conflict still detected (CNFLACT-016).
+//
+// A public central repository's issues are public. A conflict about a private or internal repository gets a stub
+// there, which names nothing and carries only keyed hashes, and a full issue in each private or internal repository
+// it concerns, pointing to the stub. A full central issue whose details must now be hidden is closed and replaced by a
+// fresh stub: its title and body history would keep them (an organization owner can delete it).
 func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *ConflictReport, targets []string, ran map[int]bool) error {
 	central := s.centralOwner + "/" + s.centralRepo
 	// Keys of every conflict detected this run, per repo the issue may be in, so issues whose conflict is gone can be
 	// closed afterwards (SteerSpec/strspc-sync#55). Under central: fingerprints and titles of the central issues.
-	// Under a target: the keys its own issues had before CNFLACT-006. A conflict below the threshold is remembered
-	// too: it is still there, so its issue is not closed as resolved.
+	// Under a target: the keys of its own issues. A conflict below the threshold is remembered too: it is still
+	// there, so its issue is not closed as resolved.
 	current := make(map[string]map[string]bool)
 	remember := func(repo, key string) {
 		if current[repo] == nil {
@@ -483,8 +498,8 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		}
 		current[repo][key] = true
 	}
-	// moved maps the keys of a conflict's issue in its target repository to the central issue that now tracks it,
-	// so cleanup can close the target copy (CNFLACT-007).
+	// moved maps the keys of a conflict's issue in a target repository to the central issue that now tracks it, so
+	// cleanup can close the target copy (CNFLACT-007).
 	moved := make(map[string]map[string]int)
 	move := func(repo, key string, number int) {
 		if moved[repo] == nil {
@@ -493,6 +508,14 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 		moved[repo][key] = number
 	}
 
+	// The central repository's visibility decides how every issue is written. When it cannot be read, nothing is
+	// written or closed: treating it as public would redact every issue about a private target and open their
+	// copies there, and treating it as private could publish private details.
+	if s.visibilityOf(ctx, central) == "" {
+		return errVisibility
+	}
+	var skipped []error
+
 	// The central repo's open issues, listed once. The label is not required: an issue whose label was removed or
 	// renamed is still found by its fingerprint or title, so it is updated rather than duplicated (CNFLACT-007/016).
 	// Both keys are specific to one conflict. An unlabeled issue counts only when a trusted author opened it, so a
@@ -500,14 +523,7 @@ func (s *Scanner) createIssuesForConflicts(ctx context.Context, report *Conflict
 	var openIssues []*gh.Issue
 	listed := false
 	threshold := s.threshold()
-
-	// The central repository's visibility decides how every issue is written. When it cannot be read, nothing is
-	// written or closed: treating it as public would redact every issue about a private target and open their
-	// copies there, and treating it as private could publish private details.
-	if s.visibilityOf(ctx, central) == "" {
-		return errVisibility
-	}
-	var visErr error
+	label := s.cfg.Conflicts.IssueLabel
 
 entries:
 	for _, entry := range report.Entries {
@@ -525,24 +541,34 @@ entries:
 		// The fingerprint names the repository the conflict concerns, so the same conflict in two repositories gets
 		// two issues. It is the fingerprint the issue had in that repository before CNFLACT-006.
 		fp := hash.Fingerprint(string(entry.Type), entry.Repo, entry.FilePath)
+		stubFP := s.stubFP(entry.Type, entry.Repo, entry.FilePath)
 		remember(central, fp)
 		remember(central, title)
-		var oldTitle string // the title of this conflict's issue in its own repository, before CNFLACT-006
-		if !aggregate {
-			oldTitle = targetTitle(entry.Type, entry.FilePath)
-			remember(entry.Repo, fp)
-			remember(entry.Repo, oldTitle)
+		remember(central, stubFP)
+		// The title of the conflict's issue in a target: before CNFLACT-006, and for a full issue in a private or
+		// internal repository behind a stub. A duplicate skill's copy in a participant has its own fingerprint.
+		ownTitle := targetTitle(entry.Type, entry.FilePath)
+		ownFP := func(repo string) string {
+			if !aggregate {
+				return fp
+			}
+			return hash.Fingerprint(string(entry.Type), repo, entry.FilePath)
+		}
+		for _, p := range participants {
+			remember(p, ownFP(p))
+			remember(p, ownTitle)
 		}
 		// Below the threshold a conflict gets no new issue, but an open one is still updated (CNFLACT-016).
 		mayCreate := severityRank[entry.Severity] >= severityRank[threshold]
-		// redacted is set when the central issue is a stub: the central repository is public and the conflict
-		// concerns a private or internal repository. Its details then live in an issue in that repository.
 		publishable, err := s.mayPublish(ctx, participants)
 		if err != nil {
-			visErr = err // remembered above, so its issues are kept; nothing is written for it
+			skipped = append(skipped, err) // remembered above, so its issues are kept; nothing is written for it
 			continue
 		}
-		redacted := !publishable
+		if !publishable && len(s.hashKey) == 0 {
+			skipped = append(skipped, errNoHashKey)
+			continue
+		}
 
 		// Before CNFLDTS-009 a duplicate-skill finding was keyed by the skill's bare filename. An open issue still
 		// keyed that way describes the same conflict, so it is updated and retitled to the full path rather than
@@ -553,28 +579,30 @@ entries:
 			legacyTitle = targetTitle(entry.Type, base)
 			legacyFP = hash.Fingerprint(string(entry.Type), entry.Repo, base)
 		} else if !aggregate && entry.Repo == central {
-			legacyTitle = oldTitle
+			legacyTitle = ownTitle
 		}
 		hidden := withheldTitle(entry.Type)
 
-		// renderBody writes the issue body: the full description with the participants' names when publish is set,
-		// otherwise a notice that names nothing. names nil omits the names marker, hashes nil the hashes marker
-		// (an aggregate issue from before the markers, whose coverage is unknown).
-		renderBody := func(publish bool, names, hashes []string) string {
-			var body string
-			if publish {
-				body = entry.Description
-				if entry.SuggestedResolution != "" {
-					body += "\n\n**Suggested resolution:** " + entry.SuggestedResolution
-				}
-			} else {
-				body = withheldNotice
+		// fullBody is the issue with its details: description, resolution, an optional note, then the markers.
+		fullBody := func(fingerprint, note string, names []string) string {
+			body := entry.Description
+			if entry.SuggestedResolution != "" {
+				body += "\n\n**Suggested resolution:** " + entry.SuggestedResolution
 			}
-			body += "\n\n" + fingerprintPrefix + fp + fingerprintSuffix
+			if note != "" {
+				body += "\n\n" + note
+			}
+			body += "\n\n" + fingerprintPrefix + fingerprint + fingerprintSuffix
 			body += "\n" + typePrefix + string(entry.Type) + fingerprintSuffix
-			if publish && len(names) > 0 {
+			if len(names) > 0 {
 				body += "\n" + reposPrefix + strings.Join(names, ", ") + fingerprintSuffix
 			}
+			return body
+		}
+		// stubBody names nothing: its fingerprint and participants are keyed.
+		stubBody := func(hashes []string) string {
+			body := withheldNotice + "\n\n" + fingerprintPrefix + stubFP + fingerprintSuffix
+			body += "\n" + typePrefix + string(entry.Type) + fingerprintSuffix
 			if len(hashes) > 0 {
 				body += "\n" + repoHashesPrefix + strings.Join(hashes, ", ") + fingerprintSuffix
 			}
@@ -582,7 +610,6 @@ entries:
 		}
 
 		if !listed {
-			var err error
 			openIssues, err = s.ghClient.Issues.List(ctx, s.centralOwner, s.centralRepo, &gh.IssueListOptions{State: "open"})
 			if err != nil {
 				return fmt.Errorf("listing issues for %s: %w", central, err)
@@ -591,112 +618,192 @@ entries:
 		}
 
 		number := 0
+		redacted := !publishable
+		replace := false // a full issue was closed for a stub, which is opened even below the threshold
 		for _, issue := range openIssues {
-			if !issue.Trusted(s.cfg.Conflicts.IssueLabel) {
+			if !issue.Trusted(label) {
 				continue
 			}
 			issueFP := extractFingerprint(issue.Body)
-			isCurrent := issueFP == fp || issue.Title == title
-			legacyKey := legacyTitle != "" && ((legacyFP != "" && issueFP == legacyFP) || issue.Title == legacyTitle)
+			stub := isStub(issue)
+			isCurrent := issueFP == fp || (stub && issueFP == stubFP) || (!stub && issue.Title == title)
+			legacyKey := !stub && legacyTitle != "" &&
+				((legacyFP != "" && issueFP == legacyFP) || issue.Title == legacyTitle)
 			if !isCurrent && !legacyKey {
 				continue
 			}
 			// The participants the update writes. An aggregate issue keeps previously recorded participants this run
 			// could not vouch for (unscanned or failed read), so a later cleanup still requires their coverage. One
 			// that predates the markers has an unknown participant list: it stays without one, so cleanup never
-			// closes it on partial evidence (it needs a human to close). A withheld issue keeps hashes only, so its
-			// names are unknown.
-			names, hashes := participants, repoHashes(participants)
+			// closes it on partial evidence (it needs a human to close). A stub holds keyed hashes, not names.
+			names := participants
+			var hashes []string
 			if aggregate {
-				prevNames, prevHashes := issueRepos(issue), issueRepoHashes(issue)
-				switch {
-				case prevHashes == nil:
-					names, hashes = nil, nil
-				case prevNames == nil:
-					names, hashes = nil, s.mergeRepoHashes(participants, prevHashes, targets)
+				switch prev := issueRepos(issue); {
+				case stub:
+					names = nil
+					hashes = s.mergeStubHashes(participants, markerList(issue.Body, repoHashesPrefix), targets)
+				case prev == nil:
+					names = nil
 				default:
-					names = s.mergeParticipants(participants, prevNames, targets)
-					hashes = repoHashes(names)
+					names = s.mergeParticipants(participants, prev, targets)
 				}
 			}
-			// Publication is decided on the participants written, not only the ones found this run. Names a
-			// withheld issue no longer holds cannot be checked, so it stays withheld in a public central repository.
-			var publish bool
+			// Publication is decided on the participants written, not only the ones found this run. A stub's
+			// retained names are unknown, so only a central repository that is not public shows its details again.
+			publish := publishable
 			switch {
 			case names != nil:
 				ok, err := s.mayPublish(ctx, names)
 				if err != nil {
-					visErr = err
+					skipped = append(skipped, err)
 					continue entries
 				}
 				publish = ok
-			case hashes == nil:
-				publish = publishable
-			default:
-				publish = !s.centralPublic(ctx)
+			case stub:
+				publish = publishable && !s.centralPublic(ctx)
 			}
-			body := renderBody(publish, names, hashes)
-			want := title
+			if !publish && len(s.hashKey) == 0 {
+				skipped = append(skipped, errNoHashKey)
+				continue entries
+			}
 			redacted = !publish
-			if !publish {
-				want = hidden
+
+			switch {
+			case publish:
+				// Retitle an issue titled as a stub or with a legacy title, and one found only by a legacy key. An
+				// issue found by its current fingerprint otherwise keeps any other title someone gave it.
+				body := fullBody(fp, "", names)
+				retitle := issue.Title != title &&
+					(stub || (legacyTitle != "" && issue.Title == legacyTitle) || !isCurrent)
+				update := &gh.IssueUpdate{Body: &body}
+				if retitle {
+					update.Title = &title
+				}
+				if err := s.ghClient.Issues.Update(ctx, s.centralOwner, s.centralRepo, issue.Number, update); err != nil {
+					return fmt.Errorf("updating issue for %s: %w", central, err)
+				}
+				// Keep the listed copy current, so a later entry this run does not claim the same issue again.
+				issue.Body = body
+				if retitle {
+					issue.Title = title
+				}
+				number = issue.Number
+			case stub:
+				if hashes == nil {
+					hashes = s.stubRepoHashes(participants)
+				}
+				body := stubBody(hashes)
+				update := &gh.IssueUpdate{Body: &body}
+				if issue.Title != hidden {
+					update.Title = &hidden
+				}
+				if err := s.ghClient.Issues.Update(ctx, s.centralOwner, s.centralRepo, issue.Number, update); err != nil {
+					return fmt.Errorf("updating issue for %s: %w", central, err)
+				}
+				issue.Body, issue.Title = body, hidden
+				number = issue.Number
+			default:
+				// A full issue whose details must now be hidden. Editing it would keep them in its title and body
+				// history, so it is closed and a fresh stub opened; an organization owner can delete the old one.
+				if err := s.ghClient.Issues.Close(ctx, s.centralOwner, s.centralRepo, issue.Number); err != nil {
+					return fmt.Errorf("closing issue #%d in %s: %w", issue.Number, central, err)
+				}
+				issue.Body, issue.Title = "", "" // no later entry claims it
+				report.IssuesMoved++
+				replace = true
 			}
-			// Retitle an issue still titled with a legacy or withheld title, one found only by a legacy key, and
-			// one whose details are now withheld. An issue found by its current fingerprint otherwise keeps any
-			// other title someone gave it.
-			retitle := issue.Title != want && (!publish || issue.Title == hidden ||
-				(legacyTitle != "" && issue.Title == legacyTitle) || !isCurrent)
-			update := &gh.IssueUpdate{Body: &body}
-			if retitle {
-				update.Title = &want
-			}
-			if err := s.ghClient.Issues.Update(ctx, s.centralOwner, s.centralRepo, issue.Number, update); err != nil {
-				return fmt.Errorf("updating issue for %s: %w", central, err)
-			}
-			// Keep the listed copy current, so a later entry this run does not claim the same issue again.
-			issue.Body = body
-			if retitle {
-				issue.Title = want
-			}
-			number = issue.Number
 			break
 		}
 
-		if number == 0 && mayCreate {
-			newTitle := title
+		if number == 0 && (mayCreate || replace) {
+			create := &gh.IssueCreate{Title: title, Body: fullBody(fp, "", participants), Labels: []string{label}}
 			if redacted {
-				newTitle = hidden
+				create.Title, create.Body = hidden, stubBody(s.stubRepoHashes(participants))
 			}
-			created, err := s.ghClient.Issues.Create(ctx, s.centralOwner, s.centralRepo, &gh.IssueCreate{
-				Title:  newTitle,
-				Body:   renderBody(!redacted, participants, repoHashes(participants)),
-				Labels: []string{s.cfg.Conflicts.IssueLabel},
-			})
+			created, err := s.ghClient.Issues.Create(ctx, s.centralOwner, s.centralRepo, create)
 			if err != nil {
 				return fmt.Errorf("creating issue for %s: %w", central, err)
 			}
 			if created != nil {
+				created.Body = create.Body
 				openIssues = append(openIssues, created)
 				number = created.Number
 			}
 			report.IssuesCreated++
 		}
-		switch {
-		case redacted:
+
+		if !redacted {
+			// Copies of this conflict in its targets, filed before CNFLACT-006 or behind a former stub, are now
+			// duplicates of the central issue.
 			if number != 0 {
-				report.IssuesRedacted++
+				for _, p := range participants {
+					if p != central {
+						move(p, ownFP(p), number)
+						move(p, ownTitle, number)
+					}
+				}
 			}
-			if !aggregate && entry.Repo != central {
-				s.fileInTarget(ctx, report, entry, fp, oldTitle, number, mayCreate)
+			continue
+		}
+		if number != 0 {
+			report.IssuesRedacted++
+		}
+		pointer := ""
+		if number != 0 {
+			pointer = fmt.Sprintf("Tracked in %s/%s#%d without its details, since that repository is public.",
+				s.centralOwner, s.centralRepo, number)
+		}
+		if !aggregate {
+			if entry.Repo != central {
+				s.fileInTarget(ctx, report, entry.Repo, fp, ownTitle, fullBody(fp, pointer, participants), mayCreate)
 			}
-		case !aggregate && entry.Repo != central && number != 0:
-			move(entry.Repo, fp, number)
-			move(entry.Repo, oldTitle, number)
+			continue
+		}
+		// A duplicate skill: a full issue in each private or internal participant, naming itself and the public
+		// participants only, so one team's repository does not learn another's private one.
+		var public []string
+		hiddenCount := 0
+		for _, p := range participants {
+			if s.visibilityOf(ctx, p) == "public" {
+				public = append(public, p)
+			} else {
+				hiddenCount++
+			}
+		}
+		for _, p := range participants {
+			if s.visibilityOf(ctx, p) == "public" || p == central {
+				continue
+			}
+			note := fmt.Sprintf("Repositories with this skill: %s (this repository)", p)
+			for _, q := range public {
+				note += ", " + q
+			}
+			if others := hiddenCount - 1; others > 0 {
+				note += fmt.Sprintf(", and %d other private or internal repositories", others)
+			}
+			note += "."
+			if pointer != "" {
+				note += " " + pointer
+			}
+			s.fileInTarget(ctx, report, p, ownFP(p), ownTitle, fullBody(ownFP(p), note, []string{p}), mayCreate)
 		}
 	}
 
 	autoClose := s.cfg.Conflicts.AutoClose == nil || *s.cfg.Conflicts.AutoClose
-	return errors.Join(s.closeResolvedIssues(ctx, report, targets, current, moved, ran, autoClose), visErr)
+	return errors.Join(append([]error{s.closeResolvedIssues(ctx, report, targets, current, moved, ran, autoClose)},
+		dedupeErrors(skipped)...)...)
+}
+
+// dedupeErrors keeps one of each error, so a run that skipped many conflicts for one reason says it once.
+func dedupeErrors(errs []error) []error {
+	var out []error
+	for _, e := range errs {
+		if !slices.Contains(out, e) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // closeResolvedIssues closes the open issues carrying the conflict label whose conflict is gone, when autoClose is
@@ -722,15 +829,23 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 	for _, t := range targets {
 		scanned[t] = true
 	}
-	// clean maps the repoHash of every target scanned with no failed read, so coverage can be checked on an issue
-	// that holds only hashes.
+	// An issue can only be closed when every participant was scanned this run and none of them had a failed read:
+	// by name, or for a stub by keyed hash.
+	covered := func(participants []string) bool {
+		for _, p := range participants {
+			if !scanned[p] || s.incomplete[p] {
+				return false
+			}
+		}
+		return len(participants) > 0
+	}
 	clean := make(map[string]bool, len(targets))
 	for _, t := range targets {
 		if !s.incomplete[t] {
-			clean[repoHash(t)] = true
+			clean[s.stubRepoHash(t)] = true
 		}
 	}
-	covered := func(hashes []string) bool {
+	coveredHashes := func(hashes []string) bool {
 		for _, h := range hashes {
 			if !clean[h] {
 				return false
@@ -748,6 +863,7 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 			for _, typ := range []ConflictType{TypeVersionDrift, TypeManualOverride} {
 				fp := hash.Fingerprint(string(typ), repo, path)
 				uncheckedCentral[fp] = true
+				uncheckedCentral[s.stubFP(typ, repo, path)] = true
 				uncheckedCentral[conflictTitle(typ, repo, path, false)] = true
 				uncheckedIn[repo][fp] = true
 				uncheckedIn[repo][targetTitle(typ, path)] = true
@@ -790,11 +906,15 @@ func (s *Scanner) closeResolvedIssues(ctx context.Context, report *ConflictRepor
 			if !resolvable(issue, uncheckedCentral) {
 				continue
 			}
-			if hashes := issueRepoHashes(issue); hashes != nil {
-				if !covered(hashes) {
+			if names := issueRepos(issue); names != nil {
+				if !covered(names) {
 					continue // not every repository it concerns was scanned cleanly this run
 				}
-			} else if issueType(issue) == TypeDuplicateSkill || !covered([]string{repoHash(central)}) {
+			} else if hashes := markerList(issue.Body, repoHashesPrefix); hashes != nil {
+				if !coveredHashes(hashes) {
+					continue // a stub: not every repository it concerns was scanned cleanly this run
+				}
+			} else if issueType(issue) == TypeDuplicateSkill || !covered([]string{central}) {
 				// An aggregate issue from before the participants marker has an unknown coverage, and any other
 				// marker-less issue predates CNFLACT-006: it is about the central repo's own files.
 				continue
