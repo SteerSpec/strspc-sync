@@ -61,6 +61,10 @@ func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, _, _, _, _ strin
 	return nil
 }
 
+func (m *mockRepoService) CommitFiles(_ context.Context, _, _, _, _ string, _ []gh.FileChange, _ string) error {
+	return nil
+}
+
 type mockIssueService struct {
 	issues  []*gh.Issue
 	created []*gh.Issue

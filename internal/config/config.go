@@ -72,7 +72,16 @@ type SyncBehavior struct {
 	// PRTitlePrefix is the same for SyncPullRequest titles. Defaults to
 	// DefaultPRTitlePrefix.
 	PRTitlePrefix string `yaml:"pr-title-prefix,omitempty"`
+	// PRGrouping is PRGroupingTemplate (one SyncPullRequest per template for a target) or PRGroupingRepo (one per
+	// target, carrying every template that is out of date for it) (SYNCCFG-031). Defaults to PRGroupingTemplate.
+	PRGrouping string `yaml:"pr-grouping,omitempty"`
 }
+
+// The values of sync.pr-grouping (SYNCCFG-031).
+const (
+	PRGroupingTemplate = "template"
+	PRGroupingRepo     = "repo"
+)
 
 // DefaultCommitPrefix and DefaultPRTitlePrefix are the conventional-commit
 // type(scope) used for sync commits and PR titles when the config does not set
@@ -160,6 +169,29 @@ func checkRepoPath(p string) error {
 	return nil
 }
 
+// checkTemplateID reports why id cannot name a template. Sync branches embed the id (SYNCPR-002, SYNCPR-008), so it
+// must be valid inside a git ref name. "/" is allowed between non-empty segments; a segment may not start with "."
+// or end with ".lock", and the id may not hold "..", "@{", a space, a control character or any of ~^:?*[\.
+func checkTemplateID(id string) error {
+	switch {
+	case strings.ContainsFunc(id, func(r rune) bool { return unicode.IsControl(r) || unicode.IsSpace(r) }):
+		return fmt.Errorf("must not contain whitespace or control characters")
+	case strings.ContainsAny(id, `~^:?*[\`):
+		return fmt.Errorf(`must not contain any of ~^:?*[\`)
+	case strings.Contains(id, ".."), strings.Contains(id, "@{"):
+		return fmt.Errorf(`must not contain ".." or "@{"`)
+	}
+	for _, seg := range strings.Split(id, "/") {
+		switch {
+		case seg == "":
+			return fmt.Errorf("must not have an empty segment (a leading, doubled or trailing /)")
+		case strings.HasPrefix(seg, "."), strings.HasSuffix(seg, ".lock"):
+			return fmt.Errorf(`must not have a segment starting with "." or ending with ".lock"`)
+		}
+	}
+	return nil
+}
+
 func Load(path string) (*SyncConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -196,6 +228,9 @@ func ApplyDefaults(cfg *SyncConfig) {
 	}
 	if cfg.Sync.PRTitlePrefix == "" {
 		cfg.Sync.PRTitlePrefix = DefaultPRTitlePrefix
+	}
+	if cfg.Sync.PRGrouping == "" {
+		cfg.Sync.PRGrouping = PRGroupingTemplate
 	}
 
 	if cfg.Monitor.IssueLabel == "" {
@@ -251,6 +286,13 @@ func Validate(cfg *SyncConfig) error {
 		}
 	}
 
+	switch cfg.Sync.PRGrouping {
+	case "", PRGroupingTemplate, PRGroupingRepo: // "" is the default, "template"
+	default:
+		return fmt.Errorf("sync.pr-grouping %q must be one of: %s, %s", cfg.Sync.PRGrouping, PRGroupingTemplate,
+			PRGroupingRepo)
+	}
+
 	if cfg.CentralRepo != "" {
 		if matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$`, cfg.CentralRepo); !matched {
 			return fmt.Errorf("central-repo must be in owner/repo format, got %q", cfg.CentralRepo)
@@ -265,6 +307,9 @@ func Validate(cfg *SyncConfig) error {
 	for i, tmpl := range cfg.Templates {
 		if tmpl.ID == "" {
 			return fmt.Errorf("templates[%d].id is required", i)
+		}
+		if err := checkTemplateID(tmpl.ID); err != nil {
+			return fmt.Errorf("templates[%d].id %q: %w", i, tmpl.ID, err)
 		}
 		if seen[tmpl.ID] {
 			return fmt.Errorf("duplicate template id: %s", tmpl.ID)

@@ -40,6 +40,8 @@ type mockRepoService struct {
 	// commitMessages records, per CreateOrUpdateFile call, the "owner/repo/path/branch"
 	// key and the commit message used.
 	commitMessages map[string]string
+	// commits records each CommitFiles call.
+	commits []mockCommit
 }
 
 func newMockRepoService() *mockRepoService {
@@ -124,6 +126,37 @@ func (m *mockRepoService) CreateOrUpdateFile(_ context.Context, owner, repo, pat
 	m.createdFiles = append(m.createdFiles, key)
 	m.commitMessages[key] = message
 	return nil
+}
+
+// CommitFiles records one commit and writes each file as CreateOrUpdateFile does. createFileErr keyed by
+// "owner/repo/path/branch" for any of the files fails the whole commit, which writes nothing.
+func (m *mockRepoService) CommitFiles(_ context.Context, owner, repo, branch, _ string, files []gh.FileChange,
+	message string,
+) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, f := range files {
+		if err, ok := m.createFileErr[fmt.Sprintf("%s/%s/%s/%s", owner, repo, f.Path, branch)]; ok {
+			return err
+		}
+	}
+	var paths []string
+	for _, f := range files {
+		key := fmt.Sprintf("%s/%s/%s/%s", owner, repo, f.Path, branch)
+		m.files[key] = f.Content
+		m.fileSHAs[key] = "newsha"
+		m.createdFiles = append(m.createdFiles, key)
+		m.commitMessages[key] = message
+		paths = append(paths, f.Path)
+	}
+	m.commits = append(m.commits, mockCommit{repo: owner + "/" + repo, branch: branch, paths: paths, message: message})
+	return nil
+}
+
+// mockCommit is one CommitFiles call.
+type mockCommit struct {
+	repo, branch, message string
+	paths                 []string
 }
 
 // mockPRService implements gh.PullRequestService for testing.

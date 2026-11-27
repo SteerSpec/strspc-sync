@@ -325,6 +325,21 @@ func (s *repoService) CreateOrUpdateFile(ctx context.Context, owner, repo, path,
 	return nil
 }
 
+// CommitFiles commits every file in files to branch in a single commit, through createCommitOnBranch like
+// CreateOrUpdateFile. head is the branch head the caller read: the commit is refused if the branch has moved since.
+// Paths are repository paths; files are written with mode 100644.
+func (s *repoService) CommitFiles(ctx context.Context, owner, repo, branch, head string, files []FileChange,
+	message string,
+) error {
+	if len(files) == 0 {
+		return fmt.Errorf("commit files %s/%s@%s: no files", owner, repo, branch)
+	}
+	if err := s.commitFiles(ctx, owner, repo, branch, head, files, message); err != nil {
+		return fmt.Errorf("commit files %s/%s@%s: %w", owner, repo, branch, err)
+	}
+	return nil
+}
+
 // apiRepo is the JSON shape returned by the GitHub API.
 type apiRepo struct {
 	Owner         struct{ Login string } `json:"owner"`

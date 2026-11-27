@@ -91,6 +91,20 @@ func splitCommitMessage(message string) (headline, body string) {
 func (s *repoService) commitFile(ctx context.Context, owner, repo, path, branch, head string, content []byte,
 	message string,
 ) error {
+	return s.commitFiles(ctx, owner, repo, branch, head, []FileChange{{Path: path, Content: content}}, message)
+}
+
+// commitFiles commits every file in files to branch in one createCommitOnBranch commit, refused unless the branch
+// head is still head.
+func (s *repoService) commitFiles(ctx context.Context, owner, repo, branch, head string, files []FileChange,
+	message string,
+) error {
+	additions := make([]map[string]string, 0, len(files))
+	for _, f := range files {
+		additions = append(additions, map[string]string{
+			"path": f.Path, "contents": base64.StdEncoding.EncodeToString(f.Content),
+		})
+	}
 	headline, body := splitCommitMessage(message)
 	msg := map[string]string{"headline": headline}
 	if body != "" {
@@ -104,7 +118,7 @@ func (s *repoService) commitFile(ctx context.Context, owner, repo, path, branch,
 		"message":         msg,
 		"expectedHeadOid": head,
 		"fileChanges": map[string]any{
-			"additions": []map[string]string{{"path": path, "contents": base64.StdEncoding.EncodeToString(content)}},
+			"additions": additions,
 		},
 	}
 	var out struct {

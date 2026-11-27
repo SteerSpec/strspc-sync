@@ -188,18 +188,29 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 
 	dryRun := opts.DryRun || s.cfg.Sync.DryRun
 
-	// Build work items
+	// Build work items: one per target and template, or with pr-grouping "repo" one per target carrying all of its
+	// templates (SYNCCFG-031).
 	type workItem struct {
-		target   registry.ResolvedTarget
-		template config.TemplateConfig
+		target    registry.ResolvedTarget
+		templates []config.TemplateConfig
 	}
+	bundled := s.cfg.Sync.PRGrouping == config.PRGroupingRepo
 	var items []workItem
 	for _, target := range targets {
+		var applied []config.TemplateConfig
 		for _, tmpl := range templates {
-			if !shouldApplyTemplate(target, tmpl.ID) {
-				continue
+			if shouldApplyTemplate(target, tmpl.ID) {
+				applied = append(applied, tmpl)
 			}
-			items = append(items, workItem{target: target, template: tmpl})
+		}
+		switch {
+		case len(applied) == 0:
+		case bundled:
+			items = append(items, workItem{target: target, templates: applied})
+		default:
+			for _, tmpl := range applied {
+				items = append(items, workItem{target: target, templates: []config.TemplateConfig{tmpl}})
+			}
 		}
 	}
 
@@ -221,22 +232,40 @@ func (s *Syncer) Run(ctx context.Context, opts Options) (*Result, error) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			rr := s.syncOne(ctx, it.target, it.template, dryRun, opts.Force)
+			var rrs []RepoResult
+			if bundled {
+				rrs = s.syncBundle(ctx, it.target, it.templates, dryRun, opts.Force)
+			} else {
+				rrs = []RepoResult{s.syncOne(ctx, it.target, it.templates[0], dryRun, opts.Force)}
+			}
 
 			mu.Lock()
-			results = append(results, rr)
+			results = append(results, rrs...)
 			mu.Unlock()
 		}(item)
 	}
 	wg.Wait()
 
-	// Tally results
+	// Tally results. The templates of a repo-mode PR each have a result naming it; the PR is counted once.
+	counted := make(map[string]bool)
+	firstForPR := func(rr RepoResult) bool {
+		key := fmt.Sprintf("%s#%d", rr.Repo, rr.PRNumber)
+		if rr.PRNumber == 0 || !counted[key] {
+			counted[key] = true
+			return true
+		}
+		return false
+	}
 	for _, rr := range results {
 		switch rr.Status {
 		case "created":
-			result.PRsCreated++
+			if firstForPR(rr) {
+				result.PRsCreated++
+			}
 		case "updated":
-			result.PRsUpdated++
+			if firstForPR(rr) {
+				result.PRsUpdated++
+			}
 		case "skipped":
 			result.ReposSkipped++
 		case "error":
@@ -296,27 +325,56 @@ func (s *Syncer) resolveSource(tmpl config.TemplateConfig, visibility string) (t
 	return templateSource{owner: owner, repo: repo, path: srcPath}, nil
 }
 
-func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tmpl config.TemplateConfig, dryRun, force bool) RepoResult {
-	rr := RepoResult{
-		Repo:       target.Repo,
-		TemplateID: tmpl.ID,
-	}
+// rendering is one template rendered for one target, with what the deployment state recorded for it.
+type rendering struct {
+	src             templateSource
+	existing        []byte // the destination's content the template was rendered onto
+	destExists      bool
+	rendered        []byte
+	contentHash     string
+	managed         managedSections
+	prev            *state.TemplateState
+	previousVersion string
+}
 
+// inSync reports whether the destination already holds the rendered content: there is nothing to propose. A missing
+// file never counts as current, even when the template renders to nothing.
+func (r rendering) inSync() bool {
+	return r.destExists && bytes.Equal(r.rendered, r.existing)
+}
+
+func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tmpl config.TemplateConfig, dryRun, force bool) RepoResult {
+	r, failed := s.render(ctx, target, tmpl, nil)
+	if failed != nil {
+		return *failed
+	}
+	return s.syncRendered(ctx, target, tmpl, r, dryRun, force)
+}
+
+// render reads tmpl's source and the target's destination and renders it. rendered maps destinations to content an
+// earlier template of the same repo-mode bundle already rendered: it replaces the default branch's content of that
+// destination, so templates sharing a destination are rendered one onto the other. A non-nil RepoResult means the
+// template cannot be delivered (an error, or a symlinked destination it skips).
+func (s *Syncer) render(ctx context.Context, target registry.ResolvedTarget, tmpl config.TemplateConfig,
+	rendered map[string][]byte,
+) (rendering, *RepoResult) {
+	rr := RepoResult{Repo: target.Repo, TemplateID: tmpl.ID}
+	fail := func(format string, args ...any) (rendering, *RepoResult) {
+		rr.Status = "error"
+		rr.Error = fmt.Sprintf(format, args...)
+		return rendering{}, &rr
+	}
 	owner, repo := splitRepo(target.Repo)
 
 	// Read the template source for this target's visibility; a bare path is
 	// relative to the central repo.
 	src, err := s.resolveSource(tmpl, target.Visibility)
 	if err != nil {
-		rr.Status = "error"
-		rr.Error = fmt.Sprintf("resolving template source: %v", err)
-		return rr
+		return fail("resolving template source: %v", err)
 	}
 	templateContent, _, err := s.ghClient.Repos.GetFileContent(ctx, src.owner, src.repo, src.path, "")
 	if err != nil {
-		rr.Status = "error"
-		rr.Error = fmt.Sprintf("reading template source: %v", err)
-		return rr
+		return fail("reading template source: %v", err)
 	}
 
 	// Merge variables: global < target < template
@@ -339,9 +397,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	// as a regular file, so the content alone never shows it (GH #82).
 	isLink, err := s.ghClient.Repos.IsSymlink(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
 	if err != nil {
-		rr.Status = "error"
-		rr.Error = fmt.Sprintf("checking destination type: %v", err)
-		return rr
+		return fail("checking destination type: %v", err)
 	}
 	if isLink {
 		// Writing through the Contents API would store the rendered template as the
@@ -350,34 +406,30 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 			"operation", "sync", "template_id", tmpl.ID, "repo", target.Repo, "destination", tmpl.Destination)
 		rr.Status = "skipped"
 		rr.Error = fmt.Sprintf("destination %s is a symlink; point the template at the real file", tmpl.Destination)
-		return rr
+		return rendering{}, &rr
 	}
 
 	// Read existing file from target repo. Only a 404 means it does not exist yet: after any other failure the
 	// marker strategy would see an empty file and render the bare template over the whole destination.
-	existingContent, _, err := s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
-	destExists := err == nil
-	if err != nil && !isNotFound(err) {
-		rr.Status = "error"
-		rr.Error = fmt.Sprintf("reading existing %s: %v", tmpl.Destination, err)
-		return rr
+	existingContent, destExists := rendered[tmpl.Destination]
+	if !destExists {
+		existingContent, _, err = s.ghClient.Repos.GetFileContent(ctx, owner, repo, tmpl.Destination, target.DefaultBranch)
+		destExists = err == nil
+		if err != nil && !isNotFound(err) {
+			return fail("reading existing %s: %v", tmpl.Destination, err)
+		}
 	}
 
 	// Render template
-	rendered, err := template.Render(template.Strategy(tmpl.Strategy), templateContent, existingContent, vars)
+	out, err := template.Render(template.Strategy(tmpl.Strategy), templateContent, existingContent, vars)
 	if err != nil {
-		rr.Status = "error"
-		rr.Error = fmt.Sprintf("rendering template: %v", err)
-		return rr
+		return fail("rendering template: %v", err)
 	}
 
 	// Compute hash
-	contentHash := hash.HashBytes(rendered)
-	managed, err := markerSections(tmpl, templateContent, rendered)
+	managed, err := markerSections(tmpl, templateContent, out)
 	if err != nil {
-		rr.Status = "error"
-		rr.Error = fmt.Sprintf("reading managed sections: %v", err)
-		return rr
+		return fail("reading managed sections: %v", err)
 	}
 
 	// What the deployment state last recorded for this repo/template. Read
@@ -386,26 +438,47 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	s.stateMu.Lock()
 	prev := s.state.GetTemplateState(target.Repo, tmpl.ID)
 	s.stateMu.Unlock()
-	previousVersion := baselineVersion(prev, tmpl.Version)
 
-	// The default branch already holds the rendered content: there is nothing to propose, whatever the state or
-	// --force say. Without this, a forced run opened empty PRs for content that was already merged (GH #94), and
-	// a closed PR was reported as "target not updated" although the file is current. A missing file never counts
-	// as current, even when the template renders to nothing.
-	if destExists && bytes.Equal(rendered, existingContent) {
-		rr.Status = "skipped"
-		if !dryRun {
-			// Bring the recorded PR status up to date first (GH #56), then the version and hash. A recorded PR
-			// still open gets its label back if it lacks it.
-			status, pr := s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
-			s.repairPRLabel(ctx, owner, repo, status, pr, &rr)
-			s.recordInSync(target.Repo, tmpl, contentHash, managed)
-		}
+	return rendering{
+		src: src, existing: existingContent, destExists: destExists, rendered: out, contentHash: hash.HashBytes(out),
+		managed: managed, prev: prev, previousVersion: baselineVersion(prev, tmpl.Version),
+	}, nil
+}
+
+// markInSync handles a template whose destination already holds its render (r.inSync): nothing to propose, whatever
+// the state or --force say. Without this, a forced run opened empty PRs for content that was already merged (GH #94),
+// and a closed PR was reported as "target not updated" although the file is current.
+func (s *Syncer) markInSync(ctx context.Context, target registry.ResolvedTarget, tmpl config.TemplateConfig,
+	r rendering, dryRun bool, rr *RepoResult,
+) {
+	rr.Status = "skipped"
+	if dryRun {
+		return
+	}
+	owner, repo := splitRepo(target.Repo)
+	// Bring the recorded PR status up to date first (GH #56), then the version and hash. A recorded PR still open
+	// gets its label back if it lacks it.
+	status, pr := s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, r.prev)
+	s.repairPRLabel(ctx, owner, repo, status, pr, rr)
+	s.recordInSync(target.Repo, tmpl, r.contentHash, r.managed)
+}
+
+// syncRendered proposes a rendered template in its own SyncPullRequest (pr-grouping "template").
+func (s *Syncer) syncRendered(ctx context.Context, target registry.ResolvedTarget, tmpl config.TemplateConfig,
+	r rendering, dryRun, force bool,
+) RepoResult {
+	rr := RepoResult{Repo: target.Repo, TemplateID: tmpl.ID}
+	owner, repo := splitRepo(target.Repo)
+	src, rendered, contentHash, managed, prev, previousVersion :=
+		r.src, r.rendered, r.contentHash, r.managed, r.prev, r.previousVersion
+
+	if r.inSync() {
+		s.markInSync(ctx, target, tmpl, r, dryRun, &rr)
 		return rr
 	}
 
-	// Check state - skip if hash matches and not forced
-	if !force && prev != nil && prev.Hash == contentHash {
+	// Check state - skip if hash matches and not forced. A record whose PR sync closed as stale is proposed again.
+	if !force && prev != nil && prev.Hash == contentHash && prev.PRStatus != prSuperseded {
 		rr.Status = "skipped"
 		status, pr := s.refreshPRStatus(ctx, owner, repo, target.Repo, tmpl.ID, prev)
 		if !dryRun { // a dry run writes nothing
@@ -481,83 +554,19 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 		return rr
 	}
 
-	// Find existing PR by its exact head branch. The label is not part of the
-	// lookup: a PR whose label request failed must still be found on a retry.
-	prLabel := s.cfg.Sync.PRLabel
-	existingPRs, err := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{
-		State: "open",
-		Head:  owner + ":" + branchName,
-	})
-	if err != nil {
-		// Without the lookup an open PR cannot be told apart from none, and
-		// creating one could duplicate it (SYNCPR-005). The branch holds the
-		// commit, so the next run finds and updates the PR.
-		rr.Status = "error"
-		rr.Error = fmt.Sprintf("listing open PRs: %v", err)
-		return rr
-	}
-
 	prTitle := updateMessage(s.prTitlePrefix(), tmpl.ID, tmpl.Version)
 	prBody := s.prBody(tmpl, src, previousVersion, contentHash)
-
-	var pr *gh.PullRequest
-	for _, existing := range existingPRs {
-		if existing.Head == branchName {
-			pr = existing
-			break
-		}
+	pr, status, errMsg := s.upsertPR(ctx, owner, repo, branchName, target.DefaultBranch, prTitle, prBody)
+	rr.Status, rr.Error = status, errMsg
+	if pr == nil {
+		return rr
 	}
-	if pr != nil {
-		// Update existing PR
-		err = s.ghClient.PullRequests.Update(ctx, owner, repo, pr.Number, &gh.PullRequestUpdate{
-			Title: &prTitle,
-			Body:  &prBody,
-		})
-		if err != nil {
-			rr.Status = "error"
-			rr.Error = fmt.Sprintf("updating PR: %v", err)
-			return rr
-		}
-		rr.Status = "updated"
-		rr.PRNumber = pr.Number
-		rr.PRURL = pr.URL
-		// A sync PR carries the label (SYNCPR-004): one whose label call failed when it was created, or whose label
-		// was removed, gets it back here.
-		if !hasLabel(pr.Labels, prLabel) {
-			if err := s.ghClient.PullRequests.AddLabels(ctx, owner, repo, pr.Number, []string{prLabel}); err != nil {
-				rr.Status = "error"
-				rr.Error = fmt.Sprintf("PR #%d updated but not labeled %q: %v", pr.Number, prLabel, err)
-			}
-		}
-	} else {
-		// Create new PR
-		pr, err = s.ghClient.PullRequests.Create(ctx, owner, repo, &gh.PullRequestCreate{
-			Title:  prTitle,
-			Body:   prBody,
-			Head:   branchName,
-			Base:   target.DefaultBranch,
-			Labels: []string{prLabel},
-		})
-		if err != nil && pr == nil {
-			rr.Status = "error"
-			rr.Error = fmt.Sprintf("creating PR: %v", err)
-			return rr
-		}
-		rr.Status = "created"
-		rr.PRNumber = pr.Number
-		rr.PRURL = pr.URL
-		if err != nil {
-			// The PR exists but could not be labeled (SYNCPR-004). It is an error, so the run fails, but the PR is
-			// still recorded in the deployment state, so the next run finds it by its head branch, updates it and
-			// labels it instead of creating another.
-			rr.Status = "error"
-			rr.Error = fmt.Sprintf("PR #%d created but not labeled %q: %v", pr.Number, prLabel, err)
-		}
-	}
+	rr.PRNumber = pr.Number
+	rr.PRURL = pr.URL
 
 	// Close stale PRs if configured
-	if s.cfg.Sync.CloseStalePRs != nil && *s.cfg.Sync.CloseStalePRs {
-		s.closeStalePRs(ctx, owner, repo, target.Repo, tmpl.ID, pr.Number)
+	if s.closeStale() {
+		s.closeStalePRs(ctx, owner, repo, target.Repo, []string{tmpl.ID}, pr.Number)
 	}
 
 	// Update deployment state
@@ -577,6 +586,76 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 	return rr
 }
 
+// upsertPR updates the open SyncPullRequest on branch, or opens one against base (SYNCPR-005, SYNCPR-009), and labels
+// it (SYNCPR-004). status is "created", "updated" or "error". pr is nil when there is no PR to record: the lookup or
+// the update failed, or the PR could not be created. A PR that exists but could not be labeled is returned with
+// status "error".
+func (s *Syncer) upsertPR(ctx context.Context, owner, repo, branch, base, title, body string,
+) (pr *gh.PullRequest, status, errMsg string) {
+	// Find existing PR by its exact head branch. The label is not part of the
+	// lookup: a PR whose label request failed must still be found on a retry.
+	prLabel := s.cfg.Sync.PRLabel
+	existingPRs, err := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{
+		State: "open",
+		Head:  owner + ":" + branch,
+	})
+	if err != nil {
+		// Without the lookup an open PR cannot be told apart from none, and
+		// creating one could duplicate it (SYNCPR-005). The branch holds the
+		// commit, so the next run finds and updates the PR.
+		return nil, "error", fmt.Sprintf("listing open PRs: %v", err)
+	}
+
+	for _, existing := range existingPRs {
+		if existing.Head == branch {
+			pr = existing
+			break
+		}
+	}
+	if pr != nil {
+		// Update existing PR
+		err = s.ghClient.PullRequests.Update(ctx, owner, repo, pr.Number, &gh.PullRequestUpdate{
+			Title: &title,
+			Body:  &body,
+		})
+		if err != nil {
+			return nil, "error", fmt.Sprintf("updating PR: %v", err)
+		}
+		// A sync PR carries the label (SYNCPR-004): one whose label call failed when it was created, or whose label
+		// was removed, gets it back here.
+		if !hasLabel(pr.Labels, prLabel) {
+			if err := s.ghClient.PullRequests.AddLabels(ctx, owner, repo, pr.Number, []string{prLabel}); err != nil {
+				return pr, "error", fmt.Sprintf("PR #%d updated but not labeled %q: %v", pr.Number, prLabel, err)
+			}
+		}
+		return pr, "updated", ""
+	}
+
+	// Create new PR
+	pr, err = s.ghClient.PullRequests.Create(ctx, owner, repo, &gh.PullRequestCreate{
+		Title:  title,
+		Body:   body,
+		Head:   branch,
+		Base:   base,
+		Labels: []string{prLabel},
+	})
+	if err != nil && pr == nil {
+		return nil, "error", fmt.Sprintf("creating PR: %v", err)
+	}
+	if err != nil {
+		// The PR exists but could not be labeled (SYNCPR-004). It is an error, so the run fails, but the PR is
+		// still recorded in the deployment state, so the next run finds it by its head branch, updates it and
+		// labels it instead of creating another.
+		return pr, "error", fmt.Sprintf("PR #%d created but not labeled %q: %v", pr.Number, prLabel, err)
+	}
+	return pr, "created", ""
+}
+
+// closeStale reports whether sync closes the PRs a new or updated one replaces (close-stale-prs, default true).
+func (s *Syncer) closeStale() bool {
+	return s.cfg.Sync.CloseStalePRs != nil && *s.cfg.Sync.CloseStalePRs
+}
+
 // refreshPRStatus brings a recorded pr_status up to date once the target is
 // in sync: the PR has usually been merged by then, but the state only ever
 // recorded "open" at creation time (GH #56). Only "merged" is terminal; an
@@ -585,7 +664,7 @@ func (s *Syncer) syncOne(ctx context.Context, target registry.ResolvedTarget, tm
 // the status the state holds afterwards, and the PR it looked up (nil when it
 // looked none up).
 func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, templateID string, prev *state.TemplateState) (string, *gh.PullRequest) {
-	if prev == nil || prev.PRNumber == 0 || prev.PRStatus == "merged" {
+	if prev == nil || prev.PRNumber == 0 || prev.PRStatus == "merged" || prev.PRStatus == prSuperseded {
 		if prev == nil {
 			return "", nil
 		}
@@ -602,9 +681,24 @@ func (s *Syncer) refreshPRStatus(ctx context.Context, owner, repo, fullName, tem
 	if status == prev.PRStatus {
 		return status, pr
 	}
-	updated := *prev
-	updated.PRStatus = status
+	// Update the record as it is now, not prev: another template's PR may have superseded this one since prev was
+	// read (closeStalePRs), and the GitHub status "closed" must not hide that sync closed it.
 	s.stateMu.Lock()
+	cur := s.state.GetTemplateState(fullName, templateID)
+	if cur != nil && cur.PRNumber != prev.PRNumber {
+		// The record already names another PR: this status is not its.
+		s.stateMu.Unlock()
+		return status, pr
+	}
+	if cur != nil && cur.PRStatus == prSuperseded {
+		s.stateMu.Unlock()
+		return prSuperseded, pr
+	}
+	updated := *prev
+	if cur != nil {
+		updated = *cur
+	}
+	updated.PRStatus = status
 	s.state.SetTemplateState(fullName, templateID, updated)
 	s.stateMu.Unlock()
 	sslog.L().Info("deployment state: pull request status updated",
@@ -785,6 +879,34 @@ func serverURL() string {
 // history there and the diff link points at the source as rendered; the diff
 // of the rendered result is the PR itself.
 func (s *Syncer) prBody(tmpl config.TemplateConfig, src templateSource, previousVersion, contentHash string) string {
+	var b strings.Builder
+	b.WriteString("## SteerSpec Sync\n\n")
+	writeTemplateSection(&b, tmpl, src, previousVersion, contentHash)
+	b.WriteString("This PR was automatically generated by SteerSpec Sync. Edits to the managed file are overwritten ")
+	b.WriteString("by the next sync; drift is reported by `strspc monitor`.\n")
+	return b.String()
+}
+
+// bundleBody renders the body of a repo-mode SyncPullRequest: one section per template, each with the fields of
+// SYNCPR-003 (SYNCPR-011).
+func bundleBody(members []bundleMember) string {
+	var b strings.Builder
+	b.WriteString("## SteerSpec Sync\n\n")
+	fmt.Fprintf(&b, "Updates %d templates in this repository.\n\n", len(members))
+	for _, m := range members {
+		fmt.Fprintf(&b, "### %#q\n\n", m.tmpl.ID)
+		writeTemplateSection(&b, m.tmpl, m.r.src, m.r.previousVersion, m.r.contentHash)
+	}
+	b.WriteString("This PR was automatically generated by SteerSpec Sync. Edits to the managed files are overwritten ")
+	b.WriteString("by the next sync; drift is reported by `strspc monitor`.\n")
+	return b.String()
+}
+
+// writeTemplateSection writes what SYNCPR-003 requires for one template: its previous and new versions, a changelog
+// and a diff link.
+func writeTemplateSection(b *strings.Builder, tmpl config.TemplateConfig, src templateSource,
+	previousVersion, contentHash string,
+) {
 	previous := "none (first deployment)"
 	if previousVersion != "" {
 		previous = fmt.Sprintf("%#q", previousVersion)
@@ -792,20 +914,15 @@ func (s *Syncer) prBody(tmpl config.TemplateConfig, src templateSource, previous
 	sourceRepo := fmt.Sprintf("%s/%s/%s", serverURL(), src.owner, src.repo)
 	sourcePath := escapePath(src.path)
 
-	var b strings.Builder
-	b.WriteString("## SteerSpec Sync\n\n")
-	fmt.Fprintf(&b, "Updates %#q from template %#q in [%s/%s](%s).\n\n",
+	fmt.Fprintf(b, "Updates %#q from template %#q in [%s/%s](%s).\n\n",
 		tmpl.Destination, tmpl.ID, src.owner, src.repo, sourceRepo)
 	b.WriteString("| | |\n|---|---|\n")
-	fmt.Fprintf(&b, "| Previous version | %s |\n", previous)
-	fmt.Fprintf(&b, "| New version | %#q |\n", tmpl.Version)
-	fmt.Fprintf(&b, "| Content hash | %#q |\n\n", contentHash)
-	fmt.Fprintf(&b, "- **Changelog:** [commit history of %#q](%s/commits/HEAD/%s)\n", src.path, sourceRepo, sourcePath)
-	fmt.Fprintf(&b, "- **Diff:** [template source](%s/blob/HEAD/%s); the rendered change is this PR's **Files changed** tab\n\n",
+	fmt.Fprintf(b, "| Previous version | %s |\n", previous)
+	fmt.Fprintf(b, "| New version | %#q |\n", tmpl.Version)
+	fmt.Fprintf(b, "| Content hash | %#q |\n\n", contentHash)
+	fmt.Fprintf(b, "- **Changelog:** [commit history of %#q](%s/commits/HEAD/%s)\n", src.path, sourceRepo, sourcePath)
+	fmt.Fprintf(b, "- **Diff:** [template source](%s/blob/HEAD/%s); the rendered change is this PR's **Files changed** tab\n\n",
 		sourceRepo, sourcePath)
-	b.WriteString("This PR was automatically generated by SteerSpec Sync. Edits to the managed file are overwritten ")
-	b.WriteString("by the next sync; drift is reported by `strspc monitor`.\n")
-	return b.String()
 }
 
 // baselineVersion is the version a sync PR reports as previous (SYNCPR-003).
@@ -840,7 +957,8 @@ func escapePath(p string) string {
 // must not claim "steerspec-sync/guide/team/1.0.0" (template "guide/team").
 func isSyncBranchForTemplate(head, templateID string) bool {
 	rest, ok := strings.CutPrefix(head, "steerspec-sync/"+templateID+"/")
-	return ok && rest != "" && !strings.Contains(rest, "/")
+	// A version is a semver and always holds a ".": a template with id "repo" does not claim a bundle branch.
+	return ok && rest != "" && !strings.Contains(rest, "/") && !isBundleBranch(head)
 }
 
 // getBaseSHA resolves the branch a sync branch should be cut from to a commit
@@ -857,30 +975,65 @@ func (s *Syncer) getBaseSHA(ctx context.Context, owner, repo, branch string) (st
 	return s.ghClient.Repos.GetBranchSHA(ctx, owner, repo, branch)
 }
 
-// closeStalePRs closes the other open sync PRs for templateID (SYNCPR-007).
-// They are found by head branch or generated title, not by label: a PR whose
-// label failed to apply or was removed is still a stale version PR.
-func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, fullName, templateID string, currentPR int) {
+// closeStalePRs closes the open sync PRs that currentPR replaces (SYNCPR-010): every repo-mode PR other than
+// currentPR, and every per-template PR for one of templateIDs, the templates currentPR carries. In template mode
+// that is the other versions' PRs for the template and every bundle; in repo mode it is the older bundles and the
+// per-template PRs for the templates the bundle carries. They are found by head branch or generated title, not by
+// label: a PR whose label failed to apply or was removed is still a stale PR.
+//
+// A closed bundle may also carry templates currentPR does not, whose records still name it. They are marked
+// superseded, so the next run proposes them again instead of reporting a PR closed without merging.
+func (s *Syncer) closeStalePRs(ctx context.Context, owner, repo, fullName string, templateIDs []string, currentPR int) {
 	prs, err := s.ghClient.PullRequests.List(ctx, owner, repo, &gh.PullRequestListOptions{
 		State: "open",
 	})
 	if err != nil {
 		sslog.L().Warn("could not list open PRs to close stale ones",
-			"operation", "sync", "repo", fullName, "template_id", templateID, "err", err)
+			"operation", "sync", "repo", fullName, "template_ids", templateIDs, "err", err)
 		return
 	}
 	prefix := s.prTitlePrefix()
 	for _, pr := range prs {
-		if pr.Number == currentPR {
+		if pr.Number == currentPR || !replaces(pr, prefix, templateIDs) {
 			continue
 		}
-		// The head branch is stable across title-prefix changes; the title
-		// match keeps closing PRs whose branch was named by an older release.
-		if isSyncBranchForTemplate(pr.Head, templateID) || isSyncPRForTemplate(pr.Title, prefix, templateID) {
-			if err := s.ghClient.PullRequests.Close(ctx, owner, repo, pr.Number); err != nil {
-				sslog.L().Warn("could not close stale sync PR",
-					"operation", "sync", "repo", fullName, "pr_number", pr.Number, "err", err)
-			}
+		if err := s.ghClient.PullRequests.Close(ctx, owner, repo, pr.Number); err != nil {
+			sslog.L().Warn("could not close stale sync PR",
+				"operation", "sync", "repo", fullName, "pr_number", pr.Number, "err", err)
+			continue
+		}
+		s.supersede(fullName, pr.Number)
+	}
+}
+
+// replaces reports whether a new or updated sync PR carrying templateIDs replaces pr: pr is a bundle, or a
+// per-template PR for one of them. The head branch is stable across title-prefix changes; the title match keeps
+// closing PRs whose branch was named by an older release.
+func replaces(pr *gh.PullRequest, prefix string, templateIDs []string) bool {
+	if isBundleBranch(pr.Head) {
+		return true
+	}
+	for _, id := range templateIDs {
+		if isSyncBranchForTemplate(pr.Head, id) || isSyncPRForTemplate(pr.Title, prefix, id) {
+			return true
+		}
+	}
+	return false
+}
+
+// prSuperseded is the pr_status of a record whose sync PR sync itself closed as stale (SYNCPR-010). Unlike "closed",
+// which a person may have decided, it does not stop the next run from proposing the template again.
+const prSuperseded = "superseded"
+
+// supersede marks the records of fullName that name PR number as superseded. The PR that replaced it records its own
+// templates afterwards, so only templates it does not carry keep the mark.
+func (s *Syncer) supersede(fullName string, number int) {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	for id, ts := range s.state.Repositories[fullName] {
+		if ts.PRNumber == number && ts.PRStatus != "merged" {
+			ts.PRStatus = prSuperseded
+			s.state.SetTemplateState(fullName, id, ts)
 		}
 	}
 }
